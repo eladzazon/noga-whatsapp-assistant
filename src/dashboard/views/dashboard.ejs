@@ -21,80 +21,175 @@
             </nav>
         </header>
 
-        <!-- Main Content -->
-        <main class="main-content">
-            <!-- QR Code Panel -->
-            <section class="panel qr-panel">
-                <h2>📱 חיבור WhatsApp</h2>
-                <div class="qr-container">
-                    <div id="qr-placeholder" class="qr-placeholder">
-                        <% if (qrCode) { %>
-                            <img src="<%= qrCode %>" alt="QR Code" class="qr-image">
-                            <% } else { %>
-                                <div class="connected-message">
-                                    <span class="checkmark">✓</span>
-                                    <p>WhatsApp מחובר!</p>
-                                </div>
-                                <% } %>
-                    </div>
-                    <p class="qr-hint">סרקו את הקוד באפליקציית WhatsApp</p>
-                </div>
-            </section>
+        <!-- Tab Navigation -->
+        <div class="tab-nav">
+            <button class="tab-btn active" data-tab="tab-status">📊 סטטוס</button>
+            <button class="tab-btn" data-tab="tab-prompt">🧠 הוראות מערכת</button>
+            <button class="tab-btn" data-tab="tab-keywords">🔑 מילות מפתח</button>
+            <button class="tab-btn" data-tab="tab-console">🖥️ לוג</button>
+        </div>
 
-            <!-- Status Panel -->
-            <section class="panel status-panel">
-                <h2>📊 סטטוס מערכת</h2>
-                <div class="status-grid">
-                    <div class="status-item" id="status-whatsapp">
-                        <span class="status-icon">💬</span>
-                        <span class="status-label">WhatsApp</span>
-                        <span class="status-value loading">בודק...</span>
-                    </div>
-                    <div class="status-item" id="status-gemini">
-                        <span class="status-icon">🤖</span>
-                        <span class="status-label">Gemini AI</span>
-                        <span class="status-value loading">בודק...</span>
-                    </div>
-                    <div class="status-item" id="status-calendar">
-                        <span class="status-icon">📅</span>
-                        <span class="status-label">יומן</span>
-                        <span class="status-value loading">בודק...</span>
-                    </div>
-                    <div class="status-item" id="status-tasks">
-                        <span class="status-icon">🛒</span>
-                        <span class="status-label">קניות</span>
-                        <span class="status-value loading">בודק...</span>
-                    </div>
-                    <div class="status-item" id="status-homeassistant">
-                        <span class="status-icon">🏠</span>
-                        <span class="status-label">Home Assistant</span>
-                        <span class="status-value loading">בודק...</span>
-                    </div>
-                </div>
-            </section>
+        <!-- Tab Content -->
+        <main class="tab-content">
 
-            <!-- Console Panel -->
-            <section class="panel console-panel">
-                <h2>
-                    🖥️ לוג מערכת
-                    <button id="clear-logs" class="btn btn-small">נקה</button>
-                </h2>
-                <div class="console" id="console">
-                    <% recentLogs.forEach(log=> { %>
-                        <div class="log-entry log-<%= log.level %>">
-                            <span class="log-time">
-                                <%= new Date(log.timestamp).toLocaleTimeString('he-IL') %>
-                            </span>
-                            <span class="log-level">
-                                <%= log.level.toUpperCase() %>
-                            </span>
-                            <span class="log-message">
-                                <%= log.message %>
-                            </span>
+            <!-- ==================== Status Tab ==================== -->
+            <div class="tab-pane active" id="tab-status">
+                <!-- QR Code Panel (hidden when connected) -->
+                <section class="panel qr-panel" id="qr-section">
+                    <h2>📱 חיבור WhatsApp</h2>
+                    <div class="qr-container">
+                        <div id="qr-placeholder" class="qr-placeholder">
+                            <% if (qrCode) { %>
+                                <img src="<%= qrCode %>" alt="QR Code" class="qr-image">
+                                <% } else { %>
+                                    <div class="connected-message">
+                                        <span class="checkmark">✓</span>
+                                        <p>WhatsApp מחובר!</p>
+                                    </div>
+                                    <% } %>
                         </div>
-                        <% }) %>
-                </div>
-            </section>
+                        <p class="qr-hint">סרקו את הקוד באפליקציית WhatsApp</p>
+                    </div>
+                </section>
+
+                <!-- Status Panel -->
+                <section class="panel status-panel">
+                    <h2>📊 סטטוס מערכת</h2>
+                    <div class="status-grid">
+                        <div class="status-item" id="status-whatsapp">
+                            <span class="status-icon">💬</span>
+                            <span class="status-label">WhatsApp</span>
+                            <span class="status-value loading">בודק...</span>
+                        </div>
+                        <div class="status-item" id="status-gemini">
+                            <span class="status-icon">🤖</span>
+                            <span class="status-label">Gemini AI</span>
+                            <span class="status-value loading">בודק...</span>
+                        </div>
+                        <div class="status-item" id="status-calendar">
+                            <span class="status-icon">📅</span>
+                            <span class="status-label">יומן</span>
+                            <span class="status-value loading">בודק...</span>
+                        </div>
+                        <div class="status-item" id="status-tasks">
+                            <span class="status-icon">🛒</span>
+                            <span class="status-label">קניות</span>
+                            <span class="status-value loading">בודק...</span>
+                        </div>
+                        <div class="status-item" id="status-homeassistant">
+                            <span class="status-icon">🏠</span>
+                            <span class="status-label">Home Assistant</span>
+                            <span class="status-value loading">בודק...</span>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- ==================== System Prompt Tab ==================== -->
+            <div class="tab-pane" id="tab-prompt">
+                <section class="panel prompt-panel">
+                    <h2>
+                        🧠 הוראות מערכת
+                        <div class="prompt-actions">
+                            <span id="prompt-status" class="save-status"></span>
+                            <button id="save-prompt" class="btn btn-primary btn-small">שמור</button>
+                        </div>
+                    </h2>
+                    <p class="panel-hint">הוראות אלו נשלחות ל-Gemini כהקשר מערכת. שינויים נכנסים לתוקף מיידית.</p>
+                    <div class="prompt-container">
+                        <textarea id="system-prompt" class="prompt-textarea" placeholder="טוען..." dir="ltr"></textarea>
+                    </div>
+                </section>
+            </div>
+
+            <!-- ==================== Keywords Tab ==================== -->
+            <div class="tab-pane" id="tab-keywords">
+                <section class="panel keywords-panel">
+                    <h2>
+                        🔑 מילות מפתח
+                        <button id="add-keyword-btn" class="btn btn-primary btn-small">+ הוסף</button>
+                    </h2>
+                    <p class="panel-hint">הגדר מילות מפתח: <strong>סטטי</strong> = תגובה קבועה מיידית,
+                        <strong>AI</strong> = הוראות מותאמות ל-Gemini
+                    </p>
+
+                    <!-- Add/Edit Form -->
+                    <div id="keyword-form" class="keyword-form" style="display: none;">
+                        <input type="hidden" id="keyword-edit-id" value="">
+                        <div class="form-row">
+                            <div class="form-group form-group-grow">
+                                <label for="keyword-input">מילת מפתח</label>
+                                <input type="text" id="keyword-input" class="form-input"
+                                    placeholder='למשל: עזרה,היי,שלום (מופרד בפסיקים)' dir="rtl">
+                                <small style="color: var(--gray); font-size: 11px;">ניתן להגדיר מספר מילות מפתח מופרדות
+                                    בפסיקים</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="keyword-type">סוג</label>
+                                <select id="keyword-type" class="form-input">
+                                    <option value="static">⚡ סטטי</option>
+                                    <option value="ai">🤖 AI</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="keyword-response" id="keyword-response-label">תגובה</label>
+                            <textarea id="keyword-response" class="form-textarea"
+                                placeholder="התגובה שתישלח כשהמילה תתקבל" dir="rtl"></textarea>
+                        </div>
+                        <div class="form-actions">
+                            <button id="keyword-save" class="btn btn-primary btn-small">שמור</button>
+                            <button id="keyword-cancel" class="btn btn-secondary btn-small">ביטול</button>
+                        </div>
+                    </div>
+
+                    <!-- Keywords Table -->
+                    <div class="keywords-table-container">
+                        <table class="keywords-table" id="keywords-table">
+                            <thead>
+                                <tr>
+                                    <th>מילת מפתח</th>
+                                    <th>סוג</th>
+                                    <th>תגובה / הוראות</th>
+                                    <th>פעיל</th>
+                                    <th>פעולות</th>
+                                </tr>
+                            </thead>
+                            <tbody id="keywords-tbody">
+                                <tr class="empty-row">
+                                    <td colspan="5">טוען...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+            <!-- ==================== Console Tab ==================== -->
+            <div class="tab-pane" id="tab-console">
+                <section class="panel console-panel">
+                    <h2>
+                        🖥️ לוג מערכת
+                        <button id="clear-logs" class="btn btn-small">נקה</button>
+                    </h2>
+                    <div class="console" id="console">
+                        <% recentLogs.forEach(log=> { %>
+                            <div class="log-entry log-<%= log.level %>">
+                                <span class="log-time">
+                                    <%= new Date(log.timestamp).toLocaleTimeString('he-IL') %>
+                                </span>
+                                <span class="log-level">
+                                    <%= log.level.toUpperCase() %>
+                                </span>
+                                <span class="log-message">
+                                    <%= log.message %>
+                                </span>
+                            </div>
+                            <% }) %>
+                    </div>
+                </section>
+            </div>
+
         </main>
     </div>
 

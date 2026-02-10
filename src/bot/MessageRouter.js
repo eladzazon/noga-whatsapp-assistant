@@ -6,6 +6,8 @@ import db from '../database/DatabaseManager.js';
 class MessageRouter {
     constructor() {
         this.processingQueue = new Map();
+        this.lastMessageTime = new Map(); // Track last message time per user
+        this.CONTEXT_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
     }
 
     /**
@@ -26,6 +28,15 @@ class MessageRouter {
      */
     async routeMessage(message) {
         const { from, chat, body, type, hasMedia, media } = message;
+
+        // Auto-clear context after 10 minutes of inactivity
+        const now = Date.now();
+        const lastTime = this.lastMessageTime.get(from);
+        if (lastTime && (now - lastTime) > this.CONTEXT_TIMEOUT_MS) {
+            logger.info('Auto-clearing chat context (10 min inactivity)', { from });
+            geminiManager.clearHistory(from);
+        }
+        this.lastMessageTime.set(from, now);
 
         // Skip if already processing a message from this user
         if (this.processingQueue.has(from)) {
@@ -87,9 +98,35 @@ class MessageRouter {
 
         logger.info('Processing text message', { from, preview: body.substring(0, 50) });
 
-        // React to show we received the message
+        // Check for keyword match before sending to Gemini
+        const keywordMatch = db.getKeywordByText(body.trim());
+        if (keywordMatch) {
+            logger.info('Keyword matched', { from, keyword: keywordMatch.keyword, type: keywordMatch.type });
+
+            if (keywordMatch.type === 'ai') {
+                // AI keyword: send custom instructions + user message to Gemini
+                try {
+                    await whatsappManager.reactToMessage(message.id, '🤖');
+                } catch {
+                    // Ignore reaction errors
+                }
+                const augmentedMessage = `[Custom Instructions: ${keywordMatch.response}]\n\nUser message: ${body}`;
+                const response = await geminiManager.processMessage(from, augmentedMessage, { keepHistory: true });
+                return response;
+            }
+
+            // Static keyword: return the response directly
+            try {
+                await whatsappManager.reactToMessage(message.id, '⚡');
+            } catch {
+                // Ignore reaction errors
+            }
+            return keywordMatch.response;
+        }
+
+        // React to show we received the message (using robot for AI processing)
         try {
-            await whatsappManager.reactToMessage(message.id, '👀');
+            await whatsappManager.reactToMessage(message.id, '🤖');
         } catch {
             // Ignore reaction errors
         }

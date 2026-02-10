@@ -16,6 +16,8 @@ class DashboardServer {
         this.server = null;
         this.io = null;
         this.qrCode = null;
+        this.geminiManager = null;
+        this.db = null;
     }
 
     /**
@@ -156,6 +158,100 @@ class DashboardServer {
         this.app.get('/health', (req, res) => {
             res.json({ status: 'ok', timestamp: new Date().toISOString() });
         });
+
+        // ==================== System Prompt API ====================
+
+        // Get current system prompt
+        this.app.get('/api/system-prompt', requireAuth, (req, res) => {
+            if (!this.geminiManager) {
+                return res.status(500).json({ error: 'Gemini not initialized' });
+            }
+            res.json({ prompt: this.geminiManager.getSystemPrompt() });
+        });
+
+        // Update system prompt
+        this.app.put('/api/system-prompt', requireAuth, (req, res) => {
+            const { prompt } = req.body;
+            if (!prompt || !prompt.trim()) {
+                return res.status(400).json({ error: 'Prompt is required' });
+            }
+            if (!this.geminiManager) {
+                return res.status(500).json({ error: 'Gemini not initialized' });
+            }
+            try {
+                this.geminiManager.reinit(prompt.trim());
+                logger.info('System prompt updated via dashboard');
+                res.json({ success: true });
+            } catch (err) {
+                logger.error('Failed to update system prompt', { error: err.message });
+                res.status(500).json({ error: err.message });
+            }
+        });
+
+        // ==================== Keywords API ====================
+
+        // Get all keywords
+        this.app.get('/api/keywords', requireAuth, (req, res) => {
+            if (!this.db) return res.status(500).json({ error: 'DB not initialized' });
+            try {
+                const keywords = this.db.getKeywords();
+                res.json({ keywords });
+            } catch (err) {
+                res.status(500).json({ error: err.message });
+            }
+        });
+
+        // Add keyword
+        this.app.post('/api/keywords', requireAuth, (req, res) => {
+            const { keyword, response, type } = req.body;
+            if (!keyword || !response) {
+                return res.status(400).json({ error: 'keyword and response are required' });
+            }
+            if (!this.db) return res.status(500).json({ error: 'DB not initialized' });
+            try {
+                const id = this.db.addKeyword(keyword, response, type || 'static');
+                logger.info('Keyword added via dashboard', { keyword, type: type || 'static' });
+                res.json({ success: true, id });
+            } catch (err) {
+                if (err.message.includes('UNIQUE')) {
+                    return res.status(409).json({ error: 'Keyword already exists' });
+                }
+                res.status(500).json({ error: err.message });
+            }
+        });
+
+        // Update keyword
+        this.app.put('/api/keywords/:id', requireAuth, (req, res) => {
+            const { id } = req.params;
+            const { keyword, response, enabled, type } = req.body;
+            if (!keyword || !response) {
+                return res.status(400).json({ error: 'keyword and response are required' });
+            }
+            if (!this.db) return res.status(500).json({ error: 'DB not initialized' });
+            try {
+                this.db.updateKeyword(parseInt(id), keyword, response, enabled !== false, type || 'static');
+                logger.info('Keyword updated via dashboard', { id, keyword, type: type || 'static' });
+                res.json({ success: true });
+            } catch (err) {
+                if (err.message.includes('UNIQUE')) {
+                    return res.status(409).json({ error: 'Keyword already exists' });
+                }
+                res.status(500).json({ error: err.message });
+            }
+        });
+
+        // Delete keyword
+        this.app.delete('/api/keywords/:id', requireAuth, (req, res) => {
+            const { id } = req.params;
+            if (!this.db) return res.status(500).json({ error: 'DB not initialized' });
+            try {
+                this.db.deleteKeyword(parseInt(id));
+                logger.info('Keyword deleted via dashboard', { id });
+                res.json({ success: true });
+            } catch (err) {
+                res.status(500).json({ error: err.message });
+            }
+        });
     }
 
     /**
@@ -234,6 +330,14 @@ class DashboardServer {
      */
     setConfigUpdateHandler(handler) {
         this.onConfigUpdate = handler;
+    }
+
+    /**
+     * Set manager references for API routes
+     */
+    setManagers(geminiManager, db) {
+        this.geminiManager = geminiManager;
+        this.db = db;
     }
 
     /**

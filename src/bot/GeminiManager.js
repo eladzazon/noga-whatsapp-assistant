@@ -25,14 +25,50 @@ class GeminiManager {
         this.tools = tools;
         this.toolHandlers = handlers;
 
-        // Configure the model
+        // Load system prompt from DB if available, otherwise use default from config
+        const storedPrompt = db.getConfig('system_prompt', null);
+        this.systemPrompt = storedPrompt || config.gemini.systemPrompt;
+
+        this._buildModel();
+
+        logger.info('Gemini AI initialized', {
+            model: config.gemini.model,
+            toolsCount: tools.length,
+            promptSource: storedPrompt ? 'database' : 'default'
+        });
+
+        return this;
+    }
+
+    /**
+     * Re-initialize the model with a new system prompt
+     * @param {string} newPrompt - The new system prompt
+     */
+    reinit(newPrompt) {
+        this.systemPrompt = newPrompt;
+        db.setConfig('system_prompt', newPrompt);
+        this._buildModel();
+        logger.info('Gemini model re-initialized with updated system prompt');
+    }
+
+    /**
+     * Get the current system prompt
+     */
+    getSystemPrompt() {
+        return this.systemPrompt;
+    }
+
+    /**
+     * Build/rebuild the Gemini model with current settings
+     */
+    _buildModel() {
         this.model = this.genAI.getGenerativeModel({
             model: config.gemini.model,
-            systemInstruction: config.gemini.systemPrompt,
-            tools: tools.length > 0 ? [{ functionDeclarations: tools }] : undefined,
-            toolConfig: tools.length > 0 ? {
+            systemInstruction: this.systemPrompt,
+            tools: this.tools.length > 0 ? [{ functionDeclarations: this.tools }] : undefined,
+            toolConfig: this.tools.length > 0 ? {
                 functionCallingConfig: {
-                    mode: 'AUTO' // AUTO lets model decide, ANY forces function calls
+                    mode: 'AUTO'
                 }
             } : undefined,
             safetySettings: [
@@ -54,13 +90,6 @@ class GeminiManager {
                 }
             ]
         });
-
-        logger.info('Gemini AI initialized', {
-            model: config.gemini.model,
-            toolsCount: tools.length
-        });
-
-        return this;
     }
 
     /**
@@ -68,7 +97,7 @@ class GeminiManager {
      * @param {string} userId - User identifier for context
      * @param {string} text - User message text
      */
-    async processMessage(userId, text) {
+    async processMessage(userId, text, options = {}) {
         logger.info('Processing message with Gemini', { userId, textLength: text.length });
 
         try {
@@ -76,9 +105,9 @@ class GeminiManager {
             const isDeviceRelated = this._isDeviceRelatedMessage(text);
 
             // For device-related messages, use minimal history to force fresh API calls
-            // Otherwise Gemini may answer from memory instead of calling functions
+            // UNLESS keepHistory is set (e.g. from AI keywords that need context)
             let history = [];
-            if (!isDeviceRelated) {
+            if (options.keepHistory || !isDeviceRelated) {
                 history = this._buildHistory(userId);
             } else {
                 logger.info('Device-related message detected - using empty history to force API calls');

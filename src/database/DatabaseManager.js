@@ -32,6 +32,15 @@ class DatabaseManager {
         const schema = fs.readFileSync(schemaPath, 'utf-8');
         this.db.exec(schema);
 
+        // Migrations: add type column to keywords if missing
+        try {
+            const cols = this.db.pragma('table_info(keywords)');
+            if (cols.length > 0 && !cols.find(c => c.name === 'type')) {
+                this.db.exec("ALTER TABLE keywords ADD COLUMN type TEXT DEFAULT 'static' CHECK(type IN ('static', 'ai'))");
+                console.log('[Database] Migrated keywords table: added type column');
+            }
+        } catch { /* table may not exist yet */ }
+
         console.log('[Database] Initialized successfully');
         return this;
     }
@@ -266,6 +275,89 @@ class DatabaseManager {
             details: row.details ? JSON.parse(row.details) : null,
             createdAt: row.created_at
         }));
+    }
+
+    // ==================== Keyword Operations ====================
+
+    /**
+     * Get all keywords
+     */
+    getKeywords() {
+        const stmt = this.db.prepare('SELECT * FROM keywords ORDER BY keyword ASC');
+        return stmt.all();
+    }
+
+    /**
+     * Get enabled keywords only
+     */
+    getEnabledKeywords() {
+        const stmt = this.db.prepare('SELECT * FROM keywords WHERE enabled = 1 ORDER BY keyword ASC');
+        return stmt.all();
+    }
+
+    /**
+     * Find a keyword by its text (case-insensitive exact match)
+     * Supports comma-separated keywords like "עזרה,היי"
+     * @param {string} text - The keyword text to search for
+     */
+    getKeywordByText(text) {
+        const trimmedText = text.trim();
+
+        // Get all enabled keywords
+        const stmt = this.db.prepare('SELECT * FROM keywords WHERE enabled = 1');
+        const keywords = stmt.all();
+
+        // Check each keyword (which may contain comma-separated values)
+        for (const kw of keywords) {
+            const variants = kw.keyword.split(',').map(v => v.trim());
+            if (variants.some(variant => variant === trimmedText)) {
+                return kw;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Add a new keyword
+     * @param {string} keyword - Keyword trigger text
+     * @param {string} response - Response text (static) or custom instructions (ai)
+     * @param {string} type - 'static' or 'ai'
+     */
+    addKeyword(keyword, response, type = 'static') {
+        const stmt = this.db.prepare(`
+            INSERT INTO keywords (keyword, response, type)
+            VALUES (?, ?, ?)
+        `);
+        const result = stmt.run(keyword.trim(), response, type);
+        return result.lastInsertRowid;
+    }
+
+    /**
+     * Update an existing keyword
+     * @param {number} id - Keyword ID
+     * @param {string} keyword - New keyword text
+     * @param {string} response - New response text or instructions
+     * @param {boolean} enabled - Whether the keyword is enabled
+     * @param {string} type - 'static' or 'ai'
+     */
+    updateKeyword(id, keyword, response, enabled, type = 'static') {
+        const stmt = this.db.prepare(`
+            UPDATE keywords 
+            SET keyword = ?, response = ?, enabled = ?, type = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        `);
+        stmt.run(keyword.trim(), response, enabled ? 1 : 0, type, id);
+    }
+
+    /**
+     * Delete a keyword
+     * @param {number} id - Keyword ID
+     */
+    deleteKeyword(id) {
+        const stmt = this.db.prepare('DELETE FROM keywords WHERE id = ?');
+        const result = stmt.run(id);
+        return result.changes;
     }
 }
 

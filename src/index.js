@@ -66,6 +66,9 @@ async function main() {
             () => getSkillsStatus()
         );
 
+        // Set manager references for dashboard API routes
+        dashboardServer.setManagers(geminiManager, db);
+
         // Start dashboard server
         dashboardServer.start();
 
