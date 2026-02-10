@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>נוגה - לוח בקרה</title>
+    <link rel="stylesheet" href="/public/css/style.css">
+</head>
+
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <h1>🏠 נוגה</h1>
+                <span class="status-badge" id="status-badge">מתחבר...</span>
+            </div>
+            <nav>
+                <a href="/logout" class="btn btn-secondary">התנתק</a>
+            </nav>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- QR Code Panel -->
+            <section class="panel qr-panel">
+                <h2>📱 חיבור WhatsApp</h2>
+                <div class="qr-container">
+                    <div id="qr-placeholder" class="qr-placeholder">
+                        <% if (qrCode) { %>
+                            <img src="<%= qrCode %>" alt="QR Code" class="qr-image">
+                            <% } else { %>
+                                <div class="connected-message">
+                                    <span class="checkmark">✓</span>
+                                    <p>WhatsApp מחובר!</p>
+                                </div>
+                                <% } %>
+                    </div>
+                    <p class="qr-hint">סרקו את הקוד באפליקציית WhatsApp</p>
+                </div>
+            </section>
+
+            <!-- Status Panel -->
+            <section class="panel status-panel">
+                <h2>📊 סטטוס מערכת</h2>
+                <div class="status-grid">
+                    <div class="status-item" id="status-whatsapp">
+                        <span class="status-icon">💬</span>
+                        <span class="status-label">WhatsApp</span>
+                        <span class="status-value loading">בודק...</span>
+                    </div>
+                    <div class="status-item" id="status-gemini">
+                        <span class="status-icon">🤖</span>
+                        <span class="status-label">Gemini AI</span>
+                        <span class="status-value loading">בודק...</span>
+                    </div>
+                    <div class="status-item" id="status-calendar">
+                        <span class="status-icon">📅</span>
+                        <span class="status-label">יומן</span>
+                        <span class="status-value loading">בודק...</span>
+                    </div>
+                    <div class="status-item" id="status-tasks">
+                        <span class="status-icon">🛒</span>
+                        <span class="status-label">קניות</span>
+                        <span class="status-value loading">בודק...</span>
+                    </div>
+                    <div class="status-item" id="status-homeassistant">
+                        <span class="status-icon">🏠</span>
+                        <span class="status-label">Home Assistant</span>
+                        <span class="status-value loading">בודק...</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Console Panel -->
+            <section class="panel console-panel">
+                <h2>
+                    🖥️ לוג מערכת
+                    <button id="clear-logs" class="btn btn-small">נקה</button>
+                </h2>
+                <div class="console" id="console">
+                    <% recentLogs.forEach(log=> { %>
+                        <div class="log-entry log-<%= log.level %>">
+                            <span class="log-time">
+                                <%= new Date(log.timestamp).toLocaleTimeString('he-IL') %>
+                            </span>
+                            <span class="log-level">
+                                <%= log.level.toUpperCase() %>
+                            </span>
+                            <span class="log-message">
+                                <%= log.message %>
+                            </span>
+                        </div>
+                        <% }) %>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/public/js/dashboard.js"></script>
+</body>
+
+</html>

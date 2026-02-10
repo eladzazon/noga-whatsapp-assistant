@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  noga:
+    build: .
+    container_name: noga-assistant
+    restart: unless-stopped
+    ports:
+      - "${DASHBOARD_PORT:-3000}:3000"
+    volumes:
+      # Persistent data (SQLite + WhatsApp session)
+      - noga-data:/app/data
+      # Mount credentials folder
+      - ./credentials:/app/credentials:ro
+      # Environment file
+      - ./.env:/app/.env:ro
+    environment:
+      - NODE_ENV=production
+    networks:
+      - noga-network
+    # Required for Chromium in Alpine
+    security_opt:
+      - seccomp:unconfined
+    # Limit resources
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
+
+volumes:
+  noga-data:
+    driver: local
+
+networks:
+  noga-network:
+    driver: bridge

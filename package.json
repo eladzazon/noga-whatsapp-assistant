@@ -1,0 +1,39 @@
+{
+  "name": "noga-home-assistant",
+  "version": "1.0.0",
+  "description": "WhatsApp AI Home Assistant powered by Gemini",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js"
+  },
+  "dependencies": {
+    "whatsapp-web.js": "*",
+    "qrcode-terminal": "*",
+    "qrcode": "*",
+    "@google/generative-ai": "*",
+    "googleapis": "*",
+    "axios": "*",
+    "express": "*",
+    "express-session": "*",
+    "ejs": "*",
+    "socket.io": "*",
+    "better-sqlite3": "*",
+    "node-cron": "*",
+    "dotenv": "*",
+    "winston": "*"
+  },
+  "devDependencies": {
+    "nodemon": "*"
+  },
+  "keywords": [
+    "whatsapp",
+    "home-assistant",
+    "gemini",
+    "ai",
+    "chatbot"
+  ],
+  "author": "",
+  "license": "MIT"
+}
