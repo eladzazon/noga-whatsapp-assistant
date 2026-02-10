@@ -2,7 +2,8 @@
 
 A modular, Dockerized home assistant accessible via WhatsApp, powered by Google Gemini 2.0 Flash with Hebrew/English support.
 
-![Noga Dashboard](https://via.placeholder.com/800x400?text=Noga+Dashboard)
+<img width="1224" height="738" alt="{07E0F28E-38E2-4D07-9054-15B015BEEF79}" src="https://github.com/user-attachments/assets/d8152253-b7b3-423a-925b-295da876cbff" />
+
 
 ## ✨ Features
 
