@@ -133,7 +133,8 @@ class DashboardServer {
             res.json({
                 whatsapp: this.getWhatsAppStatus ? this.getWhatsAppStatus() : { isReady: false },
                 gemini: this.getGeminiStatus ? this.getGeminiStatus() : { isInitialized: false },
-                skills: this.getSkillsStatus ? this.getSkillsStatus() : {}
+                skills: this.getSkillsStatus ? this.getSkillsStatus() : {},
+                usage: this.db ? this.db.getUsageStats() : { today: {}, month: {} }
             });
         });
 

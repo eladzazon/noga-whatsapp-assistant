@@ -151,6 +151,28 @@ class GeminiManager {
             // Store assistant response
             db.addChatMessage(userId, 'model', responseText);
 
+            // Log usage and cost
+            if (result.response.usageMetadata) {
+                const usage = result.response.usageMetadata;
+                const inputTokens = usage.promptTokenCount || 0;
+                const outputTokens = usage.candidatesTokenCount || 0;
+                const totalTokens = usage.totalTokenCount || 0;
+
+                // Pricing (Gemini 1.5 Flash estimation)
+                // Input: $0.075 / 1M tokens
+                // Output: $0.30 / 1M tokens
+                const inputCost = (inputTokens / 1000000) * 0.075;
+                const outputCost = (outputTokens / 1000000) * 0.30;
+                const totalCost = inputCost + outputCost;
+
+                try {
+                    db.logUsage(config.gemini.model, inputTokens, outputTokens, totalTokens, totalCost);
+                    logger.info('Usage logged', { inputTokens, outputTokens, totalCost: totalCost.toFixed(6) });
+                } catch (err) {
+                    logger.error('Failed to log usage', { error: err.message });
+                }
+            }
+
             logger.info('Gemini response generated', {
                 userId,
                 responseLength: responseText.length

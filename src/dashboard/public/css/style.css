@@ -262,6 +262,55 @@ body {
     border-radius: 10px;
 }
 
+/* ==================== Usage Panel ==================== */
+.usage-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+}
+
+.usage-card {
+    background: var(--light);
+    border-radius: 10px;
+    padding: 20px;
+    border: 1px solid var(--gray-light);
+}
+
+.usage-card h3 {
+    font-size: 16px;
+    color: var(--dark);
+    margin-bottom: 15px;
+    border-bottom: 2px solid var(--gray-light);
+    padding-bottom: 8px;
+}
+
+.usage-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 10px;
+    font-size: 14px;
+    color: var(--gray);
+}
+
+.usage-row span:last-child {
+    font-weight: 600;
+    color: var(--dark);
+    font-family: 'Consolas', monospace;
+}
+
+.usage-row.cost-row {
+    margin-top: 15px;
+    padding-top: 10px;
+    border-top: 1px dashed var(--gray-light);
+    font-size: 16px;
+    color: var(--primary-dark);
+}
+
+.usage-row.cost-row span:last-child {
+    color: var(--primary);
+    font-size: 18px;
+}
+
 .status-value.connected {
     background: #c6f6d5;
     color: #22543d;

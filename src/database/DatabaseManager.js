@@ -356,8 +356,72 @@ class DatabaseManager {
      */
     deleteKeyword(id) {
         const stmt = this.db.prepare('DELETE FROM keywords WHERE id = ?');
-        const result = stmt.run(id);
-        return result.changes;
+        stmt.run(id);
+    }
+
+    // ==================== Usage Tracking ====================
+
+    /**
+     * Log API usage
+     * @param {string} model - The model used (e.g., 'gpt-4')
+     * @param {number} inputTokens - Number of input tokens
+     * @param {number} outputTokens - Number of output tokens
+     * @param {number} totalTokens - Total tokens (input + output)
+     * @param {number} cost - Cost in USD
+     */
+    logUsage(model, inputTokens, outputTokens, totalTokens, cost) {
+        const stmt = this.db.prepare(`
+            INSERT INTO usage_logs (model, input_tokens, output_tokens, total_tokens, cost_usd)
+            VALUES (?, ?, ?, ?, ?)
+        `);
+        stmt.run(model, inputTokens, outputTokens, totalTokens, cost);
+    }
+
+    /**
+     * Get usage metrics for today and this month
+     */
+    getUsageStats() {
+        const now = new Date();
+        const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+
+        const todayStmt = this.db.prepare(`
+            SELECT 
+                SUM(input_tokens) as input, 
+                SUM(output_tokens) as output, 
+                SUM(total_tokens) as total, 
+                SUM(cost_usd) as cost 
+            FROM usage_logs 
+            WHERE timestamp >= ?
+        `);
+
+        const monthStmt = this.db.prepare(`
+            SELECT 
+                SUM(input_tokens) as input, 
+                SUM(output_tokens) as output, 
+                SUM(total_tokens) as total, 
+                SUM(cost_usd) as cost 
+            FROM usage_logs 
+            WHERE timestamp >= ?
+        `);
+
+        const today = todayStmt.get(startOfDay);
+        const month = monthStmt.get(startOfMonth);
+
+        return {
+            today: {
+                input: today.input || 0,
+                output: today.output || 0,
+                total: today.total || 0,
+                cost: today.cost || 0
+            },
+            month: {
+                input: month.input || 0,
+                output: month.output || 0,
+                total: month.total || 0,
+                cost: month.cost || 0
+            }
+        };
     }
 }
 

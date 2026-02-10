@@ -57,3 +57,17 @@ CREATE INDEX IF NOT EXISTS idx_cache_type ON cache(type);
 CREATE INDEX IF NOT EXISTS idx_audit_user ON audit_log(user_id);
 CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_log(created_at);
 CREATE INDEX IF NOT EXISTS idx_keywords_keyword ON keywords(keyword);
+
+-- Usage tracking for Gemini API tokens and costs
+CREATE TABLE IF NOT EXISTS usage_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+    model TEXT NOT NULL,
+    input_tokens INTEGER DEFAULT 0,
+    output_tokens INTEGER DEFAULT 0,
+    total_tokens INTEGER DEFAULT 0,
+    cost_usd REAL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_usage_timestamp ON usage_logs(timestamp);
+CREATE INDEX IF NOT EXISTS idx_usage_model ON usage_logs(model);

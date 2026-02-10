@@ -177,6 +177,18 @@
                 updateStatusItem('tasks', data.skills.tasks?.available);
                 updateStatusItem('homeassistant', data.skills.homeAssistant?.available);
             }
+
+            if (data.usage) {
+                // Update Today's Usage
+                document.getElementById('usage-today-input').textContent = (data.usage.today.input || 0).toLocaleString();
+                document.getElementById('usage-today-output').textContent = (data.usage.today.output || 0).toLocaleString();
+                document.getElementById('usage-today-cost').textContent = formatCost(data.usage.today.cost || 0);
+
+                // Update Month's Usage
+                document.getElementById('usage-month-input').textContent = (data.usage.month.input || 0).toLocaleString();
+                document.getElementById('usage-month-output').textContent = (data.usage.month.output || 0).toLocaleString();
+                document.getElementById('usage-month-cost').textContent = formatCost(data.usage.month.cost || 0);
+            }
         } catch (err) {
             console.error('Failed to fetch status:', err);
         }
@@ -226,6 +238,15 @@
             savePromptBtn.disabled = false;
             savePromptBtn.textContent = 'שמור';
         }
+    }
+
+    function formatCost(cost) {
+        return new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: 'USD',
+            minimumFractionDigits: 4,
+            maximumFractionDigits: 4
+        }).format(cost);
     }
 
     function showPromptStatus(text, type) {
