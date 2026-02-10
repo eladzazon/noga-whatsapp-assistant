@@ -216,13 +216,29 @@ class MessageRouter {
     getStatusText() {
         const waStatus = whatsappManager.getStatus();
         const geminiStatus = geminiManager.getStatus();
+        const usage = db.getUsageStats();
+
+        const formatCost = (cost) => {
+            return cost.toFixed(4);
+        };
 
         return `📊 *סטטוס המערכת*
 
-💬 WhatsApp: ${waStatus.isReady ? '✅ מחובר' : '❌ מנותק'}
-🤖 Gemini: ${geminiStatus.isInitialized ? '✅ פעיל' : '❌ לא פעיל'}
+💬 *WhatsApp*: ${waStatus.isReady ? '✅ מחובר' : '❌ מנותק'}
+🤖 *Gemini*: ${geminiStatus.isInitialized ? '✅ פעיל' : '❌ לא פעיל'}
    Model: ${geminiStatus.model}
-   Skills: ${geminiStatus.toolsCount}`;
+   Skills: ${geminiStatus.toolsCount}
+
+📉 *שימוש ועלויות (Flash)*
+📅 *היום:*
+   Input: ${usage.today.input.toLocaleString()}
+   Output: ${usage.today.output.toLocaleString()}
+   Cost: $${formatCost(usage.today.cost)}
+
+🗓️ *החודש:*
+   Input: ${usage.month.input.toLocaleString()}
+   Output: ${usage.month.output.toLocaleString()}
+   Cost: $${formatCost(usage.month.cost)}`;
     }
 }
 
