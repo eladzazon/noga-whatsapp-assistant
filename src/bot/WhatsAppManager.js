@@ -36,15 +36,18 @@ class WhatsAppManager {
             const files = fs.readdirSync(dir);
             for (const file of files) {
                 const fullPath = path.join(dir, file);
-                const stat = fs.statSync(fullPath);
-                if (stat.isDirectory()) {
-                    findAndDeleteLockFiles(fullPath);
-                } else if (file === 'SingletonLock' || file === 'SingletonCookie' || file === 'SingletonSocket') {
-                    try {
+                try {
+                    const stat = fs.statSync(fullPath);
+                    if (stat.isDirectory()) {
+                        findAndDeleteLockFiles(fullPath);
+                    } else if (file === 'SingletonLock' || file === 'SingletonCookie' || file === 'SingletonSocket') {
                         logger.warn(`Removing Chromium lock file: ${fullPath}`);
                         fs.unlinkSync(fullPath);
-                    } catch (err) {
-                        logger.error(`Failed to remove lock file ${fullPath}`, { error: err.message });
+                    }
+                } catch (err) {
+                    // Ignore ENOENT (file already deleted or symlink broken)
+                    if (err.code !== 'ENOENT') {
+                        logger.debug(`Error checking file ${fullPath}`, { error: err.message });
                     }
                 }
             }
