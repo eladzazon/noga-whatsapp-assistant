@@ -25,7 +25,8 @@ const config = {
         port: parseInt(process.env.DASHBOARD_PORT, 10) || 3000,
         user: process.env.DASHBOARD_USER || 'admin',
         password: process.env.DASHBOARD_PASSWORD || 'changeme',
-        sessionSecret: process.env.SESSION_SECRET || 'default-secret-change-me'
+        sessionSecret: process.env.SESSION_SECRET || 'default-secret-change-me',
+        webhookSecret: process.env.WEBHOOK_SECRET
     },
 
     // WhatsApp

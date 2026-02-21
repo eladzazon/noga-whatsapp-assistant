@@ -160,6 +160,58 @@ class DashboardServer {
             res.json({ status: 'ok', timestamp: new Date().toISOString() });
         });
 
+        // ==================== Webhook API ====================
+
+        // Notification webhook (for Home Assistant)
+        this.app.post('/api/notify', async (req, res) => {
+            const { event, data } = req.body;
+            const secret = req.headers['x-webhook-secret'] || req.query.secret;
+
+            // 1. Verify Secret
+            if (!config.dashboard.webhookSecret || secret !== config.dashboard.webhookSecret) {
+                logger.warn('Unauthorized webhook attempt', { ip: req.ip });
+                return res.status(401).json({ error: 'Unauthorized' });
+            }
+
+            // 2. Validate Data
+            if (!event) {
+                return res.status(400).json({ error: 'Event name required' });
+            }
+
+            // 3. Process Webhook
+            logger.info('Webhook received', { event });
+
+            try {
+                // Generate message using AI
+                const message = await this.geminiManager.generateBroadcastMessage({ event, ...data });
+
+                // Send to WhatsApp Group
+                if (config.whatsapp.groupId) {
+                    // Use the WhatsAppManager instance we can access via global import 
+                    // (since this.getWhatsAppStatus is just a status getter)
+                    // Better approach: Import WhatsAppManager at the top
+                    // check if isReady
+                    const whatsappStatus = this.getWhatsAppStatus ? this.getWhatsAppStatus() : { isReady: false };
+
+                    if (whatsappStatus.isReady) {
+                        // Assuming we can access the manager instance globally or pass it in.
+                        // For now, let's use a dynamic import or assume it's available via the singleton export
+                        const { default: whatsappManager } = await import('../bot/WhatsAppManager.js');
+                        await whatsappManager.sendMessage(config.whatsapp.groupId, message);
+                        return res.json({ success: true, message });
+                    } else {
+                        return res.status(503).json({ error: 'WhatsApp client not ready' });
+                    }
+                } else {
+                    return res.status(400).json({ error: 'WHATSAPP_GROUP_ID not configured' });
+                }
+
+            } catch (err) {
+                logger.error('Webhook processing error', { error: err.message, stack: err.stack });
+                return res.status(500).json({ error: 'Internal server error', details: err.message });
+            }
+        });
+
         // ==================== System Prompt API ====================
 
         // Get current system prompt

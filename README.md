@@ -233,8 +233,41 @@ docker-compose down
 | `CALENDAR_ID` | Google Calendar ID | No |
 | `HOME_ASSISTANT_URL` | Home Assistant URL | No |
 | `HOME_ASSISTANT_TOKEN` | Home Assistant token | No |
+| `WEBHOOK_SECRET` | Secret for HA webhook | Yes (for webhook) |
 
 *Either `WHATSAPP_WHITELIST` or `WHATSAPP_GROUP_ID` is required
+
+
+## 🏠 Home Assistant Integration
+
+You can trigger Noga from Home Assistant automations to send AI-composed announcements to your family group.
+
+1. Add `WEBHOOK_SECRET` to your `.env` file (choose a strong password).
+2. in `configuration.yaml` (Home Assistant), add a rest_command:
+
+```yaml
+rest_command:
+  noga_notify:
+    url: "http://YOUR_NOGA_IP:3000/api/notify"
+    method: POST
+    headers:
+      x-webhook-secret: "YOUR_WEBHOOK_SECRET"
+    content_type:  'application/json; charset=utf-8'
+    payload: '{"event": "{{ event }}", "data": {{ data | to_json }} }'
+```
+
+3. Use it in automations:
+
+```yaml
+action:
+  - service: rest_command.noga_notify
+    data:
+      event: "Dryer Finished"
+      data:
+        location: "Laundry Room"
+```
+
+Noga will receive this and say something like: "Attention everyone! The dryer just finished in the laundry room 🧺. Who wants to be a hero and take it out? 😎"
 
 ## 🤝 Contributing
 

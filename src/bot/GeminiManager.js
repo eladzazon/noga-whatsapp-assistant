@@ -271,8 +271,47 @@ class GeminiManager {
     }
 
     /**
-     * Handle function calls recursively
+     * Generate a broadcast message for a specific event
+     * @param {Object} eventData - Data about the event (e.g., { event: "Dryer Finished" })
      */
+    async generateBroadcastMessage(eventData) {
+        logger.info('Generating broadcast message', { event: eventData.event });
+
+        try {
+            // Start chat session with no history
+            const chat = this.model.startChat({
+                generationConfig: {
+                    maxOutputTokens: 1024,
+                    temperature: 0.7 // Higher temperature for more creative/friendly announcements
+                }
+            });
+
+            const prompt = `System Event: ${JSON.stringify(eventData)}
+            
+            Compose a short, friendly WhatsApp message to the family group announcing this event.
+            Use emojis. respond in Hebrew.
+            
+            Example for "Dryer Finished":
+            "המייבש סיים! 🧺 מי בא לו להוציא את הכביסה? 😉"
+            
+            Example for "Leak Detected":
+            "⚠️ שימו לב! זוהתה נזילה במטבח. כדאי לבדוק את זה עכשיו!"
+            
+            Keep it under 2 sentences.`;
+
+            // Send message and get response
+            let result = await chat.sendMessage(prompt);
+            let response = result.response;
+            const responseText = response.text();
+
+            logger.info('Broadcast message generated', { length: responseText.length });
+            return responseText;
+        } catch (err) {
+            logger.error('Broadcast generation error', { error: err.message });
+            // Fallback to simple message if AI fails
+            return `עדכון מערכת: ${eventData.event}`;
+        }
+    }
     async _handleFunctionCalls(chat, response, userId) {
         let currentResponse = response;
         let iterations = 0;

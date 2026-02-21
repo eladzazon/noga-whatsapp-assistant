@@ -3,6 +3,7 @@ version: '3.8'
 services:
   noga:
     build: .
+    image: eladzazon/noga-whatsapp-assistant:latest
     container_name: noga-assistant
     restart: unless-stopped
     ports:
@@ -17,7 +18,7 @@ services:
     environment:
       - NODE_ENV=production
     networks:
-      - noga-network
+      - proxy-network
     # Required for Chromium in Alpine
     security_opt:
       - seccomp:unconfined
@@ -34,5 +35,5 @@ volumes:
     driver: local
 
 networks:
-  noga-network:
-    driver: bridge
+  proxy-network:
+    external: true
