@@ -37,7 +37,8 @@ class WhatsAppManager {
             for (const file of files) {
                 const fullPath = path.join(dir, file);
                 try {
-                    const stat = fs.statSync(fullPath);
+                    // Use lstatSync so we don't follow broken symlinks (which SingletonLock usually is)
+                    const stat = fs.lstatSync(fullPath);
                     if (stat.isDirectory()) {
                         findAndDeleteLockFiles(fullPath);
                     } else if (file === 'SingletonLock' || file === 'SingletonCookie' || file === 'SingletonSocket') {
@@ -45,7 +46,7 @@ class WhatsAppManager {
                         fs.unlinkSync(fullPath);
                     }
                 } catch (err) {
-                    // Ignore ENOENT (file already deleted or symlink broken)
+                    // Ignore ENOENT (file already deleted)
                     if (err.code !== 'ENOENT') {
                         logger.debug(`Error checking file ${fullPath}`, { error: err.message });
                     }
