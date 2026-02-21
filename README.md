@@ -59,20 +59,38 @@ HOME_ASSISTANT_URL=http://your-ha-instance:8123
 HOME_ASSISTANT_TOKEN=your-long-lived-token
 ```
 
-### 3. Run with Docker
+### 3. Run with Docker Compose (Recommended)
+
+Make sure you have a `docker-compose.yml` file (you can use the one from the repository) and run:
 
 ```bash
 docker-compose up -d
 ```
 
-### 4. Run Locally (Development)
+### 4. Run with Docker (Standalone)
+
+If you just want to run the pre-built image from Docker Hub quickly:
+
+```bash
+docker run -d \
+  --name noga-assistant \
+  --restart unless-stopped \
+  -p 3000:3000 \
+  -v noga-data:/app/data \
+  -v ./credentials:/app/credentials:ro \
+  --env-file .env \
+  --security-opt seccomp:unconfined \
+  eladzazon/noga-whatsapp-assistant:latest
+```
+
+### 5. Run Locally (Development)
 
 ```bash
 npm install
 npm run dev
 ```
 
-### 5. Connect WhatsApp
+### 6. Connect WhatsApp
 
 1. Open the dashboard at `http://localhost:3000`
 2. Login with your dashboard credentials
@@ -188,23 +206,25 @@ my_new_function: async (args) => {
 
 ## 🐳 Docker Configuration
 
+The project automatically builds and pushes the image `eladzazon/noga-whatsapp-assistant:latest` to Docker Hub upon changes to the `main` branch via GitHub Actions.
+
 The Docker setup includes:
-- Alpine-based Node.js image
-- Chromium for WhatsApp Web
+- Alpine-based Node.js image with Chromium installed for WhatsApp Web execution
+- Memory optimizations for tiny 1GB RAM instances
 - Persistent volume for SQLite database
 - Non-root user for security
 
 ```bash
-# Build
-docker-compose build
+# Pull the latest image
+docker pull eladzazon/noga-whatsapp-assistant:latest
 
-# Start
+# Start using docker-compose
 docker-compose up -d
 
 # View logs
 docker-compose logs -f
 
-# Stop
+# Stop and remove containers
 docker-compose down
 ```
 

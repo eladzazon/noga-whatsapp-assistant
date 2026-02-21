@@ -24,11 +24,24 @@ class WhatsAppManager {
     async init() {
         logger.info('Initializing WhatsApp client...');
 
-        // Ensure session directory exists
+        // Ensure session directory exists and clear old Chromium locks
         const sessionDir = path.dirname(config.whatsapp.sessionPath);
         if (!fs.existsSync(sessionDir)) {
             fs.mkdirSync(sessionDir, { recursive: true });
         }
+
+        // Fix for Chromium profile lock issue on unexpected container restarts
+        const lockPath = path.join(config.whatsapp.sessionPath, 'SingletonLock');
+        if (fs.existsSync(lockPath)) {
+            logger.warn('Found existing Chromium profile lock, cleaning it up...');
+            try {
+                fs.unlinkSync(lockPath);
+            } catch (err) {
+                logger.error('Failed to remove existing Chromium lock', { error: err.message });
+            }
+        }
+
+
 
         this.client = new Client({
             authStrategy: new LocalAuth({
