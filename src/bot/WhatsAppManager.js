@@ -31,15 +31,27 @@ class WhatsAppManager {
         }
 
         // Fix for Chromium profile lock issue on unexpected container restarts
-        const lockPath = path.join(config.whatsapp.sessionPath, 'SingletonLock');
-        if (fs.existsSync(lockPath)) {
-            logger.warn('Found existing Chromium profile lock, cleaning it up...');
-            try {
-                fs.unlinkSync(lockPath);
-            } catch (err) {
-                logger.error('Failed to remove existing Chromium lock', { error: err.message });
+        const findAndDeleteLockFiles = (dir) => {
+            if (!fs.existsSync(dir)) return;
+            const files = fs.readdirSync(dir);
+            for (const file of files) {
+                const fullPath = path.join(dir, file);
+                const stat = fs.statSync(fullPath);
+                if (stat.isDirectory()) {
+                    findAndDeleteLockFiles(fullPath);
+                } else if (file === 'SingletonLock' || file === 'SingletonCookie' || file === 'SingletonSocket') {
+                    try {
+                        logger.warn(`Removing Chromium lock file: ${fullPath}`);
+                        fs.unlinkSync(fullPath);
+                    } catch (err) {
+                        logger.error(`Failed to remove lock file ${fullPath}`, { error: err.message });
+                    }
+                }
             }
-        }
+        };
+
+        // Clean up locks before starting
+        findAndDeleteLockFiles(config.whatsapp.sessionPath);
 
 
 
