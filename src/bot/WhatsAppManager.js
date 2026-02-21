@@ -43,7 +43,10 @@ class WhatsAppManager {
                     '--disable-accelerated-2d-canvas',
                     '--no-first-run',
                     '--no-zygote',
-                    '--disable-gpu'
+                    '--disable-gpu',
+                    '--disable-software-rasterizer',
+                    '--disable-extensions',
+                    '--mute-audio'
                 ],
                 executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined
             }
@@ -56,7 +59,8 @@ class WhatsAppManager {
             await Promise.race([
                 this.client.initialize(),
                 new Promise((_, reject) =>
-                    setTimeout(() => reject(new Error('WhatsApp initialization timeout')), 120000)
+                    // Extended timeout for slow VMs
+                    setTimeout(() => reject(new Error('WhatsApp initialization timeout')), 300000)
                 )
             ]);
         } catch (err) {
