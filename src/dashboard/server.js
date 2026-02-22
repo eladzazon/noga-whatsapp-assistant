@@ -174,6 +174,24 @@ class DashboardServer {
 
         // ==================== Webhook API ====================
 
+        // Status webhook (for Home Assistant)
+        this.app.get('/api/webhook/status', (req, res) => {
+            const secret = req.headers['x-webhook-secret'] || req.query.secret;
+
+            // Verify Secret
+            if (!config.dashboard.webhookSecret || secret !== config.dashboard.webhookSecret) {
+                logger.warn('Unauthorized status webhook attempt', { ip: req.ip });
+                return res.status(401).json({ error: 'Unauthorized' });
+            }
+
+            res.json({
+                whatsapp: this.getWhatsAppStatus ? this.getWhatsAppStatus() : { isReady: false },
+                gemini: this.getGeminiStatus ? this.getGeminiStatus() : { isInitialized: false },
+                skills: this.getSkillsStatus ? this.getSkillsStatus() : {},
+                usage: this.db ? this.db.getUsageStats() : { today: {}, month: {} }
+            });
+        });
+
         // Notification webhook (for Home Assistant)
         this.app.post('/api/notify', async (req, res) => {
             const { event, data } = req.body;
