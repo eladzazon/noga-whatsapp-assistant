@@ -59,7 +59,10 @@
                         <div class="status-item" id="status-whatsapp">
                             <span class="status-icon">💬</span>
                             <span class="status-label">WhatsApp</span>
-                            <span class="status-value loading">בודק...</span>
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span class="status-value loading">בודק...</span>
+                                <button id="btn-disconnect-wa" class="btn btn-secondary btn-small" style="display: none; padding: 2px 8px; font-size: 12px; height: auto;">התנתק</button>
+                            </div>
                         </div>
                         <div class="status-item" id="status-gemini">
                             <span class="status-icon">🤖</span>

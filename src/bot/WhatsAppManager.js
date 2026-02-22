@@ -74,19 +74,21 @@ class WhatsAppManager {
 
             if (connection === 'close') {
                 this.isReady = false;
-                const shouldReconnect = (lastDisconnect?.error)?.output?.statusCode !== DisconnectReason.loggedOut;
+                const statusCode = (lastDisconnect?.error)?.output?.statusCode;
+                const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+
                 logger.warn('WhatsApp disconnected', { reason: lastDisconnect?.error, shouldReconnect });
 
                 if (this.onDisconnectedCallback) {
                     this.onDisconnectedCallback(lastDisconnect?.error);
                 }
 
-                // Reconnect if not logged out
                 if (shouldReconnect) {
                     logger.info('Attempting to reconnect...');
                     setTimeout(() => this.init(), 5000);
                 } else {
-                    logger.warn('WhatsApp logged out. Please delete the session folder and restart to scan QR again.');
+                    logger.warn('WhatsApp logged out automatically from the device. Purging session to generate fresh QR...');
+                    this._purgeSessionAndRestart();
                 }
             } else if (connection === 'open') {
                 logger.info('WhatsApp client is ready!');
@@ -112,6 +114,48 @@ class WhatsAppManager {
             }
         });
     }
+
+    /**
+     * Purge the session folders safely and restart Baileys
+     */
+    _purgeSessionAndRestart() {
+        this.client = null;
+        this.isReady = false;
+
+        try {
+            const sessionDir = config.whatsapp.sessionPath;
+            if (fs.existsSync(sessionDir)) {
+                logger.info('Deleting WhatsApp session folder for a clean reconnect...');
+                fs.rmSync(sessionDir, { recursive: true, force: true });
+            }
+        } catch (err) {
+            logger.error('Failed to delete session directory', { error: err.message });
+        }
+
+        // Delay starting the new login process lightly to let IO finish
+        setTimeout(() => this.init(), 3000);
+    }
+
+    /**
+     * Manually log out the client
+     */
+    async logout() {
+        if (this.client) {
+            logger.info('Logging out of WhatsApp manually from the dashboard...');
+            try {
+                await this.client.logout();
+            } catch (err) {
+                logger.debug('Error executing Baileys logout', { error: err.message });
+            }
+            this.client = null;
+            this.isReady = false;
+        }
+
+        // It's safer to always purge and restart manually too just in case Baileys fails to delete the keys gracefully
+        this._purgeSessionAndRestart();
+    }
+
+
 
     /**
      * Handle incoming messages

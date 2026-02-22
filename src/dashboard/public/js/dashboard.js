@@ -10,6 +10,7 @@
     const qrSection = document.getElementById('qr-section');
     const consoleEl = document.getElementById('console');
     const clearLogsBtn = document.getElementById('clear-logs');
+    const btnDisconnectWa = document.getElementById('btn-disconnect-wa');
 
     // Status elements
     const statusElements = {
@@ -151,6 +152,11 @@
         if (valueEl) {
             valueEl.className = `status-value ${connected ? 'connected' : 'disconnected'}`;
             valueEl.textContent = label || (connected ? 'פעיל' : 'לא פעיל');
+        }
+
+        // Handle disconnect button visibility for WhatsApp
+        if (id === 'whatsapp' && btnDisconnectWa) {
+            btnDisconnectWa.style.display = connected ? 'inline-block' : 'none';
         }
     }
 
@@ -408,6 +414,34 @@
     if (clearLogsBtn) {
         clearLogsBtn.addEventListener('click', () => {
             consoleEl.innerHTML = '';
+        });
+    }
+
+    if (btnDisconnectWa) {
+        btnDisconnectWa.addEventListener('click', async () => {
+            if (!confirm('האם אתה בטוח שברצונך להתנתק מ-WhatsApp? תצטרך לסרוק את ה-QR שוב.')) return;
+
+            btnDisconnectWa.disabled = true;
+            btnDisconnectWa.textContent = 'מתנתק...';
+
+            try {
+                const res = await fetch('/api/whatsapp/disconnect', { method: 'POST' });
+                const data = await res.json();
+                if (data.success) {
+                    addLogEntry({
+                        level: 'info',
+                        message: 'WhatsApp disconnected manually. Waiting for QR code...',
+                        timestamp: new Date().toISOString()
+                    });
+                } else {
+                    alert(data.error || 'שגיאה בניתוק');
+                }
+            } catch (err) {
+                alert('שגיאה בתקשורת מול השרת');
+            } finally {
+                btnDisconnectWa.disabled = false;
+                btnDisconnectWa.textContent = 'התנתק';
+            }
         });
     }
 

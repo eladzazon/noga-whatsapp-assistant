@@ -160,6 +160,18 @@ class DashboardServer {
             res.json({ status: 'ok', timestamp: new Date().toISOString() });
         });
 
+        // WhatsApp Disconnect
+        this.app.post('/api/whatsapp/disconnect', requireAuth, async (req, res) => {
+            try {
+                const { default: whatsappManager } = await import('../bot/WhatsAppManager.js');
+                await whatsappManager.logout();
+                res.json({ success: true, message: 'WhatsApp disconnected successfully. Scan new QR code.' });
+            } catch (err) {
+                logger.error('Failed to disconnect WhatsApp', { error: err.message });
+                res.status(500).json({ error: 'Failed to disconnect WhatsApp' });
+            }
+        });
+
         // ==================== Webhook API ====================
 
         // Notification webhook (for Home Assistant)
