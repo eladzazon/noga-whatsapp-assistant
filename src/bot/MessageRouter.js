@@ -106,7 +106,7 @@ class MessageRouter {
             if (keywordMatch.type === 'ai') {
                 // AI keyword: send custom instructions + user message to Gemini
                 try {
-                    await whatsappManager.reactToMessage(message.id, '🤖');
+                    await whatsappManager.reactToMessage(message.key, '🤖');
                 } catch {
                     // Ignore reaction errors
                 }
@@ -117,7 +117,7 @@ class MessageRouter {
 
             // Static keyword: return the response directly
             try {
-                await whatsappManager.reactToMessage(message.id, '⚡');
+                await whatsappManager.reactToMessage(message.key, '⚡');
             } catch {
                 // Ignore reaction errors
             }
@@ -126,7 +126,7 @@ class MessageRouter {
 
         // React to show we received the message (using robot for AI processing)
         try {
-            await whatsappManager.reactToMessage(message.id, '🤖');
+            await whatsappManager.reactToMessage(message.key, '🤖');
         } catch {
             // Ignore reaction errors
         }
@@ -141,13 +141,13 @@ class MessageRouter {
      * Handle voice messages
      */
     async handleVoiceMessage(message) {
-        const { from, media } = message;
+        const { from, chat, media } = message;
 
         logger.info('Processing voice message', { from });
 
         // React to show we're processing
         try {
-            await whatsappManager.reactToMessage(message.id, '🎧');
+            await whatsappManager.reactToMessage(message.key, '🎧');
         } catch {
             // Ignore reaction errors
         }

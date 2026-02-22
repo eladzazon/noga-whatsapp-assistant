@@ -9,19 +9,20 @@
     "dev": "node --watch src/index.js"
   },
   "dependencies": {
-    "whatsapp-web.js": "*",
-    "qrcode-terminal": "*",
-    "qrcode": "*",
     "@google/generative-ai": "*",
-    "googleapis": "*",
+    "@whiskeysockets/baileys": "^7.0.0-rc.9",
     "axios": "*",
+    "better-sqlite3": "*",
+    "dotenv": "*",
+    "ejs": "*",
     "express": "*",
     "express-session": "*",
-    "ejs": "*",
-    "socket.io": "*",
-    "better-sqlite3": "*",
+    "googleapis": "*",
     "node-cron": "*",
-    "dotenv": "*",
+    "pino": "^10.3.1",
+    "qrcode": "*",
+    "qrcode-terminal": "^0.12.0",
+    "socket.io": "*",
     "winston": "*"
   },
   "devDependencies": {

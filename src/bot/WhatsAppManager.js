@@ -1,7 +1,7 @@
-import pkg from 'whatsapp-web.js';
-const { Client, LocalAuth, MessageMedia } = pkg;
-import qrcode from 'qrcode';
+import { makeWASocket, useMultiFileAuthState, DisconnectReason } from '@whiskeysockets/baileys';
 import qrcodeTerminal from 'qrcode-terminal';
+import qrcode from 'qrcode';
+import pino from 'pino';
 import fs from 'fs';
 import path from 'path';
 import config from '../utils/config.js';
@@ -22,79 +22,26 @@ class WhatsAppManager {
      * Initialize WhatsApp client
      */
     async init() {
-        logger.info('Initializing WhatsApp client...');
+        logger.info('Initializing WhatsApp client with Baileys...');
 
-        // Ensure session directory exists and clear old Chromium locks
-        const sessionDir = path.dirname(config.whatsapp.sessionPath);
+        // Ensure session directory exists for Baileys
+        const sessionDir = config.whatsapp.sessionPath;
         if (!fs.existsSync(sessionDir)) {
             fs.mkdirSync(sessionDir, { recursive: true });
         }
 
-        // Fix for Chromium profile lock issue on unexpected container restarts
-        const findAndDeleteLockFiles = (dir) => {
-            if (!fs.existsSync(dir)) return;
-            const files = fs.readdirSync(dir);
-            for (const file of files) {
-                const fullPath = path.join(dir, file);
-                try {
-                    // Use lstatSync so we don't follow broken symlinks (which SingletonLock usually is)
-                    const stat = fs.lstatSync(fullPath);
-                    if (stat.isDirectory()) {
-                        findAndDeleteLockFiles(fullPath);
-                    } else if (file === 'SingletonLock' || file === 'SingletonCookie' || file === 'SingletonSocket') {
-                        logger.warn(`Removing Chromium lock file: ${fullPath}`);
-                        fs.unlinkSync(fullPath);
-                    }
-                } catch (err) {
-                    // Ignore ENOENT (file already deleted)
-                    if (err.code !== 'ENOENT') {
-                        logger.debug(`Error checking file ${fullPath}`, { error: err.message });
-                    }
-                }
-            }
-        };
+        const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
 
-        // Clean up locks before starting
-        findAndDeleteLockFiles(config.whatsapp.sessionPath);
-
-
-
-        this.client = new Client({
-            authStrategy: new LocalAuth({
-                dataPath: config.whatsapp.sessionPath
-            }),
-            puppeteer: {
-                headless: true,
-                args: [
-                    '--no-sandbox',
-                    '--disable-setuid-sandbox',
-                    '--disable-dev-shm-usage',
-                    '--disable-accelerated-2d-canvas',
-                    '--no-first-run',
-                    '--no-zygote',
-                    '--disable-gpu',
-                    '--disable-software-rasterizer',
-                    '--disable-extensions',
-                    '--mute-audio'
-                ],
-                executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined
-            }
+        this.client = makeWASocket({
+            auth: state,
+            printQRInTerminal: false, // We handle QR printing manually
+            logger: pino({ level: 'silent' }), // Suppress baileys internal logs or set to 'debug' for troubleshooting
+            browser: ['Noga AI Assistant', 'Chrome', '1.0.0']
         });
 
+        // Setup Event Handlers
+        this.client.ev.on('creds.update', saveCreds);
         this._setupEventHandlers();
-
-        // Initialize client and wait for ready or timeout
-        try {
-            await Promise.race([
-                this.client.initialize(),
-                new Promise((_, reject) =>
-                    // Extended timeout for slow VMs
-                    setTimeout(() => reject(new Error('WhatsApp initialization timeout')), 300000)
-                )
-            ]);
-        } catch (err) {
-            logger.error('WhatsApp initialization error', { error: err.message });
-        }
 
         return this;
     }
@@ -103,117 +50,193 @@ class WhatsAppManager {
      * Set up WhatsApp event handlers
      */
     _setupEventHandlers() {
-        // QR Code event
-        this.client.on('qr', async (qr) => {
-            logger.info('QR Code received - scan to authenticate');
-            this.qrCode = qr;
+        // Connection events
+        this.client.ev.on('connection.update', async (update) => {
+            const { connection, lastDisconnect, qr } = update;
 
-            // Display in terminal
-            qrcodeTerminal.generate(qr, { small: true });
+            if (qr) {
+                logger.info('QR Code received - scan to authenticate');
+                this.qrCode = qr;
 
-            // Generate base64 for dashboard
-            try {
-                const qrDataUrl = await qrcode.toDataURL(qr);
-                if (this.onQrCodeCallback) {
-                    this.onQrCodeCallback(qrDataUrl);
+                // Display in terminal
+                qrcodeTerminal.generate(qr, { small: true });
+
+                // Generate base64 for dashboard
+                try {
+                    const qrDataUrl = await qrcode.toDataURL(qr);
+                    if (this.onQrCodeCallback) {
+                        this.onQrCodeCallback(qrDataUrl);
+                    }
+                } catch (err) {
+                    logger.error('Failed to generate QR code image', { error: err.message });
                 }
-            } catch (err) {
-                logger.error('Failed to generate QR code image', { error: err.message });
+            }
+
+            if (connection === 'close') {
+                this.isReady = false;
+                const shouldReconnect = (lastDisconnect?.error)?.output?.statusCode !== DisconnectReason.loggedOut;
+                logger.warn('WhatsApp disconnected', { reason: lastDisconnect?.error, shouldReconnect });
+
+                if (this.onDisconnectedCallback) {
+                    this.onDisconnectedCallback(lastDisconnect?.error);
+                }
+
+                // Reconnect if not logged out
+                if (shouldReconnect) {
+                    logger.info('Attempting to reconnect...');
+                    setTimeout(() => this.init(), 5000);
+                } else {
+                    logger.warn('WhatsApp logged out. Please delete the session folder and restart to scan QR again.');
+                }
+            } else if (connection === 'open') {
+                logger.info('WhatsApp client is ready!');
+                this.isReady = true;
+                this.qrCode = null;
+
+                if (this.onReadyCallback) {
+                    this.onReadyCallback();
+                }
             }
         });
 
-        // Ready event
-        this.client.on('ready', () => {
-            logger.info('WhatsApp client is ready!');
-            this.isReady = true;
-            this.qrCode = null;
+        // Message events
+        this.client.ev.on('messages.upsert', async (m) => {
+            // Only process new messages, ignore history syncs
+            if (m.type !== 'notify') return;
 
-            if (this.onReadyCallback) {
-                this.onReadyCallback();
+            for (const msg of m.messages) {
+                // Ignore our own messages
+                if (msg.key.fromMe) continue;
+
+                await this._handleMessage(msg);
             }
-        });
-
-        // Authenticated event
-        this.client.on('authenticated', () => {
-            logger.info('WhatsApp authenticated successfully');
-        });
-
-        // Authentication failure
-        this.client.on('auth_failure', (msg) => {
-            logger.error('WhatsApp authentication failed', { error: msg });
-            this.isReady = false;
-        });
-
-        // Disconnected event
-        this.client.on('disconnected', (reason) => {
-            logger.warn('WhatsApp disconnected', { reason });
-            this.isReady = false;
-
-            if (this.onDisconnectedCallback) {
-                this.onDisconnectedCallback(reason);
-            }
-        });
-
-        // Message event
-        this.client.on('message', async (message) => {
-            await this._handleMessage(message);
         });
     }
 
     /**
      * Handle incoming messages
      */
-    async _handleMessage(message) {
+    async _handleMessage(msg) {
         try {
-            // Get sender info
-            const contact = await message.getContact();
-            const chat = await message.getChat();
+            // Check if it's a protocol message or a status broadcast
+            if (!msg.message || msg.key.remoteJid === 'status@broadcast') return;
 
-            const senderId = contact.id.user; // Phone number without @c.us
-            const isGroup = chat.isGroup;
-            const groupId = isGroup ? chat.id._serialized : null;
+            // Extract basic info
+            const jid = msg.key.remoteJid;
+            const isGroup = jid.endsWith('@g.us');
+            const groupId = isGroup ? jid : null;
+
+            // Extract sender - handle Linked Devices (@lid)
+            let senderId;
+            if (isGroup) {
+                senderId = msg.key.participant ? msg.key.participant : jid;
+            } else {
+                // If it's an @lid, Baileys provides the real phone number in remoteJidAlt
+                if (jid.endsWith('@lid') && msg.key.remoteJidAlt) {
+                    senderId = msg.key.remoteJidAlt;
+                } else {
+                    senderId = jid;
+                }
+            }
+
+            // Clean up suffixes to get the raw phone number
+            senderId = senderId.replace('@s.whatsapp.net', '').replace('@lid', '').replace('@g.us', '');
+
+            // Extract message content
+            let messageContent = msg.message;
+
+            // Unwrap ephemeral messages (Disappearing Messages)
+            if (messageContent?.ephemeralMessage) {
+                messageContent = messageContent.ephemeralMessage.message;
+            }
+
+            // Mark message as read
+            try {
+                await this.client.readMessages([msg.key]);
+            } catch (err) {
+                logger.debug('Failed to mark message as read', { error: err.message });
+            }
+
+            // Map message type - ignore metadata keys
+            const keys = Object.keys(messageContent);
+            const type = keys.find(k => k !== 'messageContextInfo' && k !== 'senderKeyDistributionMessage') || keys[0];
+
+            // Determine body
+            let body = '';
+            let hasMedia = false;
+            let mediaData = null;
+
+            if (type === 'conversation') {
+                body = messageContent.conversation;
+            } else if (type === 'extendedTextMessage') {
+                body = messageContent.extendedTextMessage?.text;
+            } else if (type === 'imageMessage') {
+                body = messageContent.imageMessage?.caption;
+                hasMedia = true;
+            } else if (type === 'videoMessage') {
+                body = messageContent.videoMessage?.caption;
+                hasMedia = true;
+            } else if (type === 'audioMessage' || type === 'pttMessage') {
+                hasMedia = true;
+            } else if (type === 'documentMessage') {
+                hasMedia = true;
+            }
 
             logger.info('Message received', {
                 from: senderId,
                 isGroup,
                 groupId,
-                type: message.type,
-                hasMedia: message.hasMedia
+                rawType: type,
+                hasMedia
             });
 
-            // Check whitelist
+            if (senderId.includes('@lid')) {
+                logger.info('LID Message Details', {
+                    key: msg.key,
+                    participant: msg.participant,
+                    pushName: msg.pushName
+                });
+            }
+
+            // Check whitelist using the exact same logic as before
             if (!this._isAllowed(senderId, groupId)) {
                 logger.debug('Message ignored - not in whitelist', { senderId, groupId });
                 return;
             }
 
-            // Prepare message data
+            // Prepare the mapped message data structure identical to the old implementation
             const messageData = {
-                id: message.id._serialized,
+                id: msg.key.id,
+                key: msg.key,
                 from: senderId,
-                chat: chat.id._serialized,
+                chat: jid,
                 isGroup,
                 groupId,
-                type: message.type,
-                body: message.body,
-                timestamp: message.timestamp,
-                hasMedia: message.hasMedia,
+                type: type === 'audioMessage' ? 'ptt' : type === 'conversation' || type === 'extendedTextMessage' ? 'chat' : type,
+                body: body,
+                timestamp: msg.messageTimestamp,
+                hasMedia: hasMedia,
                 media: null
             };
 
-            // Handle voice messages
-            if (message.hasMedia && (message.type === 'ptt' || message.type === 'audio')) {
+            // Download media for voice notes
+            if (hasMedia && (type === 'audioMessage' || type === 'pttMessage')) {
                 try {
-                    const media = await message.downloadMedia();
-                    if (media) {
+                    const { downloadMediaMessage } = await import('@whiskeysockets/baileys');
+                    const buffer = await downloadMediaMessage(msg, 'buffer', {}, {
+                        logger: pino({ level: 'silent' }),
+                        reuploadRequest: this.client.updateMediaMessage
+                    });
+
+                    if (buffer) {
                         messageData.media = {
-                            mimetype: media.mimetype,
-                            data: media.data, // Base64 encoded
-                            filename: media.filename
+                            mimetype: messageContent.audioMessage.mimetype,
+                            data: buffer.toString('base64'), // Base64 encoded
+                            filename: 'audio.ogg' // Default for WA voice notes
                         };
                         logger.info('Voice message downloaded', {
-                            mimetype: media.mimetype,
-                            size: media.data.length
+                            mimetype: messageData.media.mimetype,
+                            size: buffer.length
                         });
                     }
                 } catch (err) {
@@ -257,7 +280,7 @@ class WhatsAppManager {
         }
 
         try {
-            await this.client.sendMessage(chatId, text);
+            await this.client.sendMessage(chatId, { text: text });
             logger.info('Message sent', { to: chatId, length: text.length });
         } catch (err) {
             logger.error('Failed to send message', { error: err.message, to: chatId });
@@ -273,9 +296,24 @@ class WhatsAppManager {
             throw new Error('WhatsApp client is not ready');
         }
 
+        // Simplistic implementation for generic media sending using Baileys
         try {
-            const media = MessageMedia.fromFilePath(mediaPath);
-            await this.client.sendMessage(chatId, media, { caption });
+            const buffer = fs.readFileSync(mediaPath);
+            const ext = path.extname(mediaPath).toLowerCase();
+
+            let messageContent = {};
+
+            if (ext === '.jpg' || ext === '.jpeg' || ext === '.png') {
+                messageContent = { image: buffer, caption: caption };
+            } else if (ext === '.mp4') {
+                messageContent = { video: buffer, caption: caption };
+            } else if (ext === '.ogg' || ext === '.mp3') {
+                messageContent = { audio: buffer, mimetype: 'audio/mp4', ptt: true };
+            } else {
+                messageContent = { document: buffer, mimetype: 'application/octet-stream', fileName: path.basename(mediaPath), caption: caption };
+            }
+
+            await this.client.sendMessage(chatId, messageContent);
             logger.info('Media message sent', { to: chatId, caption });
         } catch (err) {
             logger.error('Failed to send media message', { error: err.message, to: chatId });
@@ -286,13 +324,18 @@ class WhatsAppManager {
     /**
      * React to a message
      */
-    async reactToMessage(messageId, emoji) {
+    async reactToMessage(key, emoji) {
         try {
-            // Note: This might require specific whatsapp-web.js version
-            const msg = await this.client.getMessageById(messageId);
-            if (msg) {
-                await msg.react(emoji);
-            }
+            if (!this.client || !this.isReady || !key) return;
+
+            const reactionMessage = {
+                react: {
+                    text: emoji,
+                    key: key
+                }
+            };
+
+            await this.client.sendMessage(key.remoteJid, reactionMessage);
         } catch (err) {
             logger.debug('Failed to react to message', { error: err.message });
         }
@@ -330,7 +373,11 @@ class WhatsAppManager {
      */
     async destroy() {
         if (this.client) {
-            await this.client.destroy();
+            try {
+                this.client.end(new Error('Destroy called'));
+            } catch (e) {
+                // Ignore
+            }
             this.client = null;
             this.isReady = false;
         }

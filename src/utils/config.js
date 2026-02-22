@@ -33,7 +33,7 @@ const config = {
     whatsapp: {
         whitelist: parseList(process.env.WHATSAPP_WHITELIST),
         groupId: process.env.WHATSAPP_GROUP_ID || null,
-        sessionPath: process.env.WHATSAPP_SESSION_PATH || './data/.wwebjs_auth'
+        sessionPath: process.env.WHATSAPP_SESSION_PATH || './data/.baileys_auth'
     },
 
     // Gemini AI
