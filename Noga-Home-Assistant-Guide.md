@@ -27,7 +27,33 @@ rest_command:
 
 > **Note**: You must restart Home Assistant after editing `configuration.yaml`.
 
-## 3. Create Automations
+## 3. Monitor Noga Status (Optional)
+
+You can monitor Noga's connection status (such as whether WhatsApp is ready or if you need to scan a new QR code) by adding a REST sensor to your Home Assistant `configuration.yaml`.
+
+```yaml
+sensor:
+  - platform: rest
+    name: "Noga WhatsApp Status"
+    resource: "http://YOUR_NOGA_IP:3000/api/webhook/status"
+    method: GET
+    headers:
+      x-webhook-secret: "my_super_secret_webhook_key_123"
+    scan_interval: 60
+    value_template: >
+      {% if value_json.whatsapp.isReady == true %}
+        Connected
+      {% elif value_json.whatsapp.hasQrCode == true %}
+        Needs QR Scan
+      {% else %}
+        Disconnected
+      {% endif %}
+    json_attributes:
+      - whatsapp
+      - gemini
+```
+
+## 4. Create Automations
 
 Now you can use the `noga_notify` service in any automation!
 
