@@ -62,9 +62,27 @@ class GeminiManager {
      * Build/rebuild the Gemini model with current settings
      */
     _buildModel() {
-        this.model = this.genAI.getGenerativeModel({
+        this.model = this._getModel();
+    }
+
+    /**
+     * Get a fresh GenerativeModel instance with dynamic date injection
+     */
+    _getModel() {
+        if (!this.genAI) return this.model;
+
+        // Inject current date and time into the system prompt
+        const now = new Date();
+        const options = { timeZone: 'Asia/Jerusalem' };
+        const currentDate = now.toLocaleDateString('he-IL', options);
+        const currentTime = now.toLocaleTimeString('he-IL', options);
+        const dayOfWeek = now.toLocaleDateString('he-IL', { ...options, weekday: 'long' });
+
+        const dynamicPrompt = `${this.systemPrompt}\n\n[SYSTEM INFO: Today is ${dayOfWeek}, ${currentDate}, Current time is ${currentTime}]`;
+
+        return this.genAI.getGenerativeModel({
             model: config.gemini.model,
-            systemInstruction: this.systemPrompt,
+            systemInstruction: dynamicPrompt,
             tools: this.tools.length > 0 ? [{ functionDeclarations: this.tools }] : undefined,
             toolConfig: this.tools.length > 0 ? {
                 functionCallingConfig: {
@@ -114,7 +132,7 @@ class GeminiManager {
             }
 
             // Start chat session
-            const chat = this.model.startChat({
+            const chat = this._getModel().startChat({
                 history,
                 generationConfig: {
                     maxOutputTokens: 1024,
@@ -226,7 +244,7 @@ class GeminiManager {
             const history = this._buildHistory(userId);
 
             // Start chat session
-            const chat = this.model.startChat({
+            const chat = this._getModel().startChat({
                 history,
                 generationConfig: {
                     maxOutputTokens: 1024,
@@ -279,7 +297,7 @@ class GeminiManager {
 
         try {
             // Start chat session with no history
-            const chat = this.model.startChat({
+            const chat = this._getModel().startChat({
                 generationConfig: {
                     maxOutputTokens: 1024,
                     temperature: 0.7 // Higher temperature for more creative/friendly announcements
