@@ -229,7 +229,7 @@ class MessageRouter {
    Model: ${geminiStatus.model}
    Skills: ${geminiStatus.toolsCount}
 
-📉 *שימוש ועלויות (Flash)*
+📉 *שימוש ועלויות*
 📅 *היום:*
    Input: ${usage.today.input.toLocaleString()}
    Output: ${usage.today.output.toLocaleString()}
