@@ -1,33 +1,29 @@
-FROM node:lts-alpine
+FROM node:latest AS builder
 
-# Install dependencies for Puppeteer/Chromium (required by whatsapp-web.js)
-RUN apk add --no-cache \
-    chromium \
-    nss \
-    freetype \
-    harfbuzz \
-    ca-certificates \
-    ttf-freefont \
+WORKDIR /app
+
+# Install build dependencies for native modules (better-sqlite3)
+RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
     make \
-    g++
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
 
-# Set Puppeteer to use installed Chromium
-ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
-    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+# Copy package files and install dependencies
+COPY package*.json ./
+RUN npm ci --only=production
 
-# Create app directory
+# --- Production stage ---
+FROM node:latest
+
 WORKDIR /app
 
 # Create non-root user for security
-RUN addgroup -g 1001 -S noga && \
-    adduser -S noga -u 1001 -G noga
+RUN groupadd -g 1001 noga && \
+    useradd -u 1001 -g noga -s /bin/sh noga
 
-# Copy package files
-COPY package*.json ./
-
-# Install dependencies
-RUN npm ci --only=production
+# Copy built node_modules from builder
+COPY --from=builder /app/node_modules ./node_modules
 
 # Copy source code
 COPY --chown=noga:noga . .
