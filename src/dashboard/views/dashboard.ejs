@@ -26,6 +26,7 @@
             <button class="tab-btn active" data-tab="tab-status">📊 סטטוס</button>
             <button class="tab-btn" data-tab="tab-prompt">🧠 הוראות מערכת</button>
             <button class="tab-btn" data-tab="tab-keywords">🔑 מילות מפתח</button>
+            <button class="tab-btn" data-tab="tab-scheduled-prompts">⏱️ תזמונים</button>
             <button class="tab-btn" data-tab="tab-console">🖥️ לוג</button>
         </div>
 
@@ -61,7 +62,8 @@
                             <span class="status-label">WhatsApp</span>
                             <div style="display: flex; align-items: center; gap: 10px;">
                                 <span class="status-value loading">בודק...</span>
-                                <button id="btn-disconnect-wa" class="btn btn-secondary btn-small" style="display: none; padding: 2px 8px; font-size: 12px; height: auto;">התנתק</button>
+                                <button id="btn-disconnect-wa" class="btn btn-secondary btn-small"
+                                    style="display: none; padding: 2px 8px; font-size: 12px; height: auto;">התנתק</button>
                             </div>
                         </div>
                         <div class="status-item" id="status-gemini">
@@ -196,6 +198,68 @@
                                 </tr>
                             </thead>
                             <tbody id="keywords-tbody">
+                                <tr class="empty-row">
+                                    <td colspan="5">טוען...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+            <!-- ==================== Scheduled Prompts Tab ==================== -->
+            <div class="tab-pane" id="tab-scheduled-prompts">
+                <section class="panel scheduled-prompts-panel">
+                    <h2>
+                        ⏱️ תזמונים
+                        <button id="add-schedule-btn" class="btn btn-primary btn-small">+ הוסף</button>
+                    </h2>
+                    <p class="panel-hint">הגדר הוראות לביצוע מתוזמן (באמצעות קרון). הפקודות יבוצעו אוטומטית והתוצאה
+                        תישלח לקבוצת הוואטסאפ.</p>
+
+                    <!-- Add/Edit Form -->
+                    <div id="schedule-form" class="keyword-form" style="display: none;">
+                        <input type="hidden" id="schedule-edit-id" value="">
+                        <div class="form-row">
+                            <div class="form-group form-group-grow">
+                                <label for="schedule-name">שם התזמון</label>
+                                <input type="text" id="schedule-name" class="form-input" placeholder="למשל: סיכום בוקר"
+                                    dir="rtl">
+                            </div>
+                            <div class="form-group">
+                                <label for="schedule-cron">תזמון (Cron)</label>
+                                <input type="text" id="schedule-cron" class="form-input" placeholder="למשל: 0 7 * * *"
+                                    dir="ltr">
+                                <small style="color: var(--gray); font-size: 11px;">
+                                    <a href="https://crontab.guru/" target="_blank" style="color: var(--primary);">עזרה
+                                        בבניית Cron</a>
+                                </small>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="schedule-prompt">הוראה ל-AI</label>
+                            <textarea id="schedule-prompt" class="form-textarea"
+                                placeholder="למשל: סכם לי את אירועי היום מהיומן" dir="rtl"></textarea>
+                        </div>
+                        <div class="form-actions">
+                            <button id="schedule-save" class="btn btn-primary btn-small">שמור</button>
+                            <button id="schedule-cancel" class="btn btn-secondary btn-small">ביטול</button>
+                        </div>
+                    </div>
+
+                    <!-- Scheduled Prompts Table -->
+                    <div class="keywords-table-container">
+                        <table class="keywords-table" id="schedules-table">
+                            <thead>
+                                <tr>
+                                    <th>שם</th>
+                                    <th>תזמון (Cron)</th>
+                                    <th>הוראה</th>
+                                    <th>פעיל</th>
+                                    <th>פעולות</th>
+                                </tr>
+                            </thead>
+                            <tbody id="schedules-tbody">
                                 <tr class="empty-row">
                                     <td colspan="5">טוען...</td>
                                 </tr>

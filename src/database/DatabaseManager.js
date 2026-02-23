@@ -41,6 +41,19 @@ class DatabaseManager {
             }
         } catch { /* table may not exist yet */ }
 
+        // Migration: Create scheduled_prompts table if missing
+        this.db.exec(`
+            CREATE TABLE IF NOT EXISTS scheduled_prompts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                prompt TEXT NOT NULL,
+                cron_expression TEXT NOT NULL,
+                enabled INTEGER DEFAULT 1,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            );
+        `);
+
         console.log('[Database] Initialized successfully');
         return this;
     }
@@ -359,6 +372,56 @@ class DatabaseManager {
         stmt.run(id);
     }
 
+    // ==================== Scheduled Prompt Operations ====================
+
+    /**
+     * Get all scheduled prompts
+     */
+    getScheduledPrompts() {
+        const stmt = this.db.prepare('SELECT * FROM scheduled_prompts ORDER BY name ASC');
+        return stmt.all();
+    }
+
+    /**
+     * Get enabled scheduled prompts
+     */
+    getEnabledScheduledPrompts() {
+        const stmt = this.db.prepare('SELECT * FROM scheduled_prompts WHERE enabled = 1 ORDER BY name ASC');
+        return stmt.all();
+    }
+
+    /**
+     * Add a scheduled prompt
+     */
+    addScheduledPrompt(name, prompt, cronExpression, enabled = true) {
+        const stmt = this.db.prepare(`
+            INSERT INTO scheduled_prompts (name, prompt, cron_expression, enabled)
+            VALUES (?, ?, ?, ?)
+        `);
+        const result = stmt.run(name.trim(), prompt.trim(), cronExpression.trim(), enabled ? 1 : 0);
+        return result.lastInsertRowid;
+    }
+
+    /**
+     * Update a scheduled prompt
+     */
+    updateScheduledPrompt(id, name, prompt, cronExpression, enabled) {
+        const stmt = this.db.prepare(`
+            UPDATE scheduled_prompts
+            SET name = ?, prompt = ?, cron_expression = ?, enabled = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        `);
+        stmt.run(name.trim(), prompt.trim(), cronExpression.trim(), enabled ? 1 : 0, id);
+    }
+
+    /**
+     * Delete a scheduled prompt
+     */
+    deleteScheduledPrompt(id) {
+        const stmt = this.db.prepare('DELETE FROM scheduled_prompts WHERE id = ?');
+        stmt.run(id);
+    }
+
     // ==================== Usage Tracking ====================
 
     /**
@@ -381,9 +444,15 @@ class DatabaseManager {
      * Get usage metrics for today and this month
      */
     getUsageStats() {
+        // Calculate correctly aligned local timestamps for SQLite
+        // SQLite uses UTC string matching for datetimes, so we must align local midnight to UTC.
         const now = new Date();
-        const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+
+        // Start of today (local time)
+        const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+        // Start of this month (local time)
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
         const todayStmt = this.db.prepare(`
             SELECT 
@@ -405,8 +474,15 @@ class DatabaseManager {
             WHERE timestamp >= ?
         `);
 
-        const today = todayStmt.get(startOfDay);
-        const month = monthStmt.get(startOfMonth);
+        // Convert exactly local midnight to SQLite UTC string format (YYYY-MM-DD HH:MM:SS) 
+        // Note: usage_logs stores UTC timestamps via CURRENT_TIMESTAMP
+        const formatSqliteDate = d => {
+            const pad = n => n.toString().padStart(2, '0');
+            return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`;
+        };
+
+        const today = todayStmt.get(formatSqliteDate(startOfDay));
+        const month = monthStmt.get(formatSqliteDate(startOfMonth));
 
         return {
             today: {

@@ -71,3 +71,14 @@ CREATE TABLE IF NOT EXISTS usage_logs (
 
 CREATE INDEX IF NOT EXISTS idx_usage_timestamp ON usage_logs(timestamp);
 CREATE INDEX IF NOT EXISTS idx_usage_model ON usage_logs(model);
+
+-- Scheduled prompts
+CREATE TABLE IF NOT EXISTS scheduled_prompts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    prompt TEXT NOT NULL,
+    cron_expression TEXT NOT NULL,
+    enabled INTEGER DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);

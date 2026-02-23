@@ -335,6 +335,83 @@ class DashboardServer {
                 res.status(500).json({ error: err.message });
             }
         });
+
+        // ==================== Scheduled Prompts API ====================
+
+        // Get all scheduled prompts
+        this.app.get('/api/scheduled-prompts', requireAuth, (req, res) => {
+            if (!this.db) return res.status(500).json({ error: 'DB not initialized' });
+            try {
+                const prompts = this.db.getScheduledPrompts();
+                res.json({ prompts });
+            } catch (err) {
+                res.status(500).json({ error: err.message });
+            }
+        });
+
+        // Add scheduled prompt
+        this.app.post('/api/scheduled-prompts', requireAuth, async (req, res) => {
+            const { name, prompt, cronExpression, enabled } = req.body;
+            if (!name || !prompt || !cronExpression) {
+                return res.status(400).json({ error: 'Name, prompt, and cron expression are required' });
+            }
+            if (!this.db) return res.status(500).json({ error: 'DB not initialized' });
+
+            try {
+                const id = this.db.addScheduledPrompt(name, prompt, cronExpression, enabled);
+                logger.info('Scheduled prompt added via dashboard', { name });
+
+                // Reload scheduling engine
+                const { default: schedulerManager } = await import('../bot/SchedulerManager.js');
+                schedulerManager.reload();
+
+                res.json({ success: true, id });
+            } catch (err) {
+                res.status(500).json({ error: err.message });
+            }
+        });
+
+        // Update scheduled prompt
+        this.app.put('/api/scheduled-prompts/:id', requireAuth, async (req, res) => {
+            const { id } = req.params;
+            const { name, prompt, cronExpression, enabled } = req.body;
+            if (!name || !prompt || !cronExpression) {
+                return res.status(400).json({ error: 'Name, prompt, and cron expression are required' });
+            }
+            if (!this.db) return res.status(500).json({ error: 'DB not initialized' });
+
+            try {
+                this.db.updateScheduledPrompt(parseInt(id), name, prompt, cronExpression, enabled);
+                logger.info('Scheduled prompt updated via dashboard', { id, name });
+
+                // Reload scheduling engine
+                const { default: schedulerManager } = await import('../bot/SchedulerManager.js');
+                schedulerManager.reload();
+
+                res.json({ success: true });
+            } catch (err) {
+                res.status(500).json({ error: err.message });
+            }
+        });
+
+        // Delete scheduled prompt
+        this.app.delete('/api/scheduled-prompts/:id', requireAuth, async (req, res) => {
+            const { id } = req.params;
+            if (!this.db) return res.status(500).json({ error: 'DB not initialized' });
+
+            try {
+                this.db.deleteScheduledPrompt(parseInt(id));
+                logger.info('Scheduled prompt deleted via dashboard', { id });
+
+                // Reload scheduling engine
+                const { default: schedulerManager } = await import('../bot/SchedulerManager.js');
+                schedulerManager.reload();
+
+                res.json({ success: true });
+            } catch (err) {
+                res.status(500).json({ error: err.message });
+            }
+        });
     }
 
     /**

@@ -7,6 +7,7 @@ import db from './database/DatabaseManager.js';
 import whatsappManager from './bot/WhatsAppManager.js';
 import geminiManager from './bot/GeminiManager.js';
 import messageRouter from './bot/MessageRouter.js';
+import schedulerManager from './bot/SchedulerManager.js';
 import dashboardServer from './dashboard/server.js';
 import {
     initializeSkills,
@@ -54,6 +55,10 @@ async function main() {
         // Initialize Gemini AI with function calling
         logger.info('Initializing Gemini AI...');
         geminiManager.init(functionDeclarations, functionHandlers);
+
+        // Initialize Scheduled Prompts
+        logger.info('Initializing Scheduler...');
+        schedulerManager.init(geminiManager);
 
         // Initialize dashboard server
         logger.info('Initializing dashboard...');

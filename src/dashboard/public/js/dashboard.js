@@ -38,6 +38,17 @@
     const keywordCancelBtn = document.getElementById('keyword-cancel');
     const keywordsTbody = document.getElementById('keywords-tbody');
 
+    // Scheduled Prompts elements
+    const addScheduleBtn = document.getElementById('add-schedule-btn');
+    const scheduleForm = document.getElementById('schedule-form');
+    const scheduleEditId = document.getElementById('schedule-edit-id');
+    const scheduleName = document.getElementById('schedule-name');
+    const scheduleCron = document.getElementById('schedule-cron');
+    const schedulePrompt = document.getElementById('schedule-prompt');
+    const scheduleSaveBtn = document.getElementById('schedule-save');
+    const scheduleCancelBtn = document.getElementById('schedule-cancel');
+    const schedulesTbody = document.getElementById('schedules-tbody');
+
     // ==================== Tab Navigation ====================
 
     const tabBtns = document.querySelectorAll('.tab-btn');
@@ -247,12 +258,12 @@
     }
 
     function formatCost(cost) {
-        return new Intl.NumberFormat('en-US', {
+        return new Intl.NumberFormat('he-IL', {
             style: 'currency',
-            currency: 'USD',
+            currency: 'ILS',
             minimumFractionDigits: 4,
             maximumFractionDigits: 4
-        }).format(cost);
+        }).format(cost * usdToIlsRate);
     }
 
     function showPromptStatus(text, type) {
@@ -409,6 +420,140 @@
         }
     };
 
+    // ==================== Scheduled Prompts Functions ====================
+
+    async function loadSchedules() {
+        try {
+            const res = await fetch('/api/scheduled-prompts');
+            const data = await res.json();
+            renderSchedules(data.prompts || []);
+        } catch (err) {
+            console.error('Failed to load schedules:', err);
+            schedulesTbody.innerHTML = '<tr class="empty-row"><td colspan="5">שגיאה בטעינת תזמונים</td></tr>';
+        }
+    }
+
+    function renderSchedules(prompts) {
+        if (prompts.length === 0) {
+            schedulesTbody.innerHTML = '<tr class="empty-row"><td colspan="5">אין תזמונים. לחצו "הוסף" כדי להתחיל.</td></tr>';
+            return;
+        }
+
+        schedulesTbody.innerHTML = prompts.map(p => {
+            return `
+            <tr data-id="${p.id}">
+                <td class="kw-keyword"><strong>${escapeHtml(p.name)}</strong></td>
+                <td><code dir="ltr" style="background: var(--light-bg); padding: 2px 6px; border-radius: 4px;">${escapeHtml(p.cron_expression)}</code></td>
+                <td class="kw-response">${escapeHtml(p.prompt).substring(0, 80)}${p.prompt.length > 80 ? '...' : ''}</td>
+                <td>
+                    <label class="toggle-switch">
+                        <input type="checkbox" ${p.enabled ? 'checked' : ''} onchange="window._toggleSchedule(${p.id}, '${escapeAttr(p.name)}', '${escapeAttr(p.prompt)}', '${escapeAttr(p.cron_expression)}', this.checked)">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </td>
+                <td class="kw-actions">
+                    <button class="btn btn-small btn-action" onclick="window._editSchedule(${p.id}, '${escapeAttr(p.name)}', '${escapeAttr(p.prompt)}', '${escapeAttr(p.cron_expression)}')">✏️</button>
+                    <button class="btn btn-small btn-action btn-danger-action" onclick="window._deleteSchedule(${p.id})">🗑️</button>
+                </td>
+            </tr>
+            `;
+        }).join('');
+    }
+
+    function showScheduleForm(id = '', name = '', prompt = '', cron = '') {
+        scheduleEditId.value = id;
+        scheduleName.value = name;
+        schedulePrompt.value = prompt;
+        scheduleCron.value = cron;
+        scheduleForm.style.display = 'block';
+        scheduleName.focus();
+    }
+
+    function hideScheduleForm() {
+        scheduleForm.style.display = 'none';
+        scheduleEditId.value = '';
+        scheduleName.value = '';
+        schedulePrompt.value = '';
+        scheduleCron.value = '';
+    }
+
+    async function saveSchedule() {
+        const id = scheduleEditId.value;
+        const name = scheduleName.value.trim();
+        const prompt = schedulePrompt.value.trim();
+        const cronExpression = scheduleCron.value.trim();
+
+        if (!name || !prompt || !cronExpression) {
+            alert('יש למלא שם, תזמון, והוראה');
+            return;
+        }
+
+        scheduleSaveBtn.disabled = true;
+
+        try {
+            let res;
+            const payload = { name, prompt, cronExpression, enabled: true };
+            if (id) {
+                res = await fetch(`/api/scheduled-prompts/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+            } else {
+                res = await fetch('/api/scheduled-prompts', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+            }
+
+            const data = await res.json();
+            if (data.success || data.id) {
+                hideScheduleForm();
+                loadSchedules();
+            } else {
+                alert(data.error || 'שגיאה בשמירת תזמון');
+            }
+        } catch (err) {
+            alert('שגיאה בשמירה');
+        } finally {
+            scheduleSaveBtn.disabled = false;
+        }
+    }
+
+    // Global functions for inline event handlers (Schedules)
+    window._editSchedule = function (id, name, prompt, cron) {
+        showScheduleForm(id, name.replace(/\\n/g, '\n'), prompt.replace(/\\n/g, '\n'), cron);
+    };
+
+    window._deleteSchedule = async function (id) {
+        if (!confirm('למחוק תזמון זה?')) return;
+        try {
+            await fetch(`/api/scheduled-prompts/${id}`, { method: 'DELETE' });
+            loadSchedules();
+        } catch (err) {
+            alert('שגיאה במחיקה');
+        }
+    };
+
+    window._toggleSchedule = async function (id, name, prompt, cron, enabled) {
+        try {
+            await fetch(`/api/scheduled-prompts/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: name.replace(/\\n/g, '\n'),
+                    prompt: prompt.replace(/\\n/g, '\n'),
+                    cronExpression: cron,
+                    enabled
+                })
+            });
+        } catch (err) {
+            alert('שגיאה בעדכון');
+            loadSchedules();
+        }
+    };
+
     // ==================== Event Listeners ====================
 
     if (clearLogsBtn) {
@@ -465,10 +610,42 @@
         keywordType.addEventListener('change', () => updateFormLabels(keywordType.value));
     }
 
+    // Schedule listeners
+    if (addScheduleBtn) {
+        addScheduleBtn.addEventListener('click', () => showScheduleForm());
+    }
+
+    if (scheduleSaveBtn) {
+        scheduleSaveBtn.addEventListener('click', saveSchedule);
+    }
+
+    if (scheduleCancelBtn) {
+        scheduleCancelBtn.addEventListener('click', hideScheduleForm);
+    }
+
     // ==================== Initialization ====================
 
-    setInterval(fetchStatus, 30000);
-    fetchStatus();
+    let usdToIlsRate = 3.65; // Fallback rate
+
+    async function fetchExchangeRate() {
+        try {
+            const res = await fetch('https://open.er-api.com/v6/latest/USD');
+            const data = await res.json();
+            if (data && data.rates && data.rates.ILS) {
+                usdToIlsRate = data.rates.ILS;
+                console.log(`Updated USD to ILS rate: ${usdToIlsRate}`);
+            }
+        } catch (err) {
+            console.error('Failed to fetch exchange rate:', err);
+        }
+    }
+
+    fetchExchangeRate().then(() => {
+        fetchStatus();
+        setInterval(fetchStatus, 30000);
+    });
+
     loadSystemPrompt();
     loadKeywords();
+    loadSchedules();
 })();
