@@ -129,18 +129,27 @@ class CalendarManager {
 
             if (time) {
                 // Timed event
-                const startDateTime = new Date(`${date}T${time}:00`);
+                const [year, month, day] = date.split('-');
+                const [hours, minutes] = time.split(':');
+
+                // Note month is 0-indexed in Date constructor
+                const startDateTime = new Date(year, month - 1, day, hours, minutes);
                 const endDateTime = new Date(startDateTime.getTime() + durationMinutes * 60000);
+
+                // Format as YYYY-MM-DDTHH:mm:00 without the 'Z' (UTC specifier)
+                // This ensures Google Calendar actually applies the provided timezone
+                const pad = (n) => n.toString().padStart(2, '0');
+                const formatDateTime = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:00`;
 
                 event = {
                     summary: title,
                     description,
                     start: {
-                        dateTime: startDateTime.toISOString(),
+                        dateTime: formatDateTime(startDateTime),
                         timeZone: 'Asia/Jerusalem'
                     },
                     end: {
-                        dateTime: endDateTime.toISOString(),
+                        dateTime: formatDateTime(endDateTime),
                         timeZone: 'Asia/Jerusalem'
                     }
                 };
