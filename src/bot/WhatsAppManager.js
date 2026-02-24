@@ -1,4 +1,4 @@
-import { makeWASocket, useMultiFileAuthState, DisconnectReason } from '@whiskeysockets/baileys';
+import { makeWASocket, useMultiFileAuthState, DisconnectReason, Browsers } from '@whiskeysockets/baileys';
 import qrcodeTerminal from 'qrcode-terminal';
 import qrcode from 'qrcode';
 import pino from 'pino';
@@ -36,7 +36,7 @@ class WhatsAppManager {
             auth: state,
             printQRInTerminal: false, // We handle QR printing manually
             logger: pino({ level: 'silent' }), // Suppress baileys internal logs or set to 'debug' for troubleshooting
-            browser: ['Noga AI Assistant', 'Chrome', '1.0.0']
+            browser: Browsers.macOS('Desktop')
         });
 
         // Setup Event Handlers
@@ -118,8 +118,13 @@ class WhatsAppManager {
     /**
      * Purge the session folders safely and restart Baileys
      */
-    _purgeSessionAndRestart() {
+    async _purgeSessionAndRestart() {
         if (this.client) {
+            try {
+                this.client.ev.removeAllListeners();
+            } catch (err) {
+                // Ignore
+            }
             try {
                 this.client.ws.close();
             } catch (err) {
@@ -135,11 +140,22 @@ class WhatsAppManager {
         this.client = null;
         this.isReady = false;
 
+        // Give baileys event loop time to flush any pending saveCreds
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
         try {
             const sessionDir = path.resolve(process.cwd(), config.whatsapp.sessionPath);
             if (fs.existsSync(sessionDir)) {
                 logger.info('Deleting WhatsApp session folder for a clean reconnect...', { sessionDir });
-                fs.rmSync(sessionDir, { recursive: true, force: true });
+
+                // Rename first to avoid race conditions with lingering file handles
+                const trashDir = `${sessionDir}_trash_${Date.now()}`;
+                try {
+                    fs.renameSync(sessionDir, trashDir);
+                    fs.rmSync(trashDir, { recursive: true, force: true });
+                } catch (renameErr) {
+                    fs.rmSync(sessionDir, { recursive: true, force: true });
+                }
             } else {
                 logger.info('Session folder does not exist, skipping deletion', { sessionDir });
             }
@@ -148,7 +164,7 @@ class WhatsAppManager {
         }
 
         // Delay starting the new login process lightly to let IO finish
-        setTimeout(() => this.init(), 3000);
+        setTimeout(() => this.init(), 2000);
     }
 
     /**
