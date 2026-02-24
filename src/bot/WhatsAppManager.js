@@ -75,7 +75,7 @@ class WhatsAppManager {
             if (connection === 'close') {
                 this.isReady = false;
                 const statusCode = (lastDisconnect?.error)?.output?.statusCode;
-                const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+                const shouldReconnect = statusCode !== DisconnectReason.loggedOut && statusCode !== 405;
 
                 logger.warn('WhatsApp disconnected', { reason: lastDisconnect?.error, shouldReconnect });
 
