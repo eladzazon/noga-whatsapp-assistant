@@ -1,4 +1,4 @@
-import { makeWASocket, useMultiFileAuthState, DisconnectReason, Browsers } from '@whiskeysockets/baileys';
+import { makeWASocket, useMultiFileAuthState, DisconnectReason, Browsers, fetchLatestBaileysVersion } from '@whiskeysockets/baileys';
 import qrcodeTerminal from 'qrcode-terminal';
 import qrcode from 'qrcode';
 import pino from 'pino';
@@ -30,13 +30,24 @@ class WhatsAppManager {
             fs.mkdirSync(sessionDir, { recursive: true });
         }
 
+        // Fetch the latest WhatsApp Web version to avoid 405 errors
+        let version;
+        try {
+            const versionInfo = await fetchLatestBaileysVersion();
+            version = versionInfo.version;
+            logger.info('Fetched latest WhatsApp Web version', { version });
+        } catch (err) {
+            logger.warn('Failed to fetch latest version, using default', { error: err.message });
+        }
+
         const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
 
         this.client = makeWASocket({
             auth: state,
             printQRInTerminal: false, // We handle QR printing manually
             logger: pino({ level: 'silent' }), // Suppress baileys internal logs or set to 'debug' for troubleshooting
-            browser: Browsers.macOS('Desktop')
+            browser: Browsers.macOS('Desktop'),
+            ...(version && { version })
         });
 
         // Setup Event Handlers
