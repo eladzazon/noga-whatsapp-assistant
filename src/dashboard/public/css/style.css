@@ -603,6 +603,66 @@ select.form-input {
     transform: translateX(20px);
 }
 
+/* ==================== Danger Button ==================== */
+.btn-danger-small {
+    background: #fc8181;
+    color: #742a2a;
+    padding: 6px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-danger-small:hover {
+    background: #f56565;
+    color: white;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(245, 101, 101, 0.4);
+}
+
+/* ==================== Log Sub-Tabs ==================== */
+.log-sub-tabs {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 12px;
+    border-bottom: 2px solid var(--gray-light);
+    padding-bottom: 8px;
+}
+
+.log-sub-tab {
+    padding: 6px 16px;
+    border: 1px solid var(--gray-light);
+    background: var(--light);
+    color: var(--gray);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border-radius: 8px 8px 0 0;
+    transition: all 0.2s;
+}
+
+.log-sub-tab:hover {
+    background: #edf2f7;
+    color: var(--dark);
+}
+
+.log-sub-tab.active {
+    background: #1a202c;
+    color: #e2e8f0;
+    border-color: #1a202c;
+}
+
+.log-pane {
+    display: none;
+}
+
+.log-pane.active {
+    display: block;
+}
+
 /* ==================== Console ==================== */
 .console {
     background: #1a202c;

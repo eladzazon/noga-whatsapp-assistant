@@ -3,6 +3,7 @@ import session from 'express-session';
 import { createServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import config from '../utils/config.js';
 import logger, { subscribeToLogs, getRecentLogs } from '../utils/logger.js';
@@ -158,6 +159,44 @@ class DashboardServer {
         // Health check
         this.app.get('/health', (req, res) => {
             res.json({ status: 'ok', timestamp: new Date().toISOString() });
+        });
+
+        // Restart application (Docker will auto-restart via restart: unless-stopped)
+        this.app.post('/api/restart', requireAuth, (req, res) => {
+            logger.warn('Application restart requested from dashboard');
+            res.json({ success: true, message: 'Restarting application...' });
+            setTimeout(() => {
+                process.exit(0);
+            }, 1000);
+        });
+
+        // Get server log file contents
+        this.app.get('/api/logs/file', requireAuth, (req, res) => {
+            const lines = Math.min(parseInt(req.query.lines) || 500, 2000);
+            const logPath = path.resolve(process.cwd(), 'data', 'logs', 'combined.log');
+
+            try {
+                if (!fs.existsSync(logPath)) {
+                    return res.json({ logs: [], message: 'Log file not found. File logging is only available in production mode.' });
+                }
+
+                const content = fs.readFileSync(logPath, 'utf-8');
+                const allLines = content.trim().split('\n').filter(Boolean);
+                const recentLines = allLines.slice(-lines);
+
+                const parsedLogs = recentLines.map(line => {
+                    try {
+                        return JSON.parse(line);
+                    } catch {
+                        return { timestamp: '', level: 'info', message: line };
+                    }
+                });
+
+                res.json({ logs: parsedLogs, total: allLines.length, showing: recentLines.length });
+            } catch (err) {
+                logger.error('Failed to read log file', { error: err.message });
+                res.status(500).json({ error: 'Failed to read log file' });
+            }
         });
 
         // WhatsApp Disconnect

@@ -17,6 +17,7 @@
                 <span class="status-badge" id="status-badge">מתחבר...</span>
             </div>
             <nav>
+                <button id="btn-restart" class="btn btn-danger-small" style="margin-left: 8px;">🔄 הפעל מחדש</button>
                 <a href="/logout" class="btn btn-secondary">התנתק</a>
             </nav>
         </header>
@@ -277,22 +278,55 @@
                 <section class="panel console-panel">
                     <h2>
                         🖥️ לוג מערכת
-                        <button id="clear-logs" class="btn btn-small">נקה</button>
                     </h2>
-                    <div class="console" id="console">
-                        <% recentLogs.forEach(log=> { %>
-                            <div class="log-entry log-<%= log.level %>">
-                                <span class="log-time">
-                                    <%= new Date(log.timestamp).toLocaleTimeString('he-IL') %>
-                                </span>
-                                <span class="log-level">
-                                    <%= log.level.toUpperCase() %>
-                                </span>
-                                <span class="log-message">
-                                    <%= log.message %>
-                                </span>
+                    <!-- Sub-tab navigation -->
+                    <div class="log-sub-tabs">
+                        <button class="log-sub-tab active" data-log-tab="live-log">📡 לוג חי</button>
+                        <button class="log-sub-tab" data-log-tab="server-log">📄 לוג שרת</button>
+                    </div>
+
+                    <!-- Live Log Pane -->
+                    <div class="log-pane active" id="live-log">
+                        <div style="display: flex; justify-content: flex-end; margin-bottom: 8px;">
+                            <button id="clear-logs" class="btn btn-small">נקה</button>
+                        </div>
+                        <div class="console" id="console">
+                            <% recentLogs.forEach(log=> { %>
+                                <div class="log-entry log-<%= log.level %>">
+                                    <span class="log-time">
+                                        <%= new Date(log.timestamp).toLocaleTimeString('he-IL') %>
+                                    </span>
+                                    <span class="log-level">
+                                        <%= log.level.toUpperCase() %>
+                                    </span>
+                                    <span class="log-message">
+                                        <%= log.message %>
+                                    </span>
+                                </div>
+                                <% }) %>
+                        </div>
+                    </div>
+
+                    <!-- Server Log Pane -->
+                    <div class="log-pane" id="server-log">
+                        <div
+                            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <span id="server-log-info" style="font-size: 12px; color: var(--gray);"></span>
+                            <div style="display: flex; gap: 8px; align-items: center;">
+                                <select id="server-log-lines" class="form-input"
+                                    style="width: auto; padding: 4px 8px; font-size: 12px;">
+                                    <option value="200">200 שורות</option>
+                                    <option value="500" selected>500 שורות</option>
+                                    <option value="1000">1000 שורות</option>
+                                    <option value="2000">2000 שורות</option>
+                                </select>
+                                <button id="refresh-server-log" class="btn btn-small btn-primary">🔄 רענן</button>
                             </div>
-                            <% }) %>
+                        </div>
+                        <div class="console" id="server-log-console">
+                            <div style="text-align: center; color: var(--gray); padding: 40px;">לחצו על "רענן" כדי לטעון
+                                את לוג השרת</div>
+                        </div>
                     </div>
                 </section>
             </div>

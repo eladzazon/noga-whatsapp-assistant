@@ -664,6 +664,139 @@
         scheduleCancelBtn.addEventListener('click', hideScheduleForm);
     }
 
+    // ==================== Restart Button ====================
+
+    const btnRestart = document.getElementById('btn-restart');
+    if (btnRestart) {
+        btnRestart.addEventListener('click', async () => {
+            if (!confirm('האם אתה בטוח שברצונך להפעיל מחדש את המערכת?')) return;
+
+            btnRestart.disabled = true;
+            btnRestart.textContent = 'מפעיל מחדש...';
+
+            try {
+                await fetch('/api/restart', { method: 'POST' });
+                // Show restarting message
+                addLogEntry({
+                    level: 'warn',
+                    message: 'Application restart requested. Reconnecting...',
+                    timestamp: new Date().toISOString()
+                });
+                updateStatusBadge('מאתחל...', 'disconnected');
+
+                // Poll until server comes back
+                setTimeout(() => {
+                    const poll = setInterval(async () => {
+                        try {
+                            const res = await fetch('/health');
+                            if (res.ok) {
+                                clearInterval(poll);
+                                window.location.reload();
+                            }
+                        } catch {
+                            // Server still down, keep polling
+                        }
+                    }, 2000);
+                }, 3000);
+            } catch (err) {
+                btnRestart.disabled = false;
+                btnRestart.textContent = '🔄 הפעל מחדש';
+                alert('שגיאה בהפעלה מחדש');
+            }
+        });
+    }
+
+    // ==================== Log Sub-Tabs ====================
+
+    const logSubTabs = document.querySelectorAll('.log-sub-tab');
+    const logPanes = document.querySelectorAll('.log-pane');
+
+    logSubTabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            const targetPane = tab.dataset.logTab;
+
+            logSubTabs.forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+
+            logPanes.forEach(p => p.classList.remove('active'));
+            const pane = document.getElementById(targetPane);
+            if (pane) pane.classList.add('active');
+
+            // Auto-fetch server log when switching to it
+            if (targetPane === 'server-log') {
+                fetchServerLog();
+            }
+        });
+    });
+
+    // ==================== Server Log Functions ====================
+
+    const serverLogConsole = document.getElementById('server-log-console');
+    const serverLogInfo = document.getElementById('server-log-info');
+    const serverLogLines = document.getElementById('server-log-lines');
+    const refreshServerLog = document.getElementById('refresh-server-log');
+
+    async function fetchServerLog() {
+        if (!serverLogConsole) return;
+
+        const lines = serverLogLines ? serverLogLines.value : 500;
+        serverLogConsole.innerHTML = '<div style="text-align: center; color: var(--gray); padding: 40px;">טוען...</div>';
+
+        try {
+            const res = await fetch(`/api/logs/file?lines=${lines}`);
+            const data = await res.json();
+
+            if (data.message && (!data.logs || data.logs.length === 0)) {
+                serverLogConsole.innerHTML = `<div style="text-align: center; color: var(--gray); padding: 40px;">${escapeHtml(data.message)}</div>`;
+                if (serverLogInfo) serverLogInfo.textContent = '';
+                return;
+            }
+
+            serverLogConsole.innerHTML = '';
+            data.logs.forEach(log => {
+                const entry = document.createElement('div');
+                const level = (log.level || 'info').toLowerCase();
+                entry.className = `log-entry log-${level}`;
+
+                const time = log.timestamp ? new Date(log.timestamp).toLocaleString('he-IL') : '';
+
+                // Build message from log fields
+                let msg = log.message || '';
+                const meta = { ...log };
+                delete meta.timestamp;
+                delete meta.level;
+                delete meta.message;
+                if (Object.keys(meta).length > 0) {
+                    msg += ' ' + JSON.stringify(meta);
+                }
+
+                entry.innerHTML = `
+                    <span class="log-time">${time}</span>
+                    <span class="log-level">${level.toUpperCase()}</span>
+                    <span class="log-message">${escapeHtml(msg)}</span>
+                `;
+                serverLogConsole.appendChild(entry);
+            });
+
+            // Scroll to bottom
+            serverLogConsole.scrollTop = serverLogConsole.scrollHeight;
+
+            if (serverLogInfo) {
+                serverLogInfo.textContent = `מציג ${data.showing || data.logs.length} מתוך ${data.total || '?'} שורות`;
+            }
+        } catch (err) {
+            serverLogConsole.innerHTML = '<div style="text-align: center; color: var(--danger); padding: 40px;">שגיאה בטעינת לוג השרת</div>';
+        }
+    }
+
+    if (refreshServerLog) {
+        refreshServerLog.addEventListener('click', fetchServerLog);
+    }
+
+    if (serverLogLines) {
+        serverLogLines.addEventListener('change', fetchServerLog);
+    }
+
     // ==================== Initialization ====================
 
     let usdToIlsRate = 3.65; // Fallback rate
