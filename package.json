@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@google/generative-ai": "*",
-    "@whiskeysockets/baileys": "^7.0.0-rc.9",
+    "@whiskeysockets/baileys": "*",
     "axios": "*",
     "better-sqlite3": "*",
     "dotenv": "*",
