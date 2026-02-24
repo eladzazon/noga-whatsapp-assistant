@@ -105,8 +105,17 @@
 
     socket.on('disconnected', (reason) => {
         updateStatusBadge('מנותק', 'disconnected');
-        // Show QR section again when disconnected
+        updateStatusItem('whatsapp', false, 'מנותק');
+        // Show QR section again when disconnected and reset QR placeholder
         if (qrSection) qrSection.classList.remove('hidden');
+        if (qrPlaceholder) {
+            qrPlaceholder.innerHTML = `
+                <div class="connected-message">
+                    <p>WhatsApp מנותק</p>
+                    <p style="font-size: 14px; color: var(--gray);">לחצו על "🔄 התחבר מחדש" למעלה כדי לקבל קוד QR חדש</p>
+                </div>
+            `;
+        }
         addLogEntry({
             level: 'warn',
             message: `WhatsApp disconnected: ${reason}`,
