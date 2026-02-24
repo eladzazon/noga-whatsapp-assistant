@@ -119,14 +119,29 @@ class WhatsAppManager {
      * Purge the session folders safely and restart Baileys
      */
     _purgeSessionAndRestart() {
+        if (this.client) {
+            try {
+                this.client.ws.close();
+            } catch (err) {
+                // Ignore
+            }
+            try {
+                this.client.end(new Error('Purging session'));
+            } catch (err) {
+                // Ignore
+            }
+        }
+
         this.client = null;
         this.isReady = false;
 
         try {
-            const sessionDir = config.whatsapp.sessionPath;
+            const sessionDir = path.resolve(process.cwd(), config.whatsapp.sessionPath);
             if (fs.existsSync(sessionDir)) {
-                logger.info('Deleting WhatsApp session folder for a clean reconnect...');
+                logger.info('Deleting WhatsApp session folder for a clean reconnect...', { sessionDir });
                 fs.rmSync(sessionDir, { recursive: true, force: true });
+            } else {
+                logger.info('Session folder does not exist, skipping deletion', { sessionDir });
             }
         } catch (err) {
             logger.error('Failed to delete session directory', { error: err.message });
