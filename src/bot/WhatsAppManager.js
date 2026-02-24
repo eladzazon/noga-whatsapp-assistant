@@ -75,20 +75,30 @@ class WhatsAppManager {
             if (connection === 'close') {
                 this.isReady = false;
                 const statusCode = (lastDisconnect?.error)?.output?.statusCode;
-                const shouldReconnect = statusCode !== DisconnectReason.loggedOut && statusCode !== 405;
+                const isLoggedOut = statusCode === DisconnectReason.loggedOut;
+                const is405 = statusCode === 405;
 
-                logger.warn('WhatsApp disconnected', { reason: lastDisconnect?.error, shouldReconnect });
+                logger.warn('WhatsApp disconnected', { reason: lastDisconnect?.error, statusCode, isLoggedOut, is405 });
 
                 if (this.onDisconnectedCallback) {
                     this.onDisconnectedCallback(lastDisconnect?.error);
                 }
 
-                if (shouldReconnect) {
+                if (isLoggedOut) {
+                    // Logged out from phone - purge session and restart to get new QR
+                    logger.warn('WhatsApp logged out from device. Purging session and restarting...');
+                    await this._purgeSession();
+                    setTimeout(() => this.init(), 3000);
+                } else if (is405) {
+                    // 405 = connection rejected by WhatsApp servers (rate-limited or blocked)
+                    // Purge session but do NOT auto-restart to avoid infinite loop
+                    logger.warn('WhatsApp connection rejected (405). Session purged. Use the dashboard to reconnect manually when ready.');
+                    await this._purgeSession();
+                    // Do NOT call this.init() here - user must reconnect manually
+                } else {
+                    // Temporary disconnect - attempt to reconnect with existing session
                     logger.info('Attempting to reconnect...');
                     setTimeout(() => this.init(), 5000);
-                } else {
-                    logger.warn('WhatsApp logged out automatically from the device. Purging session to generate fresh QR...');
-                    this._purgeSessionAndRestart();
                 }
             } else if (connection === 'open') {
                 logger.info('WhatsApp client is ready!');
@@ -116,9 +126,9 @@ class WhatsAppManager {
     }
 
     /**
-     * Purge the session folders safely and restart Baileys
+     * Purge the session folder (does NOT auto-restart)
      */
-    async _purgeSessionAndRestart() {
+    async _purgeSession() {
         if (this.client) {
             try {
                 this.client.ev.removeAllListeners();
@@ -146,24 +156,22 @@ class WhatsAppManager {
         try {
             const sessionDir = path.resolve(process.cwd(), config.whatsapp.sessionPath);
             if (fs.existsSync(sessionDir)) {
-                logger.info('Deleting WhatsApp session folder for a clean reconnect...', { sessionDir });
-
-                // Rename first to avoid race conditions with lingering file handles
-                const trashDir = `${sessionDir}_trash_${Date.now()}`;
-                try {
-                    fs.renameSync(sessionDir, trashDir);
-                    fs.rmSync(trashDir, { recursive: true, force: true });
-                } catch (renameErr) {
-                    fs.rmSync(sessionDir, { recursive: true, force: true });
-                }
+                logger.info('Deleting WhatsApp session folder...', { sessionDir });
+                fs.rmSync(sessionDir, { recursive: true, force: true });
             } else {
                 logger.info('Session folder does not exist, skipping deletion', { sessionDir });
             }
         } catch (err) {
             logger.error('Failed to delete session directory', { error: err.message });
         }
+    }
 
-        // Delay starting the new login process lightly to let IO finish
+    /**
+     * Manually reconnect WhatsApp (called from dashboard)
+     */
+    async reconnect() {
+        logger.info('Manual reconnect requested from dashboard...');
+        await this._purgeSession();
         setTimeout(() => this.init(), 2000);
     }
 
@@ -182,8 +190,9 @@ class WhatsAppManager {
             this.isReady = false;
         }
 
-        // It's safer to always purge and restart manually too just in case Baileys fails to delete the keys gracefully
-        this._purgeSessionAndRestart();
+        // Purge session and restart to generate new QR
+        await this._purgeSession();
+        setTimeout(() => this.init(), 3000);
     }
 
 

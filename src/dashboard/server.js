@@ -172,6 +172,18 @@ class DashboardServer {
             }
         });
 
+        // WhatsApp Reconnect (manual - used after 405 errors)
+        this.app.post('/api/whatsapp/reconnect', requireAuth, async (req, res) => {
+            try {
+                const { default: whatsappManager } = await import('../bot/WhatsAppManager.js');
+                await whatsappManager.reconnect();
+                res.json({ success: true, message: 'Reconnecting WhatsApp. Please wait for QR code...' });
+            } catch (err) {
+                logger.error('Failed to reconnect WhatsApp', { error: err.message });
+                res.status(500).json({ error: 'Failed to reconnect WhatsApp' });
+            }
+        });
+
         // ==================== Webhook API ====================
 
         // Status webhook (for Home Assistant)

@@ -11,6 +11,7 @@
     const consoleEl = document.getElementById('console');
     const clearLogsBtn = document.getElementById('clear-logs');
     const btnDisconnectWa = document.getElementById('btn-disconnect-wa');
+    const btnReconnectWa = document.getElementById('btn-reconnect-wa');
 
     // Status elements
     const statusElements = {
@@ -165,9 +166,14 @@
             valueEl.textContent = label || (connected ? 'פעיל' : 'לא פעיל');
         }
 
-        // Handle disconnect button visibility for WhatsApp
-        if (id === 'whatsapp' && btnDisconnectWa) {
-            btnDisconnectWa.style.display = connected ? 'inline-block' : 'none';
+        // Handle disconnect/reconnect button visibility for WhatsApp
+        if (id === 'whatsapp') {
+            if (btnDisconnectWa) {
+                btnDisconnectWa.style.display = connected ? 'inline-block' : 'none';
+            }
+            if (btnReconnectWa) {
+                btnReconnectWa.style.display = connected ? 'none' : 'inline-block';
+            }
         }
     }
 
@@ -586,6 +592,32 @@
             } finally {
                 btnDisconnectWa.disabled = false;
                 btnDisconnectWa.textContent = 'התנתק';
+            }
+        });
+    }
+
+    if (btnReconnectWa) {
+        btnReconnectWa.addEventListener('click', async () => {
+            btnReconnectWa.disabled = true;
+            btnReconnectWa.textContent = 'מתחבר...';
+
+            try {
+                const res = await fetch('/api/whatsapp/reconnect', { method: 'POST' });
+                const data = await res.json();
+                if (data.success) {
+                    addLogEntry({
+                        level: 'info',
+                        message: 'Reconnecting WhatsApp. Waiting for QR code...',
+                        timestamp: new Date().toISOString()
+                    });
+                } else {
+                    alert(data.error || 'שגיאה בהתחברות מחדש');
+                }
+            } catch (err) {
+                alert('שגיאה בתקשורת מול השרת');
+            } finally {
+                btnReconnectWa.disabled = false;
+                btnReconnectWa.textContent = '🔄 התחבר מחדש';
             }
         });
     }
