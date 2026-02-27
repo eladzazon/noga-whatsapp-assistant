@@ -119,16 +119,18 @@ class GeminiManager {
         logger.info('Processing message with Gemini', { userId, textLength: text.length });
 
         try {
-            // Check if this is a device-related message
-            const isDeviceRelated = this._isDeviceRelatedMessage(text);
+            // Check if this is a volatile request (devices, calendar, etc)
+            const isVolatileRequest = this._isVolatileRequestMessage(text);
 
-            // For device-related messages, use minimal history to force fresh API calls
-            // UNLESS keepHistory is set (e.g. from AI keywords that need context)
+            // For volatile/status messages (devices, calendar), use minimal history to force fresh API calls
+            // UNLESS keepHistory is explicitly true (e.g. from AI keywords that need context)
             let history = [];
-            if (options.keepHistory || !isDeviceRelated) {
+            if (options.keepHistory === false) {
+                logger.info('keepHistory explicitly false - using empty history to force API calls');
+            } else if (options.keepHistory || !isVolatileRequest) {
                 history = this._buildHistory(userId);
             } else {
-                logger.info('Device-related message detected - using empty history to force API calls');
+                logger.info('Volatile request detected - using empty history to force API calls');
             }
 
             // Start chat session
@@ -153,7 +155,7 @@ class GeminiManager {
             const textPreview = response.text ? response.text().substring(0, 100) : '';
             logger.info('Gemini raw response', {
                 historyLength: history.length,
-                isDeviceRelated,
+                isVolatileRequest,
                 hasFunctionCalls: !!(functionCalls && functionCalls.length > 0),
                 functionCallsCount: functionCalls ? functionCalls.length : 0,
                 candidatesCount: candidates ? candidates.length : 0,
@@ -204,30 +206,33 @@ class GeminiManager {
     }
 
     /**
-     * Check if message is related to device control or status
+     * Check if message is related to volatile status (device control, calendar, etc).
      * @param {string} text - Message text
      * @returns {boolean}
      */
-    _isDeviceRelatedMessage(text) {
+    _isVolatileRequestMessage(text) {
         const lowerText = text.toLowerCase();
-        const devicePatterns = [
-            // Hebrew patterns
+        const volatilePatterns = [
+            // Hebrew device patterns
             'תדליק', 'תכבה', 'הדלק', 'כבה', 'להדליק', 'לכבות',
             'האור', 'אור', 'מנורה', 'תאורה', 'נורה',
             'מזגן', 'מיזוג', 'טמפרטורה',
             'מתג', 'שקע',
             'מה המצב', 'האם דולק', 'האם כבוי', 'האם פועל',
             'בדוק', 'תבדוק', 'בדקי', 'תבדקי',
-            // English patterns  
+            // Hebrew calendar/volatile patterns
+            'יומן', 'אירוע', 'אירועים', 'פגישה', 'פגישות', 'לוז', 'לו"ז', 'משימה', 'משימות',
+            // English device & calendar patterns  
             'turn on', 'turn off', 'switch on', 'switch off', 'toggle',
             'light', 'lamp', 'switch',
             'status', 'state', 'check',
+            'calendar', 'event', 'events', 'schedule', 'meeting', 'meetings',
             // Entity ID patterns
             'light.', 'switch.', 'sensor.', 'climate.',
             'tz3000', 'ts0004'  // Common Zigbee patterns
         ];
 
-        return devicePatterns.some(pattern => lowerText.includes(pattern));
+        return volatilePatterns.some(pattern => lowerText.includes(pattern));
     }
 
     /**
