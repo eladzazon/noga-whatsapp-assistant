@@ -41,6 +41,23 @@ class DatabaseManager {
             }
         } catch { /* table may not exist yet */ }
 
+        // Migration: Create ha_mappings table if missing
+        this.db.exec(`
+            CREATE TABLE IF NOT EXISTS ha_mappings (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                entity_id TEXT NOT NULL UNIQUE,
+                nickname TEXT NOT NULL,
+                location TEXT,
+                type TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            );
+        `);
+
+        // Migration: Indexes for ha_mappings
+        this.db.exec(`CREATE INDEX IF NOT EXISTS idx_ha_entity ON ha_mappings(entity_id);`);
+        this.db.exec(`CREATE INDEX IF NOT EXISTS idx_ha_nickname ON ha_mappings(nickname);`);
+
         // Migration: Create scheduled_prompts table if missing
         this.db.exec(`
             CREATE TABLE IF NOT EXISTS scheduled_prompts (
@@ -418,7 +435,49 @@ class DatabaseManager {
      * Delete a scheduled prompt
      */
     deleteScheduledPrompt(id) {
-        const stmt = this.db.prepare('DELETE FROM scheduled_prompts WHERE id = ?');
+        const stmt = this.db.prepare('DELETE FROM scheduled_prompts WHERE id ?');
+        stmt.run(id);
+    }
+
+    // ==================== Home Assistant Mapping Operations ====================
+
+    /**
+     * Get all Home Assistant mappings
+     */
+    getHaMappings() {
+        const stmt = this.db.prepare('SELECT * FROM ha_mappings ORDER BY location ASC, nickname ASC');
+        return stmt.all();
+    }
+
+    /**
+     * Add a new Home Assistant mapping
+     */
+    addHaMapping(entityId, nickname, location = null, type = null) {
+        const stmt = this.db.prepare(`
+            INSERT INTO ha_mappings (entity_id, nickname, location, type)
+            VALUES (?, ?, ?, ?)
+        `);
+        const result = stmt.run(entityId.trim(), nickname.trim(), location ? location.trim() : null, type ? type.trim() : null);
+        return result.lastInsertRowid;
+    }
+
+    /**
+     * Update an existing Home Assistant mapping
+     */
+    updateHaMapping(id, entityId, nickname, location, type) {
+        const stmt = this.db.prepare(`
+            UPDATE ha_mappings 
+            SET entity_id = ?, nickname = ?, location = ?, type = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        `);
+        stmt.run(entityId.trim(), nickname.trim(), location ? location.trim() : null, type ? type.trim() : null, id);
+    }
+
+    /**
+     * Delete a Home Assistant mapping
+     */
+    deleteHaMapping(id) {
+        const stmt = this.db.prepare('DELETE FROM ha_mappings WHERE id = ?');
         stmt.run(id);
     }
 

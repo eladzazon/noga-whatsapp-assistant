@@ -463,6 +463,80 @@ class DashboardServer {
                 res.status(500).json({ error: err.message });
             }
         });
+
+        // ==================== Home Assistant Mapping API ====================
+
+        // Get all Home Assistant mappings
+        this.app.get('/api/ha/mappings', requireAuth, (req, res) => {
+            if (!this.db) return res.status(500).json({ error: 'DB not initialized' });
+            try {
+                const mappings = this.db.getHaMappings();
+                res.json({ mappings });
+            } catch (err) {
+                res.status(500).json({ error: err.message });
+            }
+        });
+
+        // Add Home Assistant mapping
+        this.app.post('/api/ha/mappings', requireAuth, (req, res) => {
+            const { entityId, nickname, location, type } = req.body;
+            if (!entityId || !nickname) {
+                return res.status(400).json({ error: 'entityId and nickname are required' });
+            }
+            if (!this.db) return res.status(500).json({ error: 'DB not initialized' });
+            try {
+                const id = this.db.addHaMapping(entityId, nickname, location, type);
+                logger.info('HA mapping added via dashboard', { entityId, nickname });
+                res.json({ success: true, id });
+            } catch (err) {
+                if (err.message.includes('UNIQUE')) {
+                    return res.status(409).json({ error: 'Mapping for this entity already exists' });
+                }
+                res.status(500).json({ error: err.message });
+            }
+        });
+
+        // Update Home Assistant mapping
+        this.app.put('/api/ha/mappings/:id', requireAuth, (req, res) => {
+            const { id } = req.params;
+            const { entityId, nickname, location, type } = req.body;
+            if (!entityId || !nickname) {
+                return res.status(400).json({ error: 'entityId and nickname are required' });
+            }
+            if (!this.db) return res.status(500).json({ error: 'DB not initialized' });
+            try {
+                this.db.updateHaMapping(parseInt(id), entityId, nickname, location, type);
+                logger.info('HA mapping updated via dashboard', { id, entityId });
+                res.json({ success: true });
+            } catch (err) {
+                res.status(500).json({ error: err.message });
+            }
+        });
+
+        // Delete Home Assistant mapping
+        this.app.delete('/api/ha/mappings/:id', requireAuth, (req, res) => {
+            const { id } = req.params;
+            if (!this.db) return res.status(500).json({ error: 'DB not initialized' });
+            try {
+                this.db.deleteHaMapping(parseInt(id));
+                logger.info('HA mapping deleted via dashboard', { id });
+                res.json({ success: true });
+            } catch (err) {
+                res.status(500).json({ error: err.message });
+            }
+        });
+
+        // Proxy: Get entities from Home Assistant
+        this.app.get('/api/ha/entities', requireAuth, async (req, res) => {
+            try {
+                const { homeAssistantManager } = await import('../skills/index.js');
+                const result = await homeAssistantManager.getEntities();
+                res.json(result);
+            } catch (err) {
+                logger.error('Failed to fetch entities for dashboard', { error: err.message });
+                res.status(500).json({ error: 'Failed to fetch entities from Home Assistant' });
+            }
+        });
     }
 
     /**

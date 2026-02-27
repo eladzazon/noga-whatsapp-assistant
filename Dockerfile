@@ -1,4 +1,5 @@
-FROM node:latest AS builder
+# Use a specific Node version for stability
+FROM node:20-slim AS builder
 
 WORKDIR /app
 
@@ -11,10 +12,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Copy package files and install dependencies
 COPY package*.json ./
-RUN npm ci --only=production
+RUN npm ci --omit=dev
 
 # --- Production stage ---
-FROM node:latest
+FROM node:20-slim
 
 WORKDIR /app
 
@@ -22,11 +23,12 @@ WORKDIR /app
 RUN groupadd -g 1001 noga && \
     useradd -u 1001 -g noga -s /bin/sh noga
 
+# Copy source code first (order matters)
+# With .dockerignore, this will NOT copy host node_modules
+COPY --chown=noga:noga . .
+
 # Copy built node_modules from builder
 COPY --from=builder /app/node_modules ./node_modules
-
-# Copy source code
-COPY --chown=noga:noga . .
 
 # Create data directory
 RUN mkdir -p /app/data && chown -R noga:noga /app/data

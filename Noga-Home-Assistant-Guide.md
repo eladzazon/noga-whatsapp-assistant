@@ -111,9 +111,35 @@ action:
       data:
         temperature: "{{ states('sensor.outdoor_temperature') }}"
 ```
-**Noga will say:** "Good morning beautiful family! ☀️ It's 22°C outside today. Have a wonderful day!"
+## 5. Control from WhatsApp (Entity Mapping)
 
-## 4. Troubleshooting
+You can now control your Home Assistant devices directly from WhatsApp using friendly Hebrew nicknames.
+
+### Setup Mappings
+1. Open the Noga Dashboard.
+2. Go to the **Home Assistant** tab.
+3. Use the **🔄 טען מכשירים מ-HA** button to see a list of your entities.
+4. Click on an entity in the list to map it.
+5. Provide a **Nickname** (Hebrew recommended) and a **Location**.
+6. Save the mapping.
+
+### Examples
+Once mapped, you can send these commands to Noga:
+- "תדליק את האור במטבח" (Turn on the kitchen light)
+- "כבי את המזגן בסלון" (Turn off the living room AC)
+- "מה המצב של התאורה בכניסה?" (What's the status of the entrance lighting?)
+
+Noga uses your custom nicknames and locations to precisely identify which device you want to control.
+
+## 6. AI Quota Handling
+
+If you are using the Gemini Free Tier and reach your daily limit (429 error), Noga will:
+1. Update the dashboard status for Gemini to **"מכסה נגמרה"** (Quota Exceeded) in red.
+2. Respond to WhatsApp messages with: *"המכסה היומית של הבינה המלאכותית נגמרה 😅 אשתף פעולה שוב בקרוב!"*
+
+The system will automatically recover as soon as your quota is reset.
+
+## 7. Troubleshooting
 
 - **Check Logs**: If it doesn't work, check the Noga logs (`npm run dev`).
 - **"Unauthorized"**: Make sure the secret in `configuration.yaml` matches `.env`.

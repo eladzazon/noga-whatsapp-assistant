@@ -82,3 +82,17 @@ CREATE TABLE IF NOT EXISTS scheduled_prompts (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Home Assistant entity mappings
+CREATE TABLE IF NOT EXISTS ha_mappings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    entity_id TEXT NOT NULL UNIQUE,
+    nickname TEXT NOT NULL,
+    location TEXT,
+    type TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_ha_entity ON ha_mappings(entity_id);
+CREATE INDEX IF NOT EXISTS idx_ha_nickname ON ha_mappings(nickname);

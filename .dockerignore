@@ -1,0 +1,11 @@
+node_modules
+npm-debug.log
+data/
+.env
+.git
+.github
+*.md
+Dockerfile
+docker-compose.yml
+noga-pre.tar
+run.bat

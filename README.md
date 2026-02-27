@@ -11,8 +11,9 @@ A modular, Dockerized home assistant accessible via WhatsApp, powered by Google 
 - **Gemini AI** - Powered by Google's Gemini 2.0 Flash with function calling
 - **Google Calendar** - View, add, and manage calendar events
 - **Shopping List** - Manage a shared shopping list via Google Tasks
-- **Home Assistant** - Control smart home devices and check sensors
-- **Admin Dashboard** - Web-based control panel with live QR code and logs
+- **Home Assistant** - Control smart home devices and check sensors with custom Hebrew nicknames and location mapping
+- **AI Quota Handling** - Graceful handling of Gemini API limits with dashboard alerts and user notifications
+- **Admin Dashboard** - Web-based control panel with live QR code, logs, and entity mapping interface
 - **Hebrew Support** - Native Hebrew language support (RTL)
 
 ## 🚀 Quick Start

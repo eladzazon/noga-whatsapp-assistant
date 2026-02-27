@@ -1,6 +1,8 @@
 import calendarManager from './CalendarManager.js';
 import tasksManager from './TasksManager.js';
 import homeAssistantManager from './HomeAssistantManager.js';
+import db from '../database/DatabaseManager.js';
+import { findActionAndEntity } from '../utils/HaRecognition.js';
 import logger from '../utils/logger.js';
 
 /**
