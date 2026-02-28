@@ -481,6 +481,27 @@ class DatabaseManager {
         stmt.run(id);
     }
 
+    /**
+     * Search HA mappings by nickname or location
+     * @param {string} query - The search query
+     * @param {string} type - Optional type filter
+     */
+    findHaMappingsByName(query, type = null) {
+        const search = `%${query.trim()}%`;
+        let sql = 'SELECT * FROM ha_mappings WHERE (nickname LIKE ? OR location LIKE ?)';
+        const params = [search, search];
+
+        if (type) {
+            sql += ' AND type = ?';
+            params.push(type);
+        }
+
+        sql += ' ORDER BY nickname ASC';
+
+        const stmt = this.db.prepare(sql);
+        return stmt.all(...params);
+    }
+
     // ==================== Usage Tracking ====================
 
     /**

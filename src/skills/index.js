@@ -198,6 +198,47 @@ export const functionDeclarations = [
 ];
 
 /**
+ * Helper to resolve an entity identifier (ID or friendly name) to a valid HA entity ID.
+ * Prioritizes custom mappings from the database.
+ * @param {string} identifier - The ID or name to resolve
+ * @returns {Promise<string|Object>} - Resolved entity ID or error object
+ */
+async function resolveEntityId(identifier) {
+    if (!identifier) return { error: 'No entity identifier provided' };
+
+    // 1. Check if it's already a valid entity ID that exists in mappings
+    // (This handles cases where Gemini uses the real ID)
+    const exactMapping = db.getHaMappings().find(m => m.entity_id === identifier);
+    if (exactMapping) return exactMapping.entity_id;
+
+    // 2. Identify if it looks like a friendly name
+    const looksLikeFriendlyName = !identifier.includes('.') ||
+        /[A-Z]/.test(identifier) ||
+        /\s/.test(identifier) ||
+        /[\u0590-\u05FF]/.test(identifier);
+
+    // 3. Check custom mappings by nickname/location
+    const mappings = db.findHaMappingsByName(identifier);
+    if (mappings.length > 0) {
+        logger.info('Resolved entity via custom mappings', { original: identifier, resolved: mappings[0].entity_id });
+        return mappings[0].entity_id;
+    }
+
+    // 4. If it looks like a friendly name, try native HA search
+    if (looksLikeFriendlyName) {
+        const result = await homeAssistantManager.findEntityByName(identifier);
+        if (result.success && result.entities.length > 0) {
+            logger.info('Resolved entity via HA native search', { original: identifier, resolved: result.entities[0].id });
+            return result.entities[0].id;
+        }
+        return result; // Return the search failure result
+    }
+
+    // 5. Default: return as-is (assume it's a real entity ID)
+    return identifier;
+}
+
+/**
  * Map function names to their handlers
  */
 export const functionHandlers = {
@@ -243,26 +284,10 @@ export const functionHandlers = {
     control_device: async (args) => {
         logger.info('Executing: control_device', args);
 
-        let entityId = args.entity_id;
+        const resolved = await resolveEntityId(args.entity_id);
+        if (typeof resolved === 'object' && resolved.error) return resolved;
 
-        // Detect if this looks like a friendly name rather than an entity ID
-        // Entity IDs are like "light.living_room" - lowercase, no spaces, has a dot
-        // Friendly names can be "Living Room Light" or "תאורת כניסה 1"
-        const looksLikeFriendlyName = !entityId.includes('.') ||  // No dot
-            /[A-Z]/.test(entityId) ||  // Has uppercase letters
-            /\s/.test(entityId) ||     // Has spaces
-            /[\u0590-\u05FF]/.test(entityId);  // Has Hebrew characters
-
-        if (looksLikeFriendlyName) {
-            logger.info('Entity looks like friendly name, searching...', { entityId });
-            const result = await homeAssistantManager.findEntityByName(entityId);
-            if (result.success && result.entities.length > 0) {
-                entityId = result.entities[0].id;
-                logger.info('Found entity by name', { original: args.entity_id, resolved: entityId });
-            } else {
-                return result;
-            }
-        }
+        const entityId = resolved;
 
         switch (args.action) {
             case 'turn_on':
@@ -279,24 +304,10 @@ export const functionHandlers = {
     get_device_state: async (args) => {
         logger.info('Executing: get_device_state', args);
 
-        let entityId = args.entity_id;
+        const resolved = await resolveEntityId(args.entity_id);
+        if (typeof resolved === 'object' && resolved.error) return resolved;
 
-        // Detect if this looks like a friendly name rather than an entity ID
-        const looksLikeFriendlyName = !entityId.includes('.') ||
-            /[A-Z]/.test(entityId) ||
-            /\s/.test(entityId) ||
-            /[\u0590-\u05FF]/.test(entityId);
-
-        if (looksLikeFriendlyName) {
-            logger.info('Entity looks like friendly name, searching...', { entityId });
-            const result = await homeAssistantManager.findEntityByName(entityId);
-            if (result.success && result.entities.length > 0) {
-                entityId = result.entities[0].id;
-                logger.info('Found entity by name', { original: args.entity_id, resolved: entityId });
-            } else {
-                return result;
-            }
-        }
+        const entityId = resolved;
 
         // Check if it's a sensor
         if (entityId.startsWith('sensor.')) {
@@ -305,7 +316,20 @@ export const functionHandlers = {
             return sensorResult;
         }
 
-        const stateResult = await homeAssistantManager.getState(entityId);
+        let stateResult = await homeAssistantManager.getState(entityId);
+
+        // Final fallback: if state failed (e.g. 404) and we haven't tried searching yet,
+        // it's possible Gemini used an incorrect entity ID format.
+        if (!stateResult.success && entityId.includes('.')) {
+            logger.info('Native state check failed, trying fuzzy search fallback...', { entityId });
+            const domain = entityId.split('.')[0];
+            const name = entityId.split('.')[1] || entityId;
+            const searchResult = await homeAssistantManager.findEntityByName(name, domain);
+            if (searchResult.success && searchResult.entities.length > 0) {
+                stateResult = await homeAssistantManager.getState(searchResult.entities[0].id);
+            }
+        }
+
         logger.info('get_device_state RESULT', {
             entityId,
             state: stateResult.entity?.state,
@@ -324,7 +348,30 @@ export const functionHandlers = {
 
     find_device: async (args) => {
         logger.info('Executing: find_device', args);
-        return await homeAssistantManager.findEntityByName(args.name, args.type);
+
+        // 1. Check custom mappings
+        const mappings = db.findHaMappingsByName(args.name, args.type);
+
+        // 2. Check native HA entities
+        const nativeResult = await homeAssistantManager.findEntityByName(args.name, args.type);
+
+        if (mappings.length > 0) {
+            const mappedEntities = mappings.map(m => ({
+                id: m.entity_id,
+                name: m.nickname,
+                location: m.location,
+                type: m.type,
+                is_mapped: true
+            }));
+
+            return {
+                success: true,
+                count: mappedEntities.length + (nativeResult.entities ? nativeResult.entities.length : 0),
+                entities: [...mappedEntities, ...(nativeResult.entities || [])]
+            };
+        }
+
+        return nativeResult;
     },
 
     set_light_brightness: async (args) => {
