@@ -464,7 +464,6 @@ class DashboardServer {
             }
         });
 
-<<<<<<< HEAD
         // ==================== Settings API (.env management) ====================
 
         // Get all .env settings
@@ -547,7 +546,9 @@ class DashboardServer {
             } catch (err) {
                 logger.error('Failed to write .env settings', { error: err.message });
                 res.status(500).json({ error: 'Failed to save settings' });
-=======
+            }
+        });
+
         // ==================== Home Assistant Mapping API ====================
 
         // Get all Home Assistant mappings
@@ -619,7 +620,6 @@ class DashboardServer {
             } catch (err) {
                 logger.error('Failed to fetch entities for dashboard', { error: err.message });
                 res.status(500).json({ error: 'Failed to fetch entities from Home Assistant' });
->>>>>>> 537382ab6224f18ecc7f82fd20fc3d35dee1f534
             }
         });
     }

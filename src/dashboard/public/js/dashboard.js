@@ -1116,9 +1116,6 @@
     loadSystemPrompt();
     loadKeywords();
     loadSchedules();
-<<<<<<< HEAD
     loadSettings();
-=======
     loadHaMappings();
->>>>>>> 537382ab6224f18ecc7f82fd20fc3d35dee1f534
 })();
