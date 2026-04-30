@@ -75,12 +75,16 @@ class MessageRouter {
         } catch (err) {
             logger.error('Error processing message', { error: err.message, from });
 
+            // Check if it's a quota error
+            const isQuotaError = err.message && (err.message.includes('429') || err.message.toLowerCase().includes('quota'));
+
             // Send error message in Hebrew
             try {
-                await whatsappManager.sendMessage(
-                    chat,
-                    'סליחה, נתקלתי בבעיה 😅 אנא נסו שוב.'
-                );
+                const errorMessage = isQuotaError
+                    ? 'המכסה היומית של הבינה המלאכותית נגמרה 😅 אשתף פעולה שוב בקרוב!'
+                    : 'סליחה, נתקלתי בבעיה 😅 אנא נסו שוב.';
+
+                await whatsappManager.sendMessage(chat, errorMessage);
             } catch (sendErr) {
                 logger.error('Failed to send error message', { error: sendErr.message });
             }

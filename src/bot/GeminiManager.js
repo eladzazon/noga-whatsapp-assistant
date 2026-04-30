@@ -9,6 +9,7 @@ class GeminiManager {
         this.model = null;
         this.tools = [];
         this.toolHandlers = {};
+        this.quotaExceeded = false;
     }
 
     /**
@@ -146,7 +147,16 @@ class GeminiManager {
             db.addChatMessage(userId, 'user', text);
 
             // Send message and get response
-            let result = await chat.sendMessage(text);
+            let result;
+            try {
+                result = await chat.sendMessage(text);
+                this.quotaExceeded = false; // Reset on success
+            } catch (err) {
+                if (err.message && (err.message.includes('429') || err.message.toLowerCase().includes('quota'))) {
+                    this.quotaExceeded = true;
+                }
+                throw err;
+            }
             let response = result.response;
 
             // Debug: Log what Gemini returned
@@ -269,10 +279,19 @@ class GeminiManager {
             db.addChatMessage(userId, 'user', '[Voice Message]');
 
             // Send audio for processing
-            let result = await chat.sendMessage([
-                audioPart,
-                { text: 'Please listen to this voice message and respond appropriately. If it contains a request or question, handle it. If you need to use any tools/functions, please do so.' }
-            ]);
+            let result;
+            try {
+                result = await chat.sendMessage([
+                    audioPart,
+                    { text: 'Please listen to this voice message and respond appropriately. If it contains a request or question, handle it. If you need to use any tools/functions, please do so.' }
+                ]);
+                this.quotaExceeded = false;
+            } catch (err) {
+                if (err.message && (err.message.includes('429') || err.message.toLowerCase().includes('quota'))) {
+                    this.quotaExceeded = true;
+                }
+                throw err;
+            }
             let response = result.response;
 
             // Handle function calls
@@ -438,6 +457,7 @@ class GeminiManager {
     getStatus() {
         return {
             isInitialized: !!this.model,
+            quotaExceeded: this.quotaExceeded,
             model: config.gemini.model,
             toolsCount: this.tools.length
         };
