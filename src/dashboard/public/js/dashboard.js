@@ -13,6 +13,10 @@
     const btnDisconnectWa = document.getElementById('btn-disconnect-wa');
     const btnReconnectWa = document.getElementById('btn-reconnect-wa');
 
+    // Settings elements
+    const saveSettingsBtn = document.getElementById('save-settings');
+    const settingsStatusEl = document.getElementById('settings-status');
+
     // Status elements
     const statusElements = {
         whatsapp: document.getElementById('status-whatsapp'),
@@ -797,6 +801,102 @@
         serverLogLines.addEventListener('change', fetchServerLog);
     }
 
+    // ==================== Settings Functions ====================
+
+    async function loadSettings() {
+        try {
+            const res = await fetch('/api/settings');
+            const data = await res.json();
+
+            if (data.settings) {
+                // Populate all form fields that have data-env attribute
+                const fields = document.querySelectorAll('[data-env]');
+                fields.forEach(field => {
+                    const envKey = field.dataset.env;
+                    if (envKey in data.settings) {
+                        field.value = data.settings[envKey];
+                    }
+                });
+            }
+        } catch (err) {
+            console.error('Failed to load settings:', err);
+        }
+    }
+
+    async function saveSettings() {
+        const settings = {};
+        const fields = document.querySelectorAll('[data-env]');
+
+        fields.forEach(field => {
+            const envKey = field.dataset.env;
+            const value = field.value;
+            // Only include fields that have a value
+            if (value !== '') {
+                settings[envKey] = value;
+            }
+        });
+
+        if (Object.keys(settings).length === 0) {
+            showSettingsStatus('אין הגדרות לשמור', 'error');
+            return;
+        }
+
+        saveSettingsBtn.disabled = true;
+        saveSettingsBtn.textContent = 'שומר...';
+
+        try {
+            const res = await fetch('/api/settings', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ settings })
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                showSettingsStatus('נשמר בהצלחה ✓ - נדרש הפעלה מחדש', 'success');
+
+                // Ask to restart
+                if (confirm('ההגדרות נשמרו! האם להפעיל מחדש את המערכת כעת כדי שהשינויים ייכנסו לתוקף?')) {
+                    try {
+                        await fetch('/api/restart', { method: 'POST' });
+                        updateStatusBadge('מאתחל...', 'disconnected');
+                        setTimeout(() => {
+                            const poll = setInterval(async () => {
+                                try {
+                                    const r = await fetch('/health');
+                                    if (r.ok) {
+                                        clearInterval(poll);
+                                        window.location.reload();
+                                    }
+                                } catch { /* still restarting */ }
+                            }, 2000);
+                        }, 3000);
+                    } catch { /* restart failed */ }
+                }
+            } else {
+                showSettingsStatus(data.error || 'שגיאה בשמירה', 'error');
+            }
+        } catch (err) {
+            showSettingsStatus('שגיאה בשמירה', 'error');
+        } finally {
+            saveSettingsBtn.disabled = false;
+            saveSettingsBtn.textContent = '💾 שמור הגדרות';
+        }
+    }
+
+    function showSettingsStatus(text, type) {
+        settingsStatusEl.textContent = text;
+        settingsStatusEl.className = `save-status ${type}`;
+        setTimeout(() => {
+            settingsStatusEl.textContent = '';
+            settingsStatusEl.className = 'save-status';
+        }, 5000);
+    }
+
+    if (saveSettingsBtn) {
+        saveSettingsBtn.addEventListener('click', saveSettings);
+    }
+
     // ==================== Initialization ====================
 
     let usdToIlsRate = 3.65; // Fallback rate
@@ -822,4 +922,5 @@
     loadSystemPrompt();
     loadKeywords();
     loadSchedules();
+    loadSettings();
 })();

@@ -28,6 +28,7 @@
             <button class="tab-btn" data-tab="tab-prompt">🧠 הוראות מערכת</button>
             <button class="tab-btn" data-tab="tab-keywords">🔑 מילות מפתח</button>
             <button class="tab-btn" data-tab="tab-scheduled-prompts">⏱️ תזמונים</button>
+            <button class="tab-btn" data-tab="tab-settings">⚙️ הגדרות</button>
             <button class="tab-btn" data-tab="tab-console">🖥️ לוג</button>
         </div>
 
@@ -269,6 +270,152 @@
                                 </tr>
                             </tbody>
                         </table>
+                    </div>
+                </section>
+            </div>
+
+            <!-- ==================== Settings Tab ==================== -->
+            <div class="tab-pane" id="tab-settings">
+                <section class="panel settings-panel">
+                    <h2>
+                        ⚙️ הגדרות מערכת
+                        <div class="prompt-actions">
+                            <span id="settings-status" class="save-status"></span>
+                            <button id="save-settings" class="btn btn-primary btn-small">💾 שמור הגדרות</button>
+                        </div>
+                    </h2>
+                    <p class="panel-hint">ניהול משתני סביבה (.env). לאחר שמירה, יש <strong>להפעיל מחדש</strong> את המערכת כדי שהשינויים ייכנסו לתוקף.</p>
+
+                    <!-- Dashboard Settings -->
+                    <div class="settings-group">
+                        <h3 class="settings-group-title">🖥️ לוח בקרה</h3>
+                        <div class="settings-grid">
+                            <div class="setting-item">
+                                <label for="setting-DASHBOARD_PORT">פורט</label>
+                                <input type="number" id="setting-DASHBOARD_PORT" class="form-input" data-env="DASHBOARD_PORT" placeholder="3000" dir="ltr">
+                                <small>פורט לשרת לוח הבקרה</small>
+                            </div>
+                            <div class="setting-item">
+                                <label for="setting-DASHBOARD_USER">שם משתמש</label>
+                                <input type="text" id="setting-DASHBOARD_USER" class="form-input" data-env="DASHBOARD_USER" placeholder="admin" dir="ltr">
+                                <small>שם משתמש להתחברות ללוח הבקרה</small>
+                            </div>
+                            <div class="setting-item">
+                                <label for="setting-DASHBOARD_PASSWORD">סיסמה</label>
+                                <input type="password" id="setting-DASHBOARD_PASSWORD" class="form-input" data-env="DASHBOARD_PASSWORD" placeholder="••••••" dir="ltr">
+                                <small>סיסמת התחברות ללוח הבקרה</small>
+                            </div>
+                            <div class="setting-item">
+                                <label for="setting-SESSION_SECRET">Session Secret</label>
+                                <input type="password" id="setting-SESSION_SECRET" class="form-input" data-env="SESSION_SECRET" placeholder="••••••" dir="ltr">
+                                <small>מפתח הצפנה לסשנים</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- WhatsApp Settings -->
+                    <div class="settings-group">
+                        <h3 class="settings-group-title">💬 WhatsApp</h3>
+                        <div class="settings-grid">
+                            <div class="setting-item setting-item-wide">
+                                <label for="setting-WHATSAPP_WHITELIST">רשימת מורשים (Whitelist)</label>
+                                <input type="text" id="setting-WHATSAPP_WHITELIST" class="form-input" data-env="WHATSAPP_WHITELIST" placeholder="972501234567,972509876543" dir="ltr">
+                                <small>מספרי טלפון מופרדים בפסיקים (עם קידומת מדינה, ללא + או רווחים)</small>
+                            </div>
+                            <div class="setting-item setting-item-wide">
+                                <label for="setting-WHATSAPP_GROUP_ID">מזהה קבוצה</label>
+                                <input type="text" id="setting-WHATSAPP_GROUP_ID" class="form-input" data-env="WHATSAPP_GROUP_ID" placeholder="120363404881552670@g.us" dir="ltr">
+                                <small>מזהה קבוצת WhatsApp לשליחת הודעות (ניתן למצוא בלוגים)</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Gemini Settings -->
+                    <div class="settings-group">
+                        <h3 class="settings-group-title">🤖 Gemini AI</h3>
+                        <div class="settings-grid">
+                            <div class="setting-item setting-item-wide">
+                                <label for="setting-GEMINI_API_KEY">API Key</label>
+                                <input type="password" id="setting-GEMINI_API_KEY" class="form-input" data-env="GEMINI_API_KEY" placeholder="AIza..." dir="ltr">
+                                <small>מפתח API של Google Gemini (<a href="https://aistudio.google.com/apikey" target="_blank">קבל מפתח</a>)</small>
+                            </div>
+                            <div class="setting-item">
+                                <label for="setting-GEMINI_MODEL">מודל</label>
+                                <input type="text" id="setting-GEMINI_MODEL" class="form-input" data-env="GEMINI_MODEL" placeholder="gemini-2.5-flash" dir="ltr">
+                                <small>שם המודל (למשל: gemini-2.5-flash, gemini-2.5-pro)</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Google APIs Settings -->
+                    <div class="settings-group">
+                        <h3 class="settings-group-title">📅 Google APIs</h3>
+                        <div class="settings-grid">
+                            <div class="setting-item setting-item-wide">
+                                <label for="setting-GOOGLE_SERVICE_ACCOUNT_PATH">Service Account Path</label>
+                                <input type="text" id="setting-GOOGLE_SERVICE_ACCOUNT_PATH" class="form-input" data-env="GOOGLE_SERVICE_ACCOUNT_PATH" placeholder="./credentials/service-account.json" dir="ltr">
+                                <small>נתיב לקובץ Service Account JSON (ליומן)</small>
+                            </div>
+                            <div class="setting-item setting-item-wide">
+                                <label for="setting-CALENDAR_ID">Calendar ID</label>
+                                <input type="text" id="setting-CALENDAR_ID" class="form-input" data-env="CALENDAR_ID" placeholder="primary" dir="ltr">
+                                <small>מזהה יומן Google (primary או מזהה יומן ספציפי)</small>
+                            </div>
+                            <div class="setting-item setting-item-wide">
+                                <label for="setting-GOOGLE_OAUTH_CLIENT_ID">OAuth Client ID</label>
+                                <input type="password" id="setting-GOOGLE_OAUTH_CLIENT_ID" class="form-input" data-env="GOOGLE_OAUTH_CLIENT_ID" placeholder="your-client-id" dir="ltr">
+                                <small>OAuth Client ID (למשימות)</small>
+                            </div>
+                            <div class="setting-item setting-item-wide">
+                                <label for="setting-GOOGLE_OAUTH_CLIENT_SECRET">OAuth Client Secret</label>
+                                <input type="password" id="setting-GOOGLE_OAUTH_CLIENT_SECRET" class="form-input" data-env="GOOGLE_OAUTH_CLIENT_SECRET" placeholder="your-client-secret" dir="ltr">
+                                <small>OAuth Client Secret (למשימות)</small>
+                            </div>
+                            <div class="setting-item setting-item-wide">
+                                <label for="setting-GOOGLE_OAUTH_REFRESH_TOKEN">OAuth Refresh Token</label>
+                                <input type="password" id="setting-GOOGLE_OAUTH_REFRESH_TOKEN" class="form-input" data-env="GOOGLE_OAUTH_REFRESH_TOKEN" placeholder="your-refresh-token" dir="ltr">
+                                <small>OAuth Refresh Token (למשימות)</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Home Assistant Settings -->
+                    <div class="settings-group">
+                        <h3 class="settings-group-title">🏠 Home Assistant</h3>
+                        <div class="settings-grid">
+                            <div class="setting-item setting-item-wide">
+                                <label for="setting-HOME_ASSISTANT_URL">URL</label>
+                                <input type="text" id="setting-HOME_ASSISTANT_URL" class="form-input" data-env="HOME_ASSISTANT_URL" placeholder="https://ha.example.com" dir="ltr">
+                                <small>כתובת שרת Home Assistant</small>
+                            </div>
+                            <div class="setting-item setting-item-wide">
+                                <label for="setting-HOME_ASSISTANT_TOKEN">Access Token</label>
+                                <input type="password" id="setting-HOME_ASSISTANT_TOKEN" class="form-input" data-env="HOME_ASSISTANT_TOKEN" placeholder="eyJ..." dir="ltr">
+                                <small>Long-Lived Access Token של Home Assistant</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Other Settings -->
+                    <div class="settings-group">
+                        <h3 class="settings-group-title">🔧 אחר</h3>
+                        <div class="settings-grid">
+                            <div class="setting-item">
+                                <label for="setting-LOG_LEVEL">רמת לוגים</label>
+                                <select id="setting-LOG_LEVEL" class="form-input" data-env="LOG_LEVEL">
+                                    <option value="debug">Debug</option>
+                                    <option value="info">Info</option>
+                                    <option value="warn">Warning</option>
+                                    <option value="error">Error</option>
+                                </select>
+                                <small>רמת הלוגים שיוצגו (info = ברירת מחדל)</small>
+                            </div>
+                            <div class="setting-item setting-item-wide">
+                                <label for="setting-WEBHOOK_SECRET">Webhook Secret</label>
+                                <input type="password" id="setting-WEBHOOK_SECRET" class="form-input" data-env="WEBHOOK_SECRET" placeholder="your-webhook-secret" dir="ltr">
+                                <small>מפתח אימות ל-webhooks נכנסים</small>
+                            </div>
+                        </div>
                     </div>
                 </section>
             </div>

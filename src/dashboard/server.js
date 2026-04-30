@@ -463,6 +463,91 @@ class DashboardServer {
                 res.status(500).json({ error: err.message });
             }
         });
+
+        // ==================== Settings API (.env management) ====================
+
+        // Get all .env settings
+        this.app.get('/api/settings', requireAuth, (req, res) => {
+            try {
+                const envPath = path.resolve(process.cwd(), '.env');
+                if (!fs.existsSync(envPath)) {
+                    return res.status(404).json({ error: '.env file not found' });
+                }
+
+                const content = fs.readFileSync(envPath, 'utf-8');
+                const settings = {};
+
+                content.split('\n').forEach(line => {
+                    const trimmed = line.trim();
+                    // Skip comments and empty lines
+                    if (!trimmed || trimmed.startsWith('#')) return;
+                    const eqIdx = trimmed.indexOf('=');
+                    if (eqIdx === -1) return;
+                    const key = trimmed.substring(0, eqIdx).trim();
+                    const value = trimmed.substring(eqIdx + 1).trim();
+                    settings[key] = value;
+                });
+
+                res.json({ settings });
+            } catch (err) {
+                logger.error('Failed to read .env settings', { error: err.message });
+                res.status(500).json({ error: 'Failed to read settings' });
+            }
+        });
+
+        // Update .env settings
+        this.app.put('/api/settings', requireAuth, (req, res) => {
+            const { settings } = req.body;
+            if (!settings || typeof settings !== 'object') {
+                return res.status(400).json({ error: 'Settings object is required' });
+            }
+
+            try {
+                const envPath = path.resolve(process.cwd(), '.env');
+                let content = '';
+
+                if (fs.existsSync(envPath)) {
+                    content = fs.readFileSync(envPath, 'utf-8');
+                }
+
+                // Track which keys we've updated
+                const updatedKeys = new Set();
+
+                // Update existing lines
+                const lines = content.split('\n');
+                const newLines = lines.map(line => {
+                    const trimmed = line.trim();
+                    if (!trimmed || trimmed.startsWith('#')) return line;
+                    const eqIdx = trimmed.indexOf('=');
+                    if (eqIdx === -1) return line;
+                    const key = trimmed.substring(0, eqIdx).trim();
+
+                    if (key in settings) {
+                        updatedKeys.add(key);
+                        return `${key}=${settings[key]}`;
+                    }
+                    return line;
+                });
+
+                // Append any new keys that weren't in the file
+                for (const [key, value] of Object.entries(settings)) {
+                    if (!updatedKeys.has(key)) {
+                        newLines.push(`${key}=${value}`);
+                    }
+                }
+
+                fs.writeFileSync(envPath, newLines.join('\n'), 'utf-8');
+
+                logger.info('Settings updated via dashboard', {
+                    keys: Object.keys(settings)
+                });
+
+                res.json({ success: true, message: 'Settings saved. Restart required for changes to take effect.' });
+            } catch (err) {
+                logger.error('Failed to write .env settings', { error: err.message });
+                res.status(500).json({ error: 'Failed to save settings' });
+            }
+        });
     }
 
     /**
