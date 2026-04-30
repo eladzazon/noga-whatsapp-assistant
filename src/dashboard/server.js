@@ -464,38 +464,48 @@ class DashboardServer {
             }
         });
 
-        // ==================== Settings API (.env management) ====================
+        // ==================== Settings API (DB-backed, Docker-safe) ====================
 
-        // Get all .env settings
+        // Get all settings (.env as baseline + DB overrides)
         this.app.get('/api/settings', requireAuth, (req, res) => {
             try {
-                const envPath = path.resolve(process.cwd(), '.env');
-                if (!fs.existsSync(envPath)) {
-                    return res.status(404).json({ error: '.env file not found' });
-                }
-
-                const content = fs.readFileSync(envPath, 'utf-8');
                 const settings = {};
 
-                content.split('\n').forEach(line => {
-                    const trimmed = line.trim();
-                    // Skip comments and empty lines
-                    if (!trimmed || trimmed.startsWith('#')) return;
-                    const eqIdx = trimmed.indexOf('=');
-                    if (eqIdx === -1) return;
-                    const key = trimmed.substring(0, eqIdx).trim();
-                    const value = trimmed.substring(eqIdx + 1).trim();
-                    settings[key] = value;
-                });
+                // 1. Read baseline from .env file
+                const envPath = path.resolve(process.cwd(), '.env');
+                if (fs.existsSync(envPath)) {
+                    const content = fs.readFileSync(envPath, 'utf-8');
+                    content.split('\n').forEach(line => {
+                        const trimmed = line.trim();
+                        if (!trimmed || trimmed.startsWith('#')) return;
+                        const eqIdx = trimmed.indexOf('=');
+                        if (eqIdx === -1) return;
+                        const key = trimmed.substring(0, eqIdx).trim();
+                        const value = trimmed.substring(eqIdx + 1).trim();
+                        settings[key] = value;
+                    });
+                }
+
+                // 2. Override with DB-stored settings (these take priority)
+                if (this.db) {
+                    const dbOverrides = this.db.getAllConfig();
+                    const ENV_PREFIX = 'env_';
+                    for (const [key, value] of Object.entries(dbOverrides)) {
+                        if (key.startsWith(ENV_PREFIX)) {
+                            const envKey = key.substring(ENV_PREFIX.length);
+                            settings[envKey] = value;
+                        }
+                    }
+                }
 
                 res.json({ settings });
             } catch (err) {
-                logger.error('Failed to read .env settings', { error: err.message });
+                logger.error('Failed to read settings', { error: err.message });
                 res.status(500).json({ error: 'Failed to read settings' });
             }
         });
 
-        // Update .env settings
+        // Update settings (saves to DB, applies to process.env in memory)
         this.app.put('/api/settings', requireAuth, (req, res) => {
             const { settings } = req.body;
             if (!settings || typeof settings !== 'object') {
@@ -503,48 +513,55 @@ class DashboardServer {
             }
 
             try {
-                const envPath = path.resolve(process.cwd(), '.env');
-                let content = '';
-
-                if (fs.existsSync(envPath)) {
-                    content = fs.readFileSync(envPath, 'utf-8');
+                if (!this.db) {
+                    return res.status(500).json({ error: 'DB not initialized' });
                 }
 
-                // Track which keys we've updated
-                const updatedKeys = new Set();
-
-                // Update existing lines
-                const lines = content.split('\n');
-                const newLines = lines.map(line => {
-                    const trimmed = line.trim();
-                    if (!trimmed || trimmed.startsWith('#')) return line;
-                    const eqIdx = trimmed.indexOf('=');
-                    if (eqIdx === -1) return line;
-                    const key = trimmed.substring(0, eqIdx).trim();
-
-                    if (key in settings) {
-                        updatedKeys.add(key);
-                        return `${key}=${settings[key]}`;
-                    }
-                    return line;
-                });
-
-                // Append any new keys that weren't in the file
+                const ENV_PREFIX = 'env_';
                 for (const [key, value] of Object.entries(settings)) {
-                    if (!updatedKeys.has(key)) {
-                        newLines.push(`${key}=${value}`);
-                    }
+                    // Save to DB with env_ prefix to distinguish from other config
+                    this.db.setConfig(`${ENV_PREFIX}${key}`, value);
+
+                    // Apply to process.env immediately
+                    process.env[key] = value;
                 }
 
-                fs.writeFileSync(envPath, newLines.join('\n'), 'utf-8');
+                // Hot-reload config object for key settings
+                if (settings.GEMINI_MODEL) {
+                    config.gemini.model = settings.GEMINI_MODEL;
+                }
+                if (settings.GEMINI_API_KEY) {
+                    config.gemini.apiKey = settings.GEMINI_API_KEY;
+                }
+                if (settings.WHATSAPP_WHITELIST) {
+                    config.whatsapp.whitelist = settings.WHATSAPP_WHITELIST.split(',').map(s => s.trim()).filter(Boolean);
+                }
+                if (settings.WHATSAPP_GROUP_ID) {
+                    config.whatsapp.groupId = settings.WHATSAPP_GROUP_ID;
+                }
+                if (settings.HOME_ASSISTANT_URL) {
+                    config.homeAssistant.url = settings.HOME_ASSISTANT_URL;
+                }
+                if (settings.HOME_ASSISTANT_TOKEN) {
+                    config.homeAssistant.token = settings.HOME_ASSISTANT_TOKEN;
+                }
+                if (settings.CALENDAR_ID) {
+                    config.google.calendarId = settings.CALENDAR_ID;
+                }
+                if (settings.WEBHOOK_SECRET) {
+                    config.dashboard.webhookSecret = settings.WEBHOOK_SECRET;
+                }
+                if (settings.LOG_LEVEL) {
+                    config.logging.level = settings.LOG_LEVEL;
+                }
 
-                logger.info('Settings updated via dashboard', {
+                logger.info('Settings updated via dashboard (DB)', {
                     keys: Object.keys(settings)
                 });
 
-                res.json({ success: true, message: 'Settings saved. Restart required for changes to take effect.' });
+                res.json({ success: true, message: 'Settings saved. Some changes take effect immediately, others may require a restart.' });
             } catch (err) {
-                logger.error('Failed to write .env settings', { error: err.message });
+                logger.error('Failed to save settings', { error: err.message });
                 res.status(500).json({ error: 'Failed to save settings' });
             }
         });

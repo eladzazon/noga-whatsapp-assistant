@@ -1048,26 +1048,7 @@
             const data = await res.json();
 
             if (data.success) {
-                showSettingsStatus('נשמר בהצלחה ✓ - נדרש הפעלה מחדש', 'success');
-
-                // Ask to restart
-                if (confirm('ההגדרות נשמרו! האם להפעיל מחדש את המערכת כעת כדי שהשינויים ייכנסו לתוקף?')) {
-                    try {
-                        await fetch('/api/restart', { method: 'POST' });
-                        updateStatusBadge('מאתחל...', 'disconnected');
-                        setTimeout(() => {
-                            const poll = setInterval(async () => {
-                                try {
-                                    const r = await fetch('/health');
-                                    if (r.ok) {
-                                        clearInterval(poll);
-                                        window.location.reload();
-                                    }
-                                } catch { /* still restarting */ }
-                            }, 2000);
-                        }, 3000);
-                    } catch { /* restart failed */ }
-                }
+                showSettingsStatus('נשמר בהצלחה ✓', 'success');
             } else {
                 showSettingsStatus(data.error || 'שגיאה בשמירה', 'error');
             }

@@ -149,5 +149,55 @@ export function validateConfig() {
 
     return errors;
 }
+/**
+ * Apply DB-stored environment overrides to process.env and config.
+ * Called after DB is initialized to load settings saved via dashboard.
+ * @param {object} db - DatabaseManager instance
+ */
+export function applyDbOverrides(db) {
+    try {
+        const allConfig = db.getAllConfig();
+        const ENV_PREFIX = 'env_';
+        let appliedCount = 0;
+
+        for (const [key, value] of Object.entries(allConfig)) {
+            if (key.startsWith(ENV_PREFIX)) {
+                const envKey = key.substring(ENV_PREFIX.length);
+                process.env[envKey] = value;
+                appliedCount++;
+            }
+        }
+
+        if (appliedCount > 0) {
+            // Re-apply to config object
+            config.dashboard.port = parseInt(process.env.DASHBOARD_PORT, 10) || 3000;
+            config.dashboard.user = process.env.DASHBOARD_USER || 'admin';
+            config.dashboard.password = process.env.DASHBOARD_PASSWORD || 'changeme';
+            config.dashboard.sessionSecret = process.env.SESSION_SECRET || 'default-secret-change-me';
+            config.dashboard.webhookSecret = process.env.WEBHOOK_SECRET;
+
+            config.whatsapp.whitelist = parseList(process.env.WHATSAPP_WHITELIST);
+            config.whatsapp.groupId = process.env.WHATSAPP_GROUP_ID || null;
+
+            config.gemini.apiKey = process.env.GEMINI_API_KEY;
+            config.gemini.model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+
+            config.google.serviceAccountPath = process.env.GOOGLE_SERVICE_ACCOUNT_PATH || './credentials/service-account.json';
+            config.google.calendarId = process.env.CALENDAR_ID || 'primary';
+            config.google.oauth.clientId = process.env.GOOGLE_OAUTH_CLIENT_ID;
+            config.google.oauth.clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET;
+            config.google.oauth.refreshToken = process.env.GOOGLE_OAUTH_REFRESH_TOKEN;
+
+            config.homeAssistant.url = process.env.HOME_ASSISTANT_URL;
+            config.homeAssistant.token = process.env.HOME_ASSISTANT_TOKEN;
+
+            config.logging.level = process.env.LOG_LEVEL || 'info';
+
+            console.log(`[Config] Applied ${appliedCount} DB setting override(s)`);
+        }
+    } catch (err) {
+        console.error('[Config] Failed to apply DB overrides:', err.message);
+    }
+}
 
 export default config;

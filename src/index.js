@@ -1,7 +1,7 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
-import config, { validateConfig } from './utils/config.js';
+import config, { validateConfig, applyDbOverrides } from './utils/config.js';
 import logger from './utils/logger.js';
 import db from './database/DatabaseManager.js';
 import whatsappManager from './bot/WhatsAppManager.js';
@@ -47,6 +47,10 @@ async function main() {
         // Initialize database
         logger.info('Initializing database...');
         db.init();
+
+        // Apply DB-stored setting overrides (from dashboard settings page)
+        logger.info('Applying DB setting overrides...');
+        applyDbOverrides(db);
 
         // Initialize skills (Google APIs, Home Assistant)
         logger.info('Initializing skills...');
