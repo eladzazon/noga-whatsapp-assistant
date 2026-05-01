@@ -301,7 +301,8 @@ class HomeAssistantManager {
         if (matches.length === 0) {
             return {
                 success: false,
-                message: `לא מצאתי מכשיר בשם "${name}". נסה לחפש עם שם אחר או השתמש ב-list_devices לראות את כל המכשירים.`
+                message: `לא מצאתי התאמה מדויקת למכשיר בשם "${name}". הנה רשימה של המכשירים הקיימים, אנא בחר את המתאים ביותר לפי הבנתך הסמנטית ונסה שוב:`,
+                suggestions: result.entities.map(e => ({ id: e.id, name: e.name }))
             };
         }
 

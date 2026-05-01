@@ -16,8 +16,8 @@
                 <h1>🏠 נוגה</h1>
                 <span class="status-badge" id="status-badge">מתחבר...</span>
             </div>
-            <nav>
-                <button id="btn-restart" class="btn btn-danger-small" style="margin-left: 8px;">🔄 הפעל מחדש</button>
+            <nav style="display: flex; align-items: center; gap: 10px;">
+                <button id="btn-restart" class="btn btn-danger-small">🔄 הפעל מחדש</button>
                 <a href="/logout" class="btn btn-secondary">התנתק</a>
             </nav>
         </header>
@@ -25,11 +25,12 @@
         <!-- Tab Navigation -->
         <div class="tab-nav">
             <button class="tab-btn active" data-tab="tab-status">📊 סטטוס</button>
-            <button class="tab-btn" data-tab="tab-prompt">🧠 הוראות מערכת</button>
+            <button class="tab-btn" data-tab="tab-knowledge">🧠 בסיס ידע</button>
+            <button class="tab-btn" data-tab="tab-skills">🛠️ מיומנויות</button>
             <button class="tab-btn" data-tab="tab-keywords">🔑 מילות מפתח</button>
             <button class="tab-btn" data-tab="tab-scheduled-prompts">⏱️ תזמונים</button>
             <button class="tab-btn" data-tab="tab-settings">⚙️ הגדרות</button>
-            <button class="tab-btn" id="nav-btn-homeassistant" data-tab="tab-homeassistant">🏠 Home Assistant</button>
+            <button class="tab-btn" id="nav-btn-homeassistant" data-tab="tab-homeassistant">🏠 בית חכם</button>
             <button class="tab-btn" data-tab="tab-console">🖥️ לוג</button>
         </div>
 
@@ -82,11 +83,7 @@
                             <span class="status-label">יומן</span>
                             <span class="status-value loading">בודק...</span>
                         </div>
-                        <div class="status-item" id="status-tasks">
-                            <span class="status-icon">🛒</span>
-                            <span class="status-label">קניות</span>
-                            <span class="status-value loading">בודק...</span>
-                        </div>
+
                         <div class="status-item" id="status-homeassistant">
                             <span class="status-icon">🏠</span>
                             <span class="status-label">Home Assistant</span>
@@ -133,19 +130,70 @@
                 </section>
             </div>
 
-            <!-- ==================== System Prompt Tab ==================== -->
-            <div class="tab-pane" id="tab-prompt">
-                <section class="panel prompt-panel">
+            <!-- ==================== Knowledge Base Tab ==================== -->
+            <div class="tab-pane" id="tab-knowledge">
+                <section class="panel knowledge-panel" style="display: flex; flex-direction: column; height: calc(100vh - 160px);">
                     <h2>
-                        🧠 הוראות מערכת
+                        🧠 בסיס ידע
                         <div class="prompt-actions">
-                            <span id="prompt-status" class="save-status"></span>
-                            <button id="save-prompt" class="btn btn-primary btn-small">שמור</button>
+                            <button id="add-knowledge-file" class="btn btn-secondary btn-small">+ קובץ חדש</button>
+                            <span id="knowledge-status" class="save-status"></span>
+                            <button id="save-knowledge" class="btn btn-primary btn-small">שמור</button>
                         </div>
                     </h2>
-                    <p class="panel-hint">הוראות אלו נשלחות ל-Gemini כהקשר מערכת. שינויים נכנסים לתוקף מיידית.</p>
-                    <div class="prompt-container">
-                        <textarea id="system-prompt" class="prompt-textarea" placeholder="טוען..." dir="ltr"></textarea>
+                    <p class="panel-hint">ערוך את קבצי הידע של נוגה. כל שינוי מעדכן את המוח שלה מיידית.</p>
+                    
+                    <div class="split-pane" style="display: flex; flex: 1; gap: 20px; min-height: 0;">
+                        <!-- Sidebar -->
+                        <div class="file-sidebar" style="width: 250px; background: var(--light-bg); border-radius: 8px; border: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden;">
+                            <div style="padding: 10px; background: rgba(0,0,0,0.02); border-bottom: 1px solid var(--border); font-weight: bold; font-size: 14px;">📁 קבצים</div>
+                            <ul id="knowledge-file-list" style="list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1;">
+                                <!-- Populated via JS -->
+                            </ul>
+                        </div>
+                        
+                        <!-- Editor -->
+                        <div class="file-editor" style="flex: 1; display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; position: relative;">
+                            <div style="padding: 10px; background: var(--light-bg); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+                                <span id="current-knowledge-filename" style="font-weight: bold; font-size: 14px;">בחר קובץ</span>
+                                <button id="delete-knowledge-file" class="btn btn-danger-small" style="display: none; padding: 2px 8px; font-size: 12px; height: auto;">🗑️ מחק</button>
+                            </div>
+                            <textarea id="knowledge-editor" class="prompt-textarea" placeholder="בחר קובץ לעריכה..." dir="rtl" style="border: none; border-radius: 0; flex: 1; resize: none; text-align: right;" disabled></textarea>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- ==================== Skills Library Tab ==================== -->
+            <div class="tab-pane" id="tab-skills">
+                <section class="panel skills-panel" style="display: flex; flex-direction: column; height: calc(100vh - 160px);">
+                    <h2>
+                        🛠️ מיומנויות
+                        <div class="prompt-actions">
+                            <button id="add-skill-file" class="btn btn-secondary btn-small">+ מיומנות חדשה</button>
+                            <span id="skill-status" class="save-status"></span>
+                            <button id="save-skill" class="btn btn-primary btn-small">שמור</button>
+                        </div>
+                    </h2>
+                    <p class="panel-hint">הוסף או ערוך נהלים (Skills) כדי ללמד את נוגה כיצד לבצע משימות מורכבות שלב אחר שלב.</p>
+                    
+                    <div class="split-pane" style="display: flex; flex: 1; gap: 20px; min-height: 0;">
+                        <!-- Sidebar -->
+                        <div class="file-sidebar" style="width: 250px; background: var(--light-bg); border-radius: 8px; border: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden;">
+                            <div style="padding: 10px; background: rgba(0,0,0,0.02); border-bottom: 1px solid var(--border); font-weight: bold; font-size: 14px;">🛠️ מיומנויות</div>
+                            <ul id="skills-file-list" style="list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1;">
+                                <!-- Populated via JS -->
+                            </ul>
+                        </div>
+                        
+                        <!-- Editor -->
+                        <div class="file-editor" style="flex: 1; display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; position: relative;">
+                            <div style="padding: 10px; background: var(--light-bg); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+                                <span id="current-skill-filename" style="font-weight: bold; font-size: 14px;">בחר קובץ</span>
+                                <button id="delete-skill-file" class="btn btn-danger-small" style="display: none; padding: 2px 8px; font-size: 12px; height: auto;">🗑️ מחק</button>
+                            </div>
+                            <textarea id="skill-editor" class="prompt-textarea" placeholder="בחר מיומנות לעריכה..." dir="rtl" style="border: none; border-radius: 0; flex: 1; resize: none; text-align: right;" disabled></textarea>
+                        </div>
                     </div>
                 </section>
             </div>

@@ -49,22 +49,29 @@ body {
     margin-bottom: 20px;
 }
 
+.logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
 .logo h1 {
     font-size: 24px;
     color: var(--dark);
-    display: inline;
-    margin-left: 10px;
+    margin: 0;
 }
 
 .status-badge {
-    display: inline-block;
-    padding: 4px 12px;
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 14px;
     border-radius: 20px;
     font-size: 12px;
     font-weight: 600;
     background: var(--gray-light);
     color: var(--gray);
     margin-right: 10px;
+    height: 32px;
 }
 
 .status-badge.connected {
@@ -107,6 +114,11 @@ body {
 .btn-secondary {
     background: var(--gray-light);
     color: var(--dark);
+    padding: 6px 14px;
+    font-size: 12px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
 }
 
 .btn-small {
@@ -295,7 +307,6 @@ body {
 .usage-row span:last-child {
     font-weight: 600;
     color: var(--dark);
-    font-family: 'Consolas', monospace;
 }
 
 .usage-row.cost-row {
@@ -344,8 +355,8 @@ body {
     padding: 15px;
     border: 2px solid var(--gray-light);
     border-radius: var(--radius);
-    font-family: 'Consolas', 'Monaco', monospace;
-    font-size: 13px;
+    font-family: inherit;
+    font-size: 14px;
     line-height: 1.6;
     resize: vertical;
     background: #1a202c;
@@ -614,6 +625,10 @@ select.form-input {
     border-radius: 8px;
     cursor: pointer;
     transition: all 0.2s;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
 }
 
 .btn-danger-small:hover {
@@ -668,8 +683,7 @@ select.form-input {
     background: #1a202c;
     border-radius: var(--radius);
     padding: 15px;
-    font-family: 'Consolas', 'Monaco', monospace;
-    font-size: 12px;
+    font-size: 13px;
     max-height: 500px;
     min-height: 300px;
     overflow-y: auto;
@@ -773,8 +787,7 @@ select.form-input {
 }
 
 .setting-item .form-input {
-    font-family: 'Consolas', 'Monaco', monospace;
-    font-size: 13px;
+    font-size: 14px;
 }
 
 /* ==================== Responsive ==================== */

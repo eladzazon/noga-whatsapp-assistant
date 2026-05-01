@@ -22,14 +22,26 @@
         whatsapp: document.getElementById('status-whatsapp'),
         gemini: document.getElementById('status-gemini'),
         calendar: document.getElementById('status-calendar'),
-        tasks: document.getElementById('status-tasks'),
         homeassistant: document.getElementById('status-homeassistant')
     };
 
-    // System Prompt elements
-    const systemPromptEl = document.getElementById('system-prompt');
-    const savePromptBtn = document.getElementById('save-prompt');
-    const promptStatusEl = document.getElementById('prompt-status');
+    // Knowledge Base elements
+    const knowledgeFileList = document.getElementById('knowledge-file-list');
+    const knowledgeEditor = document.getElementById('knowledge-editor');
+    const currentKnowledgeFilename = document.getElementById('current-knowledge-filename');
+    const addKnowledgeFileBtn = document.getElementById('add-knowledge-file');
+    const saveKnowledgeBtn = document.getElementById('save-knowledge');
+    const deleteKnowledgeFileBtn = document.getElementById('delete-knowledge-file');
+    const knowledgeStatusEl = document.getElementById('knowledge-status');
+
+    // Skills Library elements
+    const skillsFileList = document.getElementById('skills-file-list');
+    const skillEditor = document.getElementById('skill-editor');
+    const currentSkillFilename = document.getElementById('current-skill-filename');
+    const addSkillFileBtn = document.getElementById('add-skill-file');
+    const saveSkillBtn = document.getElementById('save-skill');
+    const deleteSkillFileBtn = document.getElementById('delete-skill-file');
+    const skillStatusEl = document.getElementById('skill-status');
 
     // Keywords elements
     const addKeywordBtn = document.getElementById('add-keyword-btn');
@@ -151,6 +163,15 @@
         logs.forEach(addLogEntry);
     });
 
+    socket.on('file_changed', (data) => {
+        console.log('File changed remotely:', data);
+        if (data.type === 'knowledge') {
+            if (knowledgeController) knowledgeController.loadFiles();
+        } else if (data.type === 'skills') {
+            if (skillsController) skillsController.loadFiles();
+        }
+    });
+
     // ==================== Status Functions ====================
 
     function updateStatusBadge(text, status) {
@@ -226,7 +247,6 @@
 
             if (data.skills) {
                 updateStatusItem('calendar', data.skills.calendar?.available);
-                updateStatusItem('tasks', data.skills.tasks?.available);
                 updateStatusItem('homeassistant', data.skills.homeAssistant?.available);
             }
 
@@ -247,7 +267,158 @@
     }
 
 
-    // ==================== System Prompt Functions ====================
+    // ==================== Knowledge Base & Skills Functions ====================
+
+    function setupFileEditor(type) {
+        const fileList = type === 'knowledge' ? knowledgeFileList : skillsFileList;
+        const editor = type === 'knowledge' ? knowledgeEditor : skillEditor;
+        const filenameSpan = type === 'knowledge' ? currentKnowledgeFilename : currentSkillFilename;
+        const addBtn = type === 'knowledge' ? addKnowledgeFileBtn : addSkillFileBtn;
+        const saveBtn = type === 'knowledge' ? saveKnowledgeBtn : saveSkillBtn;
+        const deleteBtn = type === 'knowledge' ? deleteKnowledgeFileBtn : deleteSkillFileBtn;
+        const statusEl = type === 'knowledge' ? knowledgeStatusEl : skillStatusEl;
+        const apiPath = type === 'knowledge' ? '/api/knowledge' : '/api/skills';
+        
+        let currentFile = null;
+        let filesData = [];
+
+        async function loadFiles() {
+            try {
+                const res = await fetch(apiPath);
+                const data = await res.json();
+                filesData = data.files || [];
+                renderFileList();
+                
+                // Update the open editor if the file content changed remotely
+                if (currentFile) {
+                    const fileObj = filesData.find(f => f.name === currentFile);
+                    if (fileObj && editor.value !== fileObj.content) {
+                        editor.value = fileObj.content;
+                    }
+                }
+            } catch (err) {
+                console.error(`Failed to load ${type} files:`, err);
+            }
+        }
+
+        function renderFileList() {
+            if (!fileList) return;
+            fileList.innerHTML = filesData.map(f => `
+                <li class="file-item ${currentFile === f.name ? 'active' : ''}" data-name="${escapeAttr(f.name)}" style="padding: 10px; cursor: pointer; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px;">
+                    📄 <span>${escapeHtml(f.name)}</span>
+                </li>
+            `).join('');
+
+            // Add click listeners
+            fileList.querySelectorAll('.file-item').forEach(el => {
+                el.addEventListener('click', () => {
+                    selectFile(el.dataset.name);
+                });
+            });
+        }
+
+        function selectFile(filename) {
+            currentFile = filename;
+            const fileObj = filesData.find(f => f.name === filename);
+            if (fileObj) {
+                editor.value = fileObj.content;
+                editor.disabled = false;
+                filenameSpan.textContent = filename;
+                deleteBtn.style.display = 'block';
+            }
+            renderFileList(); // Update active class
+        }
+
+        async function saveFile() {
+            if (!currentFile) return;
+            
+            const content = editor.value;
+            saveBtn.disabled = true;
+            saveBtn.textContent = 'שומר...';
+
+            try {
+                const res = await fetch(`${apiPath}/${currentFile}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    showStatus('נשמר בהצלחה ✓', 'success');
+                    // Update local data
+                    const fileObj = filesData.find(f => f.name === currentFile);
+                    if (fileObj) fileObj.content = content;
+                } else {
+                    showStatus(data.error || 'שגיאה בשמירה', 'error');
+                }
+            } catch (err) {
+                showStatus('שגיאה בשמירה', 'error');
+            } finally {
+                saveBtn.disabled = false;
+                saveBtn.textContent = 'שמור';
+            }
+        }
+
+        async function deleteFile() {
+            if (!currentFile) return;
+            if (!confirm(`האם אתה בטוח שברצונך למחוק את הקובץ ${currentFile}?`)) return;
+
+            try {
+                const res = await fetch(`${apiPath}/${currentFile}`, { method: 'DELETE' });
+                const data = await res.json();
+                
+                if (data.success) {
+                    currentFile = null;
+                    editor.value = '';
+                    editor.disabled = true;
+                    filenameSpan.textContent = 'בחר קובץ';
+                    deleteBtn.style.display = 'none';
+                    await loadFiles();
+                    showStatus('נמחק בהצלחה', 'success');
+                }
+            } catch (err) {
+                showStatus('שגיאה במחיקה', 'error');
+            }
+        }
+
+        function addFile() {
+            let filename = prompt('הכנס שם קובץ חדש (עם סיומת .md):', `new_${type}.md`);
+            if (!filename) return;
+            if (!filename.endsWith('.md')) filename += '.md';
+            
+            if (filesData.some(f => f.name === filename)) {
+                alert('קובץ עם שם כזה כבר קיים!');
+                return;
+            }
+
+            filesData.push({ name: filename, content: '' });
+            selectFile(filename);
+            editor.focus();
+        }
+
+        function showStatus(text, statusType) {
+            statusEl.textContent = text;
+            statusEl.className = `save-status ${statusType}`;
+            setTimeout(() => {
+                statusEl.textContent = '';
+                statusEl.className = 'save-status';
+            }, 3000);
+        }
+
+        // Attach listeners
+        if (addBtn) addBtn.addEventListener('click', addFile);
+        if (saveBtn) saveBtn.addEventListener('click', saveFile);
+        if (deleteBtn) deleteBtn.addEventListener('click', deleteFile);
+
+        // Initial load
+        loadFiles();
+        
+        return { loadFiles };
+    }
+
+    const knowledgeController = setupFileEditor('knowledge');
+    const skillsController = setupFileEditor('skills');
 
     // ==================== Home Assistant Functions ====================
 
@@ -410,50 +581,6 @@
         }
     };
 
-    async function loadSystemPrompt() {
-        try {
-            const res = await fetch('/api/system-prompt');
-            const data = await res.json();
-            if (data.prompt) {
-                systemPromptEl.value = data.prompt;
-            }
-        } catch (err) {
-            console.error('Failed to load system prompt:', err);
-            systemPromptEl.value = 'שגיאה בטעינת ההוראות';
-        }
-    }
-
-    async function saveSystemPrompt() {
-        const prompt = systemPromptEl.value.trim();
-        if (!prompt) {
-            showPromptStatus('ההוראות לא יכולות להיות ריקות', 'error');
-            return;
-        }
-
-        savePromptBtn.disabled = true;
-        savePromptBtn.textContent = 'שומר...';
-
-        try {
-            const res = await fetch('/api/system-prompt', {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prompt })
-            });
-            const data = await res.json();
-
-            if (data.success) {
-                showPromptStatus('נשמר בהצלחה ✓', 'success');
-            } else {
-                showPromptStatus(data.error || 'שגיאה בשמירה', 'error');
-            }
-        } catch (err) {
-            showPromptStatus('שגיאה בשמירה', 'error');
-        } finally {
-            savePromptBtn.disabled = false;
-            savePromptBtn.textContent = 'שמור';
-        }
-    }
-
     function formatCost(cost) {
         return new Intl.NumberFormat('he-IL', {
             style: 'currency',
@@ -461,15 +588,6 @@
             minimumFractionDigits: 4,
             maximumFractionDigits: 4
         }).format(cost * usdToIlsRate);
-    }
-
-    function showPromptStatus(text, type) {
-        promptStatusEl.textContent = text;
-        promptStatusEl.className = `save-status ${type}`;
-        setTimeout(() => {
-            promptStatusEl.textContent = '';
-            promptStatusEl.className = 'save-status';
-        }, 3000);
     }
 
     // ==================== Keywords Functions ====================
@@ -813,9 +931,7 @@
         });
     }
 
-    if (savePromptBtn) {
-        savePromptBtn.addEventListener('click', saveSystemPrompt);
-    }
+    // Old prompt listeners removed
 
     if (addKeywordBtn) {
         addKeywordBtn.addEventListener('click', () => showKeywordForm());
@@ -1094,7 +1210,8 @@
     fetchStatus();
     setInterval(fetchStatus, 30000);
 
-    loadSystemPrompt();
+    knowledgeController.loadFiles();
+    skillsController.loadFiles();
     loadKeywords();
     loadSchedules();
     loadSettings();

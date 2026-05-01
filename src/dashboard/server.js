@@ -293,31 +293,134 @@ class DashboardServer {
             }
         });
 
-        // ==================== System Prompt API ====================
+        // ==================== Knowledge Base API ====================
 
-        // Get current system prompt
-        this.app.get('/api/system-prompt', requireAuth, (req, res) => {
-            if (!this.geminiManager) {
-                return res.status(500).json({ error: 'Gemini not initialized' });
+        // Get all knowledge files
+        this.app.get('/api/knowledge', requireAuth, (req, res) => {
+            try {
+                const knowledgeDir = path.resolve(process.cwd(), 'data', 'knowledge');
+                if (!fs.existsSync(knowledgeDir)) {
+                    return res.json({ files: [] });
+                }
+                const files = fs.readdirSync(knowledgeDir).filter(f => f.endsWith('.md')).map(f => {
+                    const content = fs.readFileSync(path.join(knowledgeDir, f), 'utf-8');
+                    return { name: f, content };
+                });
+                res.json({ files });
+            } catch (err) {
+                res.status(500).json({ error: err.message });
             }
-            res.json({ prompt: this.geminiManager.getSystemPrompt() });
         });
 
-        // Update system prompt
-        this.app.put('/api/system-prompt', requireAuth, (req, res) => {
-            const { prompt } = req.body;
-            if (!prompt || !prompt.trim()) {
-                return res.status(400).json({ error: 'Prompt is required' });
-            }
-            if (!this.geminiManager) {
-                return res.status(500).json({ error: 'Gemini not initialized' });
+        // Save knowledge file
+        this.app.put('/api/knowledge/:filename', requireAuth, (req, res) => {
+            const { filename } = req.params;
+            const { content } = req.body;
+            if (!content && content !== '') {
+                return res.status(400).json({ error: 'Content is required' });
             }
             try {
-                this.geminiManager.reinit(prompt.trim());
-                logger.info('System prompt updated via dashboard');
+                const knowledgeDir = path.resolve(process.cwd(), 'data', 'knowledge');
+                if (!fs.existsSync(knowledgeDir)) {
+                    fs.mkdirSync(knowledgeDir, { recursive: true });
+                }
+                fs.writeFileSync(path.join(knowledgeDir, filename), content, 'utf-8');
+                
+                // Re-initialize Gemini model
+                if (this.geminiManager) {
+                    this.geminiManager.reinit();
+                }
+                
+                logger.info('Knowledge file updated via dashboard', { filename });
                 res.json({ success: true });
             } catch (err) {
-                logger.error('Failed to update system prompt', { error: err.message });
+                res.status(500).json({ error: err.message });
+            }
+        });
+
+        // Delete knowledge file
+        this.app.delete('/api/knowledge/:filename', requireAuth, (req, res) => {
+            const { filename } = req.params;
+            try {
+                const filePath = path.resolve(process.cwd(), 'data', 'knowledge', filename);
+                if (fs.existsSync(filePath)) {
+                    fs.unlinkSync(filePath);
+                }
+                
+                // Re-initialize Gemini model
+                if (this.geminiManager) {
+                    this.geminiManager.reinit();
+                }
+                
+                logger.info('Knowledge file deleted via dashboard', { filename });
+                res.json({ success: true });
+            } catch (err) {
+                res.status(500).json({ error: err.message });
+            }
+        });
+
+        // ==================== Skills Library API ====================
+
+        // Get all skill files
+        this.app.get('/api/skills', requireAuth, (req, res) => {
+            try {
+                const skillsDir = path.resolve(process.cwd(), 'data', 'skills');
+                if (!fs.existsSync(skillsDir)) {
+                    return res.json({ files: [] });
+                }
+                const files = fs.readdirSync(skillsDir).filter(f => f.endsWith('.md')).map(f => {
+                    const content = fs.readFileSync(path.join(skillsDir, f), 'utf-8');
+                    return { name: f, content };
+                });
+                res.json({ files });
+            } catch (err) {
+                res.status(500).json({ error: err.message });
+            }
+        });
+
+        // Save skill file
+        this.app.put('/api/skills/:filename', requireAuth, (req, res) => {
+            const { filename } = req.params;
+            const { content } = req.body;
+            if (!content && content !== '') {
+                return res.status(400).json({ error: 'Content is required' });
+            }
+            try {
+                const skillsDir = path.resolve(process.cwd(), 'data', 'skills');
+                if (!fs.existsSync(skillsDir)) {
+                    fs.mkdirSync(skillsDir, { recursive: true });
+                }
+                fs.writeFileSync(path.join(skillsDir, filename), content, 'utf-8');
+                
+                // Re-initialize Gemini model
+                if (this.geminiManager) {
+                    this.geminiManager.reinit();
+                }
+                
+                logger.info('Skill file updated via dashboard', { filename });
+                res.json({ success: true });
+            } catch (err) {
+                res.status(500).json({ error: err.message });
+            }
+        });
+
+        // Delete skill file
+        this.app.delete('/api/skills/:filename', requireAuth, (req, res) => {
+            const { filename } = req.params;
+            try {
+                const filePath = path.resolve(process.cwd(), 'data', 'skills', filename);
+                if (fs.existsSync(filePath)) {
+                    fs.unlinkSync(filePath);
+                }
+                
+                // Re-initialize Gemini model
+                if (this.geminiManager) {
+                    this.geminiManager.reinit();
+                }
+                
+                logger.info('Skill file deleted via dashboard', { filename });
+                res.json({ success: true });
+            } catch (err) {
                 res.status(500).json({ error: err.message });
             }
         });
@@ -671,6 +774,22 @@ class DashboardServer {
         subscribeToLogs((logEntry) => {
             this.io.emit('log', logEntry);
         });
+
+        // Setup file watching for live updates
+        const watchDir = (dirPath, fileType) => {
+            if (!fs.existsSync(dirPath)) return;
+            fs.watch(dirPath, (eventType, filename) => {
+                if (filename && filename.endsWith('.md')) {
+                    this.io.emit('file_changed', { type: fileType, filename, eventType });
+                }
+            });
+        };
+
+        const knowledgeDir = path.resolve(process.cwd(), 'data', 'knowledge');
+        const skillsDir = path.resolve(process.cwd(), 'data', 'skills');
+        
+        watchDir(knowledgeDir, 'knowledge');
+        watchDir(skillsDir, 'skills');
     }
 
     /**

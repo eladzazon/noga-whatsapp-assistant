@@ -2,6 +2,8 @@ import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/ge
 import config from '../utils/config.js';
 import logger from '../utils/logger.js';
 import db from '../database/DatabaseManager.js';
+import fs from 'fs';
+import path from 'path';
 
 class GeminiManager {
     constructor() {
@@ -26,30 +28,72 @@ class GeminiManager {
         this.tools = tools;
         this.toolHandlers = handlers;
 
-        // Load system prompt from DB if available, otherwise use default from config
-        const storedPrompt = db.getConfig('system_prompt', null);
-        this.systemPrompt = storedPrompt || config.gemini.systemPrompt;
+        // Load system prompt from files
+        this.systemPrompt = this._buildDynamicSystemPrompt();
 
         this._buildModel();
 
         logger.info('Gemini AI initialized', {
             model: config.gemini.model,
             toolsCount: tools.length,
-            promptSource: storedPrompt ? 'database' : 'default'
+            promptSource: 'files'
         });
 
         return this;
     }
 
     /**
-     * Re-initialize the model with a new system prompt
-     * @param {string} newPrompt - The new system prompt
+     * Build system prompt dynamically from Markdown files
      */
-    reinit(newPrompt) {
-        this.systemPrompt = newPrompt;
-        db.setConfig('system_prompt', newPrompt);
+    _buildDynamicSystemPrompt() {
+        const knowledgeDir = path.resolve(process.cwd(), 'data', 'knowledge');
+        const skillsDir = path.resolve(process.cwd(), 'data', 'skills');
+        let promptParts = [];
+
+        try {
+            if (fs.existsSync(knowledgeDir)) {
+                const files = fs.readdirSync(knowledgeDir).filter(f => f.endsWith('.md'));
+                for (const file of files) {
+                    const content = fs.readFileSync(path.join(knowledgeDir, file), 'utf-8');
+                    promptParts.push(`--- BEGIN ${file} ---\n${content}\n--- END ${file} ---`);
+                }
+            }
+        } catch (err) {
+            logger.error('Failed to read knowledge files', { error: err.message });
+        }
+
+        try {
+            if (fs.existsSync(skillsDir)) {
+                const files = fs.readdirSync(skillsDir).filter(f => f.endsWith('.md'));
+                if (files.length > 0) {
+                    let skillsList = "--- BEGIN AVAILABLE SKILLS ---\nThese are the skills you know how to execute. You can use these procedures if asked.\n\n";
+                    for (const file of files) {
+                        const content = fs.readFileSync(path.join(skillsDir, file), 'utf-8');
+                        skillsList += `Skill File: ${file}\n${content}\n\n`;
+                    }
+                    skillsList += "--- END AVAILABLE SKILLS ---";
+                    promptParts.push(skillsList);
+                }
+            }
+        } catch (err) {
+            logger.error('Failed to read skills files', { error: err.message });
+        }
+
+        if (promptParts.length === 0) {
+            // Fallback
+            return config.gemini.systemPrompt;
+        }
+
+        return promptParts.join('\n\n');
+    }
+
+    /**
+     * Re-initialize the model to pick up file changes
+     */
+    reinit() {
+        this.systemPrompt = this._buildDynamicSystemPrompt();
         this._buildModel();
-        logger.info('Gemini model re-initialized with updated system prompt');
+        logger.info('Gemini model re-initialized with updated system prompt from files');
     }
 
     /**
@@ -188,11 +232,11 @@ class GeminiManager {
                 const outputTokens = usage.candidatesTokenCount || 0;
                 const totalTokens = usage.totalTokenCount || 0;
 
-                // Pricing (Gemini 1.5 Flash estimation)
-                // Input: $0.075 / 1M tokens
-                // Output: $0.30 / 1M tokens
-                const inputCost = (inputTokens / 1000000) * 0.075;
-                const outputCost = (outputTokens / 1000000) * 0.30;
+                // Pricing (Gemini 2.5 Flash)
+                // Input: $0.30 / 1M tokens
+                // Output: $2.50 / 1M tokens
+                const inputCost = (inputTokens / 1000000) * 0.30;
+                const outputCost = (outputTokens / 1000000) * 2.50;
                 const totalCost = inputCost + outputCost;
 
                 try {

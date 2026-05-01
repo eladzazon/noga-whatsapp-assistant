@@ -69,8 +69,11 @@ class MessageRouter {
             }
 
             // Send response
-            if (response) {
+            if (response && response.trim().length > 0) {
                 await whatsappManager.sendMessage(chat, response);
+            } else {
+                logger.warn('Empty response generated', { from });
+                await whatsappManager.sendMessage(chat, 'סליחה, המערכת סיימה לעבד את הבקשה אבל לא ייצרה שום טקסט כתשובה. ייתכן שיש תקלה פנימית או שהפעולה בוצעה בשקט. 😅');
             }
         } catch (err) {
             logger.error('Error processing message', { error: err.message, from });
@@ -82,7 +85,7 @@ class MessageRouter {
             try {
                 const errorMessage = isQuotaError
                     ? 'המכסה היומית של הבינה המלאכותית נגמרה 😅 אשתף פעולה שוב בקרוב!'
-                    : 'סליחה, נתקלתי בבעיה 😅 אנא נסו שוב.';
+                    : `סליחה, נתקלתי בתקלה ולכן לא יכולתי לענות לבקשתך 😅\n\n*פרטי התקלה להבנת הבעיה:*\n${err.message}`;
 
                 await whatsappManager.sendMessage(chat, errorMessage);
             } catch (sendErr) {

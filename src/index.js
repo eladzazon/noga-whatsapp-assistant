@@ -14,7 +14,8 @@ import {
     getSkillsStatus,
     functionDeclarations,
     functionHandlers,
-    calendarManager
+    calendarManager,
+    setGeminiManager
 } from './skills/index.js';
 import cron from 'node-cron';
 
@@ -59,6 +60,9 @@ async function main() {
         // Initialize Gemini AI with function calling
         logger.info('Initializing Gemini AI...');
         geminiManager.init(functionDeclarations, functionHandlers);
+        
+        // Pass Gemini manager back to skills (for reinit on memory updates)
+        setGeminiManager(geminiManager);
 
         // Initialize Scheduled Prompts
         logger.info('Initializing Scheduler...');

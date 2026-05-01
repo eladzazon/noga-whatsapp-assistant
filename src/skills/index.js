@@ -1,9 +1,15 @@
 import calendarManager from './CalendarManager.js';
-import tasksManager from './TasksManager.js';
 import homeAssistantManager from './HomeAssistantManager.js';
+import memoryManager from './MemoryManager.js';
 import db from '../database/DatabaseManager.js';
 import { findActionAndEntity } from '../utils/HaRecognition.js';
 import logger from '../utils/logger.js';
+
+let globalGeminiManager = null;
+
+export function setGeminiManager(manager) {
+    globalGeminiManager = manager;
+}
 
 /**
  * Function declarations for Gemini Function Calling
@@ -60,58 +66,77 @@ export const functionDeclarations = [
         }
     },
 
-    // ==================== Shopping List Functions ====================
-    {
-        name: 'add_shopping_item',
-        description: 'הוסף פריט לרשימת הקניות. Add an item to the shopping list.',
-        parameters: {
-            type: 'object',
-            properties: {
-                item: {
-                    type: 'string',
-                    description: 'שם הפריט להוספה. Item name to add.'
-                }
-            },
-            required: ['item']
-        }
-    },
-    {
-        name: 'get_shopping_list',
-        description: 'הצג את רשימת הקניות הנוכחית. Get the current shopping list.',
-        parameters: {
-            type: 'object',
-            properties: {}
-        }
-    },
-    {
-        name: 'complete_shopping_item',
-        description: 'סמן פריט כנקנה/הושלם ברשימת הקניות. Mark a shopping item as completed.',
-        parameters: {
-            type: 'object',
-            properties: {
-                item: {
-                    type: 'string',
-                    description: 'שם הפריט לסימון. Item name to mark as done.'
-                }
-            },
-            required: ['item']
-        }
-    },
-    {
-        name: 'delete_shopping_item',
-        description: 'מחק פריט מרשימת הקניות. Delete an item from the shopping list.',
-        parameters: {
-            type: 'object',
-            properties: {
-                item: {
-                    type: 'string',
-                    description: 'שם הפריט למחיקה. Item name to delete.'
-                }
-            },
-            required: ['item']
-        }
-    },
+    // ==================== Shopping List Functions Removed (Now a Skill) ====================
 
+    // ==================== Memory/Agentic Functions ====================
+    {
+        name: 'read_knowledge_file',
+        description: 'Read the contents of a knowledge file (e.g., USER, HOME, MEMORY).',
+        parameters: {
+            type: 'object',
+            properties: {
+                filename: {
+                    type: 'string',
+                    description: 'The name of the file to read (e.g., "MEMORY.md").'
+                }
+            },
+            required: ['filename']
+        }
+    },
+    {
+        name: 'update_memory',
+        description: 'Update the MEMORY.md file or any other knowledge file with new information.',
+        parameters: {
+            type: 'object',
+            properties: {
+                filename: {
+                    type: 'string',
+                    description: 'The name of the file to update (usually "MEMORY.md").'
+                },
+                content: {
+                    type: 'string',
+                    description: 'The full new content to write to the file. You must include all previous important information and the new information.'
+                }
+            },
+            required: ['filename', 'content']
+        }
+    },
+    {
+        name: 'create_skill',
+        description: 'Create a new skill (procedure) that teaches you how to perform a multi-step task.',
+        parameters: {
+            type: 'object',
+            properties: {
+                skill_name: {
+                    type: 'string',
+                    description: 'The name of the skill file (e.g., "guest_wifi_procedure.md").'
+                },
+                instructions: {
+                    type: 'string',
+                    description: 'The step-by-step instructions in Markdown format.'
+                }
+            },
+            required: ['skill_name', 'instructions']
+        }
+    },
+    {
+        name: 'list_memory',
+        description: 'List all available knowledge and memory files.'
+    },
+    {
+        name: 'delete_memory',
+        description: 'Delete a knowledge or memory file.',
+        parameters: {
+            type: 'object',
+            properties: {
+                filename: {
+                    type: 'string',
+                    description: 'The name of the file to delete (e.g., "OLD_NOTES.md").'
+                }
+            },
+            required: ['filename']
+        }
+    },
     // ==================== Home Assistant Functions ====================
     {
         name: 'control_device',
@@ -259,25 +284,45 @@ export const functionHandlers = {
         );
     },
 
-    // ==================== Shopping List Handlers ====================
-    add_shopping_item: async (args) => {
-        logger.info('Executing: add_shopping_item', args);
-        return await tasksManager.addTask(args.item);
+    // ==================== Shopping List Handlers Removed (Now a Skill) ====================
+
+    // ==================== Memory Handlers ====================
+    read_knowledge_file: async (args) => {
+        logger.info('Executing: read_knowledge_file', args);
+        return memoryManager.readKnowledgeFile(args.filename);
     },
 
-    get_shopping_list: async () => {
-        logger.info('Executing: get_shopping_list');
-        return await tasksManager.getTasks();
+    update_memory: async (args) => {
+        logger.info('Executing: update_memory', args);
+        const result = memoryManager.writeKnowledgeFile(args.filename, args.content);
+        if (result.success && globalGeminiManager) {
+            globalGeminiManager.reinit();
+        }
+        return result;
     },
 
-    complete_shopping_item: async (args) => {
-        logger.info('Executing: complete_shopping_item', args);
-        return await tasksManager.completeTask(args.item);
+    create_skill: async (args) => {
+        logger.info('Executing: create_skill', args);
+        const result = memoryManager.createSkill(args.skill_name, args.instructions);
+        if (result.success && globalGeminiManager) {
+            globalGeminiManager.reinit();
+        }
+        return result;
     },
 
-    delete_shopping_item: async (args) => {
-        logger.info('Executing: delete_shopping_item', args);
-        return await tasksManager.deleteTask(args.item);
+    list_memory: async () => {
+        logger.info('Executing: list_memory');
+        const files = memoryManager.getKnowledgeFiles();
+        return { success: true, files: files.map(f => f.name) };
+    },
+
+    delete_memory: async (args) => {
+        logger.info('Executing: delete_memory', args);
+        const result = memoryManager.deleteKnowledgeFile(args.filename);
+        if (result.success && globalGeminiManager) {
+            globalGeminiManager.reinit();
+        }
+        return result;
     },
 
     // ==================== Home Assistant Handlers ====================
@@ -285,6 +330,7 @@ export const functionHandlers = {
         logger.info('Executing: control_device', args);
 
         const resolved = await resolveEntityId(args.entity_id);
+        if (typeof resolved === 'object' && resolved.success === false) return resolved;
         if (typeof resolved === 'object' && resolved.error) return resolved;
 
         const entityId = resolved;
@@ -305,6 +351,7 @@ export const functionHandlers = {
         logger.info('Executing: get_device_state', args);
 
         const resolved = await resolveEntityId(args.entity_id);
+        if (typeof resolved === 'object' && resolved.success === false) return resolved;
         if (typeof resolved === 'object' && resolved.error) return resolved;
 
         const entityId = resolved;
@@ -387,15 +434,15 @@ export async function initializeSkills() {
     logger.info('Initializing skills...');
 
     await calendarManager.init();
-    await tasksManager.init();
     await homeAssistantManager.init();
+    await memoryManager.init();
 
     logger.info('All skills initialized');
 
     return {
         calendar: calendarManager,
-        tasks: tasksManager,
-        homeAssistant: homeAssistantManager
+        homeAssistant: homeAssistantManager,
+        memory: memoryManager
     };
 }
 
@@ -405,9 +452,9 @@ export async function initializeSkills() {
 export function getSkillsStatus() {
     return {
         calendar: calendarManager.getStatus(),
-        tasks: tasksManager.getStatus(),
-        homeAssistant: homeAssistantManager.getStatus()
+        homeAssistant: homeAssistantManager.getStatus(),
+        memory: memoryManager.getStatus()
     };
 }
 
-export { calendarManager, tasksManager, homeAssistantManager };
+export { calendarManager, homeAssistantManager, memoryManager };
