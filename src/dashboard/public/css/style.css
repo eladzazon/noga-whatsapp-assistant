@@ -122,8 +122,11 @@ body {
 }
 
 .btn-small {
-    padding: 5px 12px;
+    padding: 6px 14px;
     font-size: 12px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
 }
 
 /* ==================== Tab Navigation ==================== */
