@@ -669,6 +669,80 @@ class DashboardServer {
             }
         });
 
+        // ==================== Backup & Restore API ====================
+
+        this.app.get('/api/backup', requireAuth, (req, res) => {
+            try {
+                const knowledgeDir = path.resolve(process.cwd(), 'data', 'knowledge');
+                const skillsDir = path.resolve(process.cwd(), 'data', 'skills');
+                const backup = { knowledge: {}, skills: {} };
+
+                if (fs.existsSync(knowledgeDir)) {
+                    fs.readdirSync(knowledgeDir).forEach(file => {
+                        if (file.endsWith('.md')) {
+                            backup.knowledge[file] = fs.readFileSync(path.join(knowledgeDir, file), 'utf8');
+                        }
+                    });
+                }
+                
+                if (fs.existsSync(skillsDir)) {
+                    fs.readdirSync(skillsDir).forEach(file => {
+                        if (file.endsWith('.md')) {
+                            backup.skills[file] = fs.readFileSync(path.join(skillsDir, file), 'utf8');
+                        }
+                    });
+                }
+
+                res.setHeader('Content-disposition', `attachment; filename=noga_backup_${Date.now()}.json`);
+                res.setHeader('Content-type', 'application/json');
+                res.send(JSON.stringify(backup, null, 2));
+            } catch (err) {
+                logger.error('Failed to generate backup', { error: err.message });
+                res.status(500).json({ error: 'Failed to generate backup' });
+            }
+        });
+
+        this.app.post('/api/restore', requireAuth, express.json({limit: '10mb'}), (req, res) => {
+            try {
+                const { knowledge, skills } = req.body;
+                if (!knowledge && !skills) {
+                    return res.status(400).json({ error: 'Invalid backup format' });
+                }
+
+                const knowledgeDir = path.resolve(process.cwd(), 'data', 'knowledge');
+                const skillsDir = path.resolve(process.cwd(), 'data', 'skills');
+
+                if (knowledge) {
+                    if (!fs.existsSync(knowledgeDir)) fs.mkdirSync(knowledgeDir, { recursive: true });
+                    for (const [file, content] of Object.entries(knowledge)) {
+                        if (file.endsWith('.md')) {
+                            fs.writeFileSync(path.join(knowledgeDir, file), content, 'utf8');
+                        }
+                    }
+                }
+
+                if (skills) {
+                    if (!fs.existsSync(skillsDir)) fs.mkdirSync(skillsDir, { recursive: true });
+                    for (const [file, content] of Object.entries(skills)) {
+                        if (file.endsWith('.md')) {
+                            fs.writeFileSync(path.join(skillsDir, file), content, 'utf8');
+                        }
+                    }
+                }
+
+                // Notify UI to refresh
+                if (this.io) {
+                    this.io.emit('file_changed', { type: 'knowledge' });
+                    this.io.emit('file_changed', { type: 'skills' });
+                }
+
+                res.json({ success: true, message: 'Backup restored successfully' });
+            } catch (err) {
+                logger.error('Failed to restore backup', { error: err.message });
+                res.status(500).json({ error: 'Failed to restore backup' });
+            }
+        });
+
         // ==================== Home Assistant Mapping API ====================
 
         // Get all Home Assistant mappings

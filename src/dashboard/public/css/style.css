@@ -11,7 +11,7 @@
     --light: #f7fafc;
     --white: #ffffff;
 
-    --radius: 12px;
+    --radius: 20px;
     --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
     --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.15);
 }
@@ -44,7 +44,7 @@ body {
     align-items: center;
     padding: 15px 25px;
     background: rgba(255, 255, 255, 0.95);
-    border-radius: var(--radius);
+    border-radius: 20px;
     box-shadow: var(--shadow);
     margin-bottom: 20px;
 }
@@ -89,7 +89,7 @@ body {
     display: inline-block;
     padding: 8px 20px;
     border: none;
-    border-radius: 8px;
+    border-radius: 20px;
     cursor: pointer;
     font-size: 14px;
     font-weight: 600;
@@ -179,7 +179,7 @@ body {
 /* ==================== Panels ==================== */
 .panel {
     background: var(--white);
-    border-radius: var(--radius);
+    border-radius: 20px;
     padding: 25px;
     box-shadow: var(--shadow);
     margin-bottom: 20px;
@@ -217,14 +217,14 @@ body {
     align-items: center;
     justify-content: center;
     border: 3px dashed var(--gray-light);
-    border-radius: var(--radius);
+    border-radius: 20px;
     background: var(--light);
 }
 
 .qr-image {
     max-width: 100%;
     max-height: 100%;
-    border-radius: 8px;
+    border-radius: 20px;
 }
 
 .qr-hint {
@@ -256,7 +256,7 @@ body {
     gap: 12px;
     padding: 20px;
     background: var(--light);
-    border-radius: 10px;
+    border-radius: 20px;
     border: 1px solid var(--gray-light);
 }
 
@@ -274,7 +274,7 @@ body {
     font-size: 12px;
     font-weight: 600;
     padding: 4px 12px;
-    border-radius: 10px;
+    border-radius: 20px;
 }
 
 /* ==================== Usage Panel ==================== */
@@ -286,7 +286,7 @@ body {
 
 .usage-card {
     background: var(--light);
-    border-radius: 10px;
+    border-radius: 20px;
     padding: 20px;
     border: 1px solid var(--gray-light);
 }
@@ -357,7 +357,7 @@ body {
     max-height: 700px;
     padding: 15px;
     border: 2px solid var(--gray-light);
-    border-radius: var(--radius);
+    border-radius: 20px;
     font-family: inherit;
     font-size: 14px;
     line-height: 1.6;
@@ -397,7 +397,7 @@ body {
 /* Keywords Form */
 .keyword-form {
     background: var(--light);
-    border-radius: var(--radius);
+    border-radius: 20px;
     padding: 20px;
     margin-bottom: 15px;
     border: 2px solid var(--gray-light);
@@ -429,7 +429,7 @@ body {
     width: 100%;
     padding: 10px 14px;
     border: 2px solid var(--gray-light);
-    border-radius: 8px;
+    border-radius: 20px;
     font-size: 14px;
     transition: border-color 0.2s;
     background: white;
@@ -449,7 +449,7 @@ select.form-input {
 .type-badge {
     display: inline-block;
     padding: 3px 10px;
-    border-radius: 12px;
+    border-radius: 20px;
     font-size: 12px;
     font-weight: 600;
     white-space: nowrap;
@@ -470,7 +470,7 @@ select.form-input {
     min-height: 80px;
     padding: 10px 14px;
     border: 2px solid var(--gray-light);
-    border-radius: 8px;
+    border-radius: 20px;
     font-size: 14px;
     resize: vertical;
     transition: border-color 0.2s;
@@ -625,7 +625,7 @@ select.form-input {
     font-size: 12px;
     font-weight: 600;
     border: none;
-    border-radius: 8px;
+    border-radius: 20px;
     cursor: pointer;
     transition: all 0.2s;
     height: 32px;
@@ -684,7 +684,7 @@ select.form-input {
 /* ==================== Console ==================== */
 .console {
     background: #1a202c;
-    border-radius: var(--radius);
+    border-radius: 20px;
     padding: 15px;
     font-size: 13px;
     max-height: 500px;
@@ -736,7 +736,7 @@ select.form-input {
 /* ==================== Settings Panel ==================== */
 .settings-group {
     background: var(--light);
-    border-radius: var(--radius);
+    border-radius: 20px;
     padding: 20px;
     margin-bottom: 16px;
     border: 1px solid var(--gray-light);
@@ -793,6 +793,55 @@ select.form-input {
     font-size: 14px;
 }
 
+/* ==================== Modals ==================== */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    backdrop-filter: blur(2px);
+}
+
+.modal-content {
+    background: white;
+    padding: 24px;
+    border-radius: 20px;
+    width: 90%;
+    max-width: 400px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+    text-align: right;
+    animation: modalFadeIn 0.2s ease-out;
+}
+
+.modal-content h3 {
+    margin-top: 0;
+    color: var(--dark);
+    margin-bottom: 12px;
+}
+
+.modal-content p {
+    color: var(--gray);
+    margin-bottom: 24px;
+    line-height: 1.5;
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+}
+
+@keyframes modalFadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
 /* ==================== Responsive ==================== */
 @media (max-width: 900px) {
     .header {
@@ -816,5 +865,19 @@ select.form-input {
 
     .settings-grid {
         grid-template-columns: 1fr;
+    }
+
+    .split-pane {
+        flex-direction: column !important;
+    }
+
+    .file-sidebar {
+        width: 100% !important;
+        max-height: 200px;
+    }
+
+    .prompt-actions {
+        flex-wrap: wrap;
+        gap: 5px;
     }
 }

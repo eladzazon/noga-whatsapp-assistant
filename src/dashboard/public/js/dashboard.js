@@ -13,6 +13,39 @@
     const btnDisconnectWa = document.getElementById('btn-disconnect-wa');
     const btnReconnectWa = document.getElementById('btn-reconnect-wa');
 
+    // ==================== Modal Functions ====================
+    const confirmModal = document.getElementById('confirm-modal');
+    const confirmModalTitle = document.getElementById('confirm-modal-title');
+    const confirmModalMessage = document.getElementById('confirm-modal-message');
+    const confirmModalOk = document.getElementById('confirm-modal-ok');
+    const confirmModalCancel = document.getElementById('confirm-modal-cancel');
+
+    function showConfirmModal(title, message) {
+        return new Promise((resolve) => {
+            if (!confirmModal) {
+                // Fallback if modal doesn't exist
+                resolve(confirm(`${title}\n\n${message}`));
+                return;
+            }
+
+            confirmModalTitle.textContent = title;
+            confirmModalMessage.textContent = message;
+            confirmModal.style.display = 'flex';
+
+            const onOk = () => { cleanup(); resolve(true); };
+            const onCancel = () => { cleanup(); resolve(false); };
+
+            const cleanup = () => {
+                confirmModal.style.display = 'none';
+                confirmModalOk.removeEventListener('click', onOk);
+                confirmModalCancel.removeEventListener('click', onCancel);
+            };
+
+            confirmModalOk.addEventListener('click', onOk);
+            confirmModalCancel.addEventListener('click', onCancel);
+        });
+    }
+
     // Settings elements
     const saveSettingsBtn = document.getElementById('save-settings');
     const settingsStatusEl = document.getElementById('settings-status');
@@ -362,7 +395,9 @@
 
         async function deleteFile() {
             if (!currentFile) return;
-            if (!confirm(`האם אתה בטוח שברצונך למחוק את הקובץ ${currentFile}?`)) return;
+            
+            const confirmed = await showConfirmModal('מחיקת קובץ', `האם אתה בטוח שברצונך למחוק את הקובץ ${currentFile}?`);
+            if (!confirmed) return;
 
             try {
                 const res = await fetch(`${apiPath}/${currentFile}`, { method: 'DELETE' });
@@ -572,7 +607,8 @@
     };
 
     window._deleteHaMapping = async function (id) {
-        if (!confirm('למחוק מיפוי זה?')) return;
+        const confirmed = await showConfirmModal('מחיקת מיפוי', 'האם אתה בטוח שברצונך למחוק מיפוי זה?');
+        if (!confirmed) return;
         try {
             await fetch(`/api/ha/mappings/${id}`, { method: 'DELETE' });
             loadHaMappings();
@@ -713,7 +749,8 @@
     };
 
     window._deleteKeyword = async function (id) {
-        if (!confirm('למחוק מילת מפתח זו?')) return;
+        const confirmed = await showConfirmModal('מחיקת מילת מפתח', 'האם אתה בטוח שברצונך למחוק מילת מפתח זו?');
+        if (!confirmed) return;
         try {
             await fetch(`/api/keywords/${id}`, { method: 'DELETE' });
             loadKeywords();
@@ -842,7 +879,8 @@
     };
 
     window._deleteSchedule = async function (id) {
-        if (!confirm('למחוק תזמון זה?')) return;
+        const confirmed = await showConfirmModal('מחיקת תזמון', 'האם אתה בטוח שברצונך למחוק תזמון זה?');
+        if (!confirmed) return;
         try {
             await fetch(`/api/scheduled-prompts/${id}`, { method: 'DELETE' });
             loadSchedules();
@@ -879,7 +917,8 @@
 
     if (btnDisconnectWa) {
         btnDisconnectWa.addEventListener('click', async () => {
-            if (!confirm('האם אתה בטוח שברצונך להתנתק מ-WhatsApp? תצטרך לסרוק את ה-QR שוב.')) return;
+            const confirmed = await showConfirmModal('התנתקות מ-WhatsApp', 'האם אתה בטוח שברצונך להתנתק? תצטרך לסרוק את ה-QR שוב.');
+            if (!confirmed) return;
 
             btnDisconnectWa.disabled = true;
             btnDisconnectWa.textContent = 'מתנתק...';
@@ -984,7 +1023,8 @@
     const btnRestart = document.getElementById('btn-restart');
     if (btnRestart) {
         btnRestart.addEventListener('click', async () => {
-            if (!confirm('האם אתה בטוח שברצונך להפעיל מחדש את המערכת?')) return;
+            const confirmed = await showConfirmModal('הפעלה מחדש', 'האם אתה בטוח שברצונך להפעיל מחדש את המערכת?');
+            if (!confirmed) return;
 
             btnRestart.disabled = true;
             btnRestart.textContent = 'מפעיל מחדש...';
@@ -1187,6 +1227,56 @@
 
     if (saveSettingsBtn) {
         saveSettingsBtn.addEventListener('click', saveSettings);
+    }
+
+    // ==================== Backup & Restore ====================
+    
+    const btnRestore = document.getElementById('btn-restore');
+    const restoreStatus = document.getElementById('restore-status');
+
+    if (btnRestore) {
+        btnRestore.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const confirmed = await showConfirmModal('שחזור מגיבוי', 'אזהרה: שחזור ידרוס את קבצי הידע והמיומנויות הקיימים. להמשיך?');
+            if (!confirmed) {
+                e.target.value = '';
+                return;
+            }
+
+            restoreStatus.textContent = 'משחזר...';
+            restoreStatus.style.color = 'var(--primary)';
+
+            try {
+                const text = await file.text();
+                const json = JSON.parse(text);
+
+                const res = await fetch('/api/restore', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(json)
+                });
+                
+                const data = await res.json();
+                if (data.success) {
+                    restoreStatus.textContent = 'שוחזר בהצלחה ✓';
+                    restoreStatus.style.color = 'var(--success)';
+                } else {
+                    restoreStatus.textContent = data.error || 'שגיאה בשחזור';
+                    restoreStatus.style.color = 'var(--danger)';
+                }
+            } catch (err) {
+                restoreStatus.textContent = 'קובץ גיבוי לא תקין';
+                restoreStatus.style.color = 'var(--danger)';
+            }
+            
+            setTimeout(() => {
+                restoreStatus.textContent = '';
+            }, 5000);
+            
+            e.target.value = ''; // Reset input
+        });
     }
 
     // ==================== Initialization ====================

@@ -226,8 +226,8 @@ class GeminiManager {
             db.addChatMessage(userId, 'model', responseText);
 
             // Log usage and cost
-            if (result.response.usageMetadata) {
-                const usage = result.response.usageMetadata;
+            if (response.usageMetadata) {
+                const usage = response.usageMetadata;
                 const inputTokens = usage.promptTokenCount || 0;
                 const outputTokens = usage.candidatesTokenCount || 0;
                 const totalTokens = usage.totalTokenCount || 0;

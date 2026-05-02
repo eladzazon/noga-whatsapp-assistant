@@ -29,9 +29,10 @@
             <button class="tab-btn" data-tab="tab-skills">🛠️ מיומנויות</button>
             <button class="tab-btn" data-tab="tab-keywords">🔑 מילות מפתח</button>
             <button class="tab-btn" data-tab="tab-scheduled-prompts">⏱️ תזמונים</button>
+            <button class="tab-btn" data-tab="tab-homeassistant">🏠 בית חכם</button>
             <button class="tab-btn" data-tab="tab-settings">⚙️ הגדרות</button>
-            <button class="tab-btn" id="nav-btn-homeassistant" data-tab="tab-homeassistant">🏠 בית חכם</button>
             <button class="tab-btn" data-tab="tab-console">🖥️ לוג</button>
+            <button class="tab-btn" data-tab="tab-backup">💾 גיבוי</button>
         </div>
 
         <!-- Tab Content -->
@@ -614,6 +615,36 @@
                         </div>
                     </div>
                 </section>
+            </div>
+            <!-- ==================== Backup Tab ==================== -->
+            <div class="tab-pane" id="tab-backup">
+                <section class="panel settings-panel">
+                    <h2>💾 גיבוי ושחזור</h2>
+                    <p class="panel-hint">גיבוי כל קבצי הידע והמיומנויות לקובץ JSON אחד, ושחזור בעת הצורך.</p>
+                    <div class="settings-group" style="margin-top: 20px;">
+                        <h3 class="settings-group-title">פעולות</h3>
+                        <div style="display: flex; gap: 15px; margin-top: 15px;">
+                            <button id="btn-backup" class="btn btn-primary" onclick="window.location.href='/api/backup'">⬇️ הורד גיבוי</button>
+                            <label class="btn btn-secondary" style="cursor: pointer;">
+                                ⬆️ שחזר מגיבוי
+                                <input type="file" id="btn-restore" accept=".json" style="display: none;">
+                            </label>
+                        </div>
+                        <div id="restore-status" style="margin-top: 10px; font-weight: bold;"></div>
+                    </div>
+                </section>
+            </div>
+            
+            <!-- Reusable Confirmation Modal -->
+            <div id="confirm-modal" class="modal-overlay" style="display: none;">
+                <div class="modal-content">
+                    <h3 id="confirm-modal-title">אישור מחיקה</h3>
+                    <p id="confirm-modal-message">האם אתה בטוח שברצונך למחוק קובץ זה?</p>
+                    <div class="modal-actions">
+                        <button id="confirm-modal-cancel" class="btn btn-secondary">ביטול</button>
+                        <button id="confirm-modal-ok" class="btn btn-danger-small" style="height: auto;">מחק</button>
+                    </div>
+                </div>
             </div>
         </main>
     </div>
