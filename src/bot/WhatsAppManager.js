@@ -264,7 +264,17 @@ class WhatsAppManager {
             if (type === 'conversation') {
                 body = messageContent.conversation;
             } else if (type === 'extendedTextMessage') {
-                body = messageContent.extendedTextMessage?.text;
+                body = messageContent.extendedTextMessage?.text || '';
+                
+                // Handle quoted/replied messages
+                const contextInfo = messageContent.extendedTextMessage?.contextInfo;
+                if (contextInfo && contextInfo.quotedMessage) {
+                    const quotedMsg = contextInfo.quotedMessage;
+                    let quotedText = quotedMsg.conversation || quotedMsg.extendedTextMessage?.text || '';
+                    if (quotedText) {
+                        body = `[בתגובה להודעה: "${quotedText}"]\n${body}`;
+                    }
+                }
             } else if (type === 'imageMessage') {
                 body = messageContent.imageMessage?.caption;
                 hasMedia = true;
