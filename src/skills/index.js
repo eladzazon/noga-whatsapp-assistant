@@ -150,7 +150,7 @@ export const functionDeclarations = [
                 },
                 action: {
                     type: 'string',
-                    enum: ['turn_on', 'turn_off', 'toggle'],
+                    enum: ['turn_on', 'turn_off', 'toggle', 'press'],
                     description: 'הפעולה לביצוע. Action to perform.'
                 }
             },
@@ -342,6 +342,8 @@ export const functionHandlers = {
                 return await homeAssistantManager.turnOff(entityId);
             case 'toggle':
                 return await homeAssistantManager.toggle(entityId);
+            case 'press':
+                return await homeAssistantManager.press(entityId);
             default:
                 return { error: `Unknown action: ${args.action}` };
         }

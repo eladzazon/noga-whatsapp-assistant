@@ -151,6 +151,14 @@ class HomeAssistantManager {
     }
 
     /**
+     * Press an entity (for buttons)
+     * @param {string} entityId - Entity ID
+     */
+    async press(entityId) {
+        return this._callService(entityId, 'press');
+    }
+
+    /**
      * Call a service on an entity
      * @param {string} entityId - Entity ID
      * @param {string} action - Service action
@@ -163,6 +171,12 @@ class HomeAssistantManager {
 
         try {
             const domain = entityId.split('.')[0];
+            
+            // Map actions for specific domains (e.g. buttons cannot be "turned on", they are pressed)
+            if ((domain === 'button' || domain === 'input_button') && (action === 'turn_on' || action === 'toggle')) {
+                action = 'press';
+            }
+            
             const endpoint = `/services/${domain}/${action}`;
             const payload = {
                 entity_id: entityId,
