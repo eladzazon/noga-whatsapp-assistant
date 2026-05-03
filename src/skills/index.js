@@ -113,7 +113,7 @@ export const functionDeclarations = [
                 },
                 instructions: {
                     type: 'string',
-                    description: 'The step-by-step instructions in Markdown format.'
+                    description: 'הוראות צעד אחר צעד בפורמט Markdown. אם המשתמש לא סיפק הוראות מדויקות, עלייך לייצר אותן בעצמך על סמך מטרת המיומנות. Step-by-step instructions in Markdown. Generate them yourself if not provided.'
                 }
             },
             required: ['skill_name', 'instructions']

@@ -137,19 +137,19 @@ class GeminiManager {
             safetySettings: [
                 {
                     category: HarmCategory.HARM_CATEGORY_HARASSMENT,
-                    threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH
+                    threshold: HarmBlockThreshold.BLOCK_NONE
                 },
                 {
                     category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
-                    threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH
+                    threshold: HarmBlockThreshold.BLOCK_NONE
                 },
                 {
                     category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-                    threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH
+                    threshold: HarmBlockThreshold.BLOCK_NONE
                 },
                 {
                     category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-                    threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH
+                    threshold: HarmBlockThreshold.BLOCK_NONE
                 }
             ]
         });
@@ -204,17 +204,27 @@ class GeminiManager {
             let response = result.response;
 
             // Debug: Log what Gemini returned
-            const candidates = response.candidates;
+            const candidates = response.candidates || [];
+            const firstCandidate = candidates[0];
+            const finishReason = firstCandidate ? firstCandidate.finishReason : 'NONE';
+            const safetyRatings = firstCandidate ? firstCandidate.safetyRatings : [];
+            
             const functionCalls = response.functionCalls ? response.functionCalls() : null;
             const textPreview = response.text ? response.text().substring(0, 100) : '';
+            
             logger.info('Gemini raw response', {
                 historyLength: history.length,
                 isVolatileRequest,
                 hasFunctionCalls: !!(functionCalls && functionCalls.length > 0),
                 functionCallsCount: functionCalls ? functionCalls.length : 0,
-                candidatesCount: candidates ? candidates.length : 0,
+                candidatesCount: candidates.length,
+                finishReason,
                 textPreview: textPreview
             });
+
+            if (finishReason !== 'STOP' && finishReason !== 'NONE') {
+                logger.warn('Gemini response finished with unusual reason', { finishReason, safetyRatings });
+            }
 
             // Handle function calls
             response = await this._handleFunctionCalls(chat, response, userId);

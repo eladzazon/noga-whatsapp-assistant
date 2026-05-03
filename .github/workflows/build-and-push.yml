@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - main
+    paths-ignore:
+      - 'todo.md'
   workflow_dispatch:
 
 jobs:
