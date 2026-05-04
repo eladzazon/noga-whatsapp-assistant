@@ -33,6 +33,7 @@
     1. A reply to the previous message (even if not formally quoted).
     2. A completely new topic.
     This ensures Noga maintains conversation continuity when the user sends short/partial follow-ups.
+- [ ] **Private-to-Group Delegation**: Enable Noga to receive a private message from the user (admin) and understand instructions to perform actions or relay messages to a specific WhatsApp group (e.g., "Ask my wife in the group if we need milk").
 
 ## 🖥️ Dashboard Expansion
 - [ ] **AI Interaction Page**: A dedicated "Chat" tab to interact with Noga directly from the dashboard for testing and debugging.
@@ -48,5 +49,6 @@
     - Use **Gemini 3.1 Pro** for complex reasoning, multi-tool tasks, or nuanced conversations (verify this is the latest Pro version).
     - Use **Gemini 2.5 Flash** for simple responses, direct lookups, or high-speed interactions.
 
-
+## 🏠 Home Assistant Integrations
+- [ ] **Camera Snapshot Integration**: Implement a way for Home Assistant to trigger a camera snapshot and send it to Noga, so she can forward the image to the designated WhatsApp group.
 
