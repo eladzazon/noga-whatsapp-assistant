@@ -14,13 +14,15 @@
 - [ ] **Error Boundaries**: Better UI feedback when a file fails to save or load remotely.
 
 ## 🛠️ Debugging & Maintenance
-- [ ] **Remote Admin Commands**: Implement a suite of commands starting with `/` for remote management via WhatsApp:
+- [x] **Remote Admin Commands**: Implemented a suite of commands starting with `/` for remote management via WhatsApp:
+    - `/help`: Display all available admin commands and their functions.
     - `/log`: Receive the latest server logs.
     - `/restart` or `/reset`: Trigger a safe restart of the assistant.
     - `/status`: Get detailed system health (WA connection, HA, Gemini quota).
     - `/clear`: Clear current conversation history for the user.
     - `/backup`: Trigger a manual backup and receive the file.
-- [ ] **Automated Backups**: Implement cronjobs for periodic (daily/weekly) automated backups sent to the admin.
+    > ⚠️ Admin-only commands (`/log`, `/backup`, `/restart`) require `ADMIN_PHONE` to be set in `.env`.
+- [x] **Automated Backups**: Daily backup at 02:00 AM (Israel time) — sent automatically to the admin via WhatsApp if `ADMIN_PHONE` is configured.
 - [ ] **Full System Backup**: Expand the Backup & Restore feature to include more than just `.md` files:
     - AI Keywords & Custom Responses.
     - Home Assistant Entity Mappings & Nicknames.

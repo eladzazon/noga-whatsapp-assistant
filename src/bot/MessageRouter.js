@@ -2,6 +2,10 @@ import whatsappManager from './WhatsAppManager.js';
 import geminiManager from './GeminiManager.js';
 import logger from '../utils/logger.js';
 import db from '../database/DatabaseManager.js';
+import config from '../utils/config.js';
+import { getRecentLogs } from '../utils/logger.js';
+import fs from 'fs';
+import path from 'path';
 
 class MessageRouter {
     constructor() {
@@ -178,10 +182,14 @@ class MessageRouter {
 
         logger.info('Processing command', { from, command });
 
+        // Admin-only commands require ADMIN_PHONE to be configured and match the sender
+        const adminPhone = config.whatsapp.adminPhone;
+        const isAdmin = adminPhone && from === adminPhone;
+
         switch (command) {
             case '/help':
             case '/עזרה':
-                return this.getHelpText();
+                return this.getHelpText(isAdmin);
 
             case '/status':
             case '/סטטוס':
@@ -192,6 +200,35 @@ class MessageRouter {
                 geminiManager.clearHistory(from);
                 return 'היסטוריית השיחה נמחקה 🗑️';
 
+            case '/log':
+            case '/לוג': {
+                if (!isAdmin) return '⛔ פקודה זו זמינה למנהל בלבד.';
+                const logs = getRecentLogs(30);
+                if (logs.length === 0) return '📋 אין לוגים זמינים כרגע.';
+                const logText = logs
+                    .map(l => `[${l.level?.toUpperCase() || 'INFO'}] ${l.message}`)
+                    .join('\n');
+                return `📋 *לוגים אחרונים (30):*\n\n\`\`\`\n${logText}\n\`\`\``;
+            }
+
+            case '/backup':
+            case '/גיבוי': {
+                if (!isAdmin) return '⛔ פקודה זו זמינה למנהל בלבד.';
+                return await this.handleBackupCommand(from);
+            }
+
+            case '/restart':
+            case '/reset':
+            case '/אתחול': {
+                if (!isAdmin) return '⛔ פקודה זו זמינה למנהל בלבד.';
+                // Send confirmation first, then restart after a short delay
+                setTimeout(() => {
+                    logger.warn('System restart requested via WhatsApp admin command');
+                    process.exit(0); // Docker will auto-restart
+                }, 2000);
+                return '🔄 מאתחל מערכת... אחזור תוך כמה שניות!';
+            }
+
             default:
                 // Unknown command - pass to Gemini
                 return geminiManager.processMessage(from, body);
@@ -201,7 +238,13 @@ class MessageRouter {
     /**
      * Get help text
      */
-    getHelpText() {
+    getHelpText(isAdmin = false) {
+        const adminCommands = isAdmin ? `
+*פקודות מנהל (Admin Only):*
+/log - קבל 30 לוגים אחרונים של המערכת
+/backup - שלח גיבוי של כל הקבצים
+/restart - אתחל את המערכת` : '';
+
         return `שלום! אני נוגה 👋
         
 אני יכולה לעזור לך עם:
@@ -210,9 +253,9 @@ class MessageRouter {
 🛒 *קניות* - "תוסיפי חלב לרשימה", "מה ברשימת הקניות?"
 🏠 *בית חכם* - "תדליקי אור בסלון", "מה הטמפרטורה?"
 
-*פקודות מיוחדות:*
+*פקודות:*
 /status - סטטוס המערכת
-/clear - נקה היסטוריית שיחה
+/clear - נקה היסטוריית שיחה${adminCommands}
 
 אפשר גם לשלוח הודעה קולית! 🎤`;
     }
@@ -246,6 +289,50 @@ class MessageRouter {
    Input: ${usage.month.input.toLocaleString()}
    Output: ${usage.month.output.toLocaleString()}
    Cost: $${formatCost(usage.month.cost)}`;
+    }
+
+    /**
+     * Generate and send a backup file to the admin
+     */
+    async handleBackupCommand(chatId) {
+        try {
+            const knowledgeDir = path.resolve(process.cwd(), 'data', 'knowledge');
+            const skillsDir = path.resolve(process.cwd(), 'data', 'skills');
+            const backup = { knowledge: {}, skills: {}, generated_at: new Date().toISOString() };
+
+            if (fs.existsSync(knowledgeDir)) {
+                fs.readdirSync(knowledgeDir).forEach(file => {
+                    if (file.endsWith('.md')) {
+                        backup.knowledge[file] = fs.readFileSync(path.join(knowledgeDir, file), 'utf8');
+                    }
+                });
+            }
+            if (fs.existsSync(skillsDir)) {
+                fs.readdirSync(skillsDir).forEach(file => {
+                    if (file.endsWith('.md')) {
+                        backup.skills[file] = fs.readFileSync(path.join(skillsDir, file), 'utf8');
+                    }
+                });
+            }
+
+            const knowledgeCount = Object.keys(backup.knowledge).length;
+            const skillsCount = Object.keys(backup.skills).length;
+
+            // Save to a temp file and send as document
+            const backupPath = path.resolve(process.cwd(), 'data', `noga_backup_${Date.now()}.json`);
+            fs.writeFileSync(backupPath, JSON.stringify(backup, null, 2), 'utf8');
+
+            await whatsappManager.sendMediaMessage(chatId, backupPath, `📦 גיבוי נוגה | ${knowledgeCount} קבצי ידע, ${skillsCount} כישורים`);
+
+            // Clean up temp file
+            fs.unlinkSync(backupPath);
+
+            logger.info('Backup sent via WhatsApp command', { chatId, knowledgeCount, skillsCount });
+            return null; // Response already sent via media message
+        } catch (err) {
+            logger.error('Failed to generate/send backup via command', { error: err.message });
+            return `❌ שגיאה ביצירת הגיבוי: ${err.message}`;
+        }
     }
 }
 
