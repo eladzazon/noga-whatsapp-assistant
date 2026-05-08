@@ -187,13 +187,24 @@ class GeminiManager {
                 }
             });
 
+            // ── Context Awareness: inject a hint for short follow-up messages ──
+            // If message is short (<=8 words) and history exists, it's likely a continuation
+            let textToSend = text;
+            if (!isVolatileRequest && history.length > 0) {
+                const wordCount = text.trim().split(/\s+/).length;
+                if (wordCount <= 8 && !text.startsWith('[')) {
+                    textToSend = `[הערה: ייתכן שהודעה זו היא המשך לשיחה הקודמת - קרא את ההקשר נכון אם כן.]\n${text}`;
+                    logger.info('Context hint injected (short follow-up)', { wordCount });
+                }
+            }
+
             // Store user message
             db.addChatMessage(userId, 'user', text);
 
             // Send message and get response
             let result;
             try {
-                result = await chat.sendMessage(text);
+                result = await chat.sendMessage(textToSend);
                 this.quotaExceeded = false; // Reset on success
             } catch (err) {
                 if (err.message && (err.message.includes('429') || err.message.toLowerCase().includes('quota'))) {
@@ -332,12 +343,16 @@ class GeminiManager {
             // Store reference to voice message
             db.addChatMessage(userId, 'user', '[Voice Message]');
 
-            // Send audio for processing
+            // Send audio for Hebrew transcription + response
             let result;
             try {
                 result = await chat.sendMessage([
                     audioPart,
-                    { text: 'Please listen to this voice message and respond appropriately. If it contains a request or question, handle it. If you need to use any tools/functions, please do so.' }
+                    { text: `אתה מקבל הודעה קולית.
+1. תמלל את ההודעה במדויק.
+2. אם יש בה בקשה או שאלה - טפל בה (כולל שימוש בכלים אם צריך).
+3. אם ההקלטה ארוכה מ-30 שניות, הוסף סיכום קצר בראשית.
+ענה בעברית.` }
                 ]);
                 this.quotaExceeded = false;
             } catch (err) {

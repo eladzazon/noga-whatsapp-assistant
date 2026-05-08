@@ -104,9 +104,30 @@ class MessageRouter {
      * Handle text messages
      */
     async handleTextMessage(message) {
-        const { from, body } = message;
+        const { from, body, isGroup } = message;
 
         logger.info('Processing text message', { from, preview: body.substring(0, 50) });
+
+        // ── Group Delegation (admin private message → group) ───────────────
+        // Detect patterns like: "שלחי לקבוצה...", "תגידי לאשתי בקבוצה...", "אמרי בקבוצה..."
+        if (!isGroup && config.whatsapp.adminPhone && from === config.whatsapp.adminPhone && config.whatsapp.groupId) {
+            const delegationMatch = this._detectGroupDelegation(body);
+            if (delegationMatch) {
+                logger.info('Group delegation detected', { from, preview: delegationMatch.substring(0, 50) });
+                try {
+                    await whatsappManager.reactToMessage(message.key, '📢');
+                } catch { /* ignore */ }
+                // Ask Gemini to compose the group message naturally
+                const prompt = `[הוראת ניהול - שלח הודעה לקבוצת הוואטסאפ המשפחתית]
+המשתמש ביקש: "${body}"
+התוכן לשלוח לקבוצה: "${delegationMatch}"
+נסח את ההודעה לקבוצה בצורה טבעית ואנושית בעברית. ענה רק את תוכן ההודעה לקבוצה.`;
+                const groupMsg = await geminiManager.processMessage(from, prompt, { keepHistory: false });
+                const groupJid = config.whatsapp.groupId.includes('@') ? config.whatsapp.groupId : `${config.whatsapp.groupId}@g.us`;
+                await whatsappManager.sendMessage(groupJid, groupMsg);
+                return `✅ ההודעה נשלחה לקבוצה:\n_${groupMsg}_`;
+            }
+        }
 
         // Check for keyword match before sending to Gemini
         const keywordMatch = db.getKeywordByText(body.trim());
@@ -114,7 +135,6 @@ class MessageRouter {
             logger.info('Keyword matched', { from, keyword: keywordMatch.keyword, type: keywordMatch.type });
 
             if (keywordMatch.type === 'ai') {
-                // AI keyword: send custom instructions + user message to Gemini
                 try {
                     await whatsappManager.reactToMessage(message.key, '🤖');
                 } catch {
@@ -134,17 +154,35 @@ class MessageRouter {
             return keywordMatch.response;
         }
 
-        // React to show we received the message (using robot for AI processing)
+        // React to show we received the message
         try {
             await whatsappManager.reactToMessage(message.key, '🤖');
         } catch {
             // Ignore reaction errors
         }
 
-        // Process with Gemini
-        const response = await geminiManager.processMessage(from, body);
+        // Process with Gemini, passing message context
+        const response = await geminiManager.processMessage(from, body, { message });
 
         return response;
+    }
+
+    /**
+     * Detect if admin is delegating a message to the family group.
+     * Returns the content to relay, or null if not a delegation.
+     */
+    _detectGroupDelegation(body) {
+        const text = body.trim();
+        // Patterns: שלחי לקבוצה / תגידי לקבוצה / אמרי לקבוצה / שלחי לאשתי בקבוצה / תעבירי לקבוצה
+        const patterns = [
+            /^(?:תגידי|תגיד|אמרי|אמר|שלחי|שלח|תשלחי|תשלח|תעבירי|תעביר|כתבי|כתוב)\s+(?:לקבוצה|בקבוצה|לאשתי|לאשתך|לבן.*?|לבת.*?|לקבוצה\s+המשפחתית)(?:\s+בקבוצה)?[:\s]+(.+)$/is,
+            /^(?:send|tell|say|write)\s+(?:to\s+)?(?:the\s+)?(?:group|family)\s*[:\s]+(.+)$/i
+        ];
+        for (const pattern of patterns) {
+            const match = text.match(pattern);
+            if (match) return match[1].trim();
+        }
+        return null;
     }
 
     /**
