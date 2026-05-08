@@ -224,8 +224,9 @@ class MessageRouter {
                     : '(אין קובץ לוג)';
                 const serverMsg = `📁 *לוג שרת (קובץ — 30 שורות אחרונות):*\n\n\`\`\`\n${serverText}\n\`\`\``;
 
-                // Send live log immediately, return server log as reply
-                await whatsappManager.sendMessage(from, liveMsg);
+                // from is a bare phone number — reconstruct full JID for Baileys
+                const adminJid = from.includes('@') ? from : `${from}@s.whatsapp.net`;
+                await whatsappManager.sendMessage(adminJid, liveMsg);
                 return serverMsg;
             }
 
