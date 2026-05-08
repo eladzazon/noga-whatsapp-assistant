@@ -20,7 +20,6 @@ class DashboardServer {
         this.io = null;
         this.qrCode = null;
         this.geminiManager = null;
-        db = null;
     }
 
     /**
