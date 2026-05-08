@@ -153,7 +153,8 @@ action:
       event: "Motion detected at the front door"
       image_path: "/config/www/tmp/front_door_snapshot.jpg"
 ```
-**Noga will send:** The image of the front door with an AI-generated caption like: "⚠️ תנועה זוהתה בדלת הקדמית! הנה תמונה ממה שקורה עכשיו."
+**Noga will send:** The image of the front door with the exact text provided in the `event` field as the caption: "Motion detected at the front door". 
+*(Note: To ensure fast delivery, Noga bypasses AI text generation when an image is attached and simply uses your exact event text).*
 
 ## 5. Control from WhatsApp (Entity Mapping)
 
