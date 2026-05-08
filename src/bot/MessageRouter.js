@@ -3,7 +3,7 @@ import geminiManager from './GeminiManager.js';
 import logger from '../utils/logger.js';
 import db from '../database/DatabaseManager.js';
 import config from '../utils/config.js';
-import { getRecentLogs } from '../utils/logger.js';
+import { getRecentLogs, readServerLogs } from '../utils/logger.js';
 
 
 class MessageRouter {
@@ -202,14 +202,17 @@ class MessageRouter {
             case '/log':
             case '/לוג': {
                 if (!isAdmin) return '⛔ פקודה זו זמינה למנהל בלבד.';
-                const logs = getRecentLogs(30);
+                const logs = readServerLogs(50);
                 if (logs.length === 0) return '📋 אין לוגים זמינים כרגע.';
                 const logText = logs
-                    .map(l => `[${l.level?.toUpperCase() || 'INFO'}] ${l.message}`)
+                    .map(l => {
+                        const time = l.timestamp ? new Date(l.timestamp).toLocaleTimeString('he-IL') : '';
+                        const level = (l.level || 'info').toUpperCase();
+                        return `[${time}] ${level}: ${l.message}`;
+                    })
                     .join('\n');
-                return `📋 *לוגים אחרונים (30):*\n\n\`\`\`\n${logText}\n\`\`\``;
+                return `📋 *לוג שרת (50 שורות אחרונות):*\n\n\`\`\`\n${logText}\n\`\`\``;
             }
-
 
             case '/restart':
             case '/reset':

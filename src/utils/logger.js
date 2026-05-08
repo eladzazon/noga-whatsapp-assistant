@@ -1,5 +1,6 @@
 import winston from 'winston';
 import path from 'path';
+import fs from 'fs';
 
 // Custom format for console output
 const consoleFormat = winston.format.combine(
@@ -28,23 +29,25 @@ const logger = winston.createLogger({
     ]
 });
 
-// Add file transport in production
-if (process.env.NODE_ENV === 'production') {
-    logger.add(new winston.transports.File({
-        filename: path.join('data', 'logs', 'error.log'),
-        level: 'error',
-        format: fileFormat,
-        maxsize: 5242880, // 5MB
-        maxFiles: 5
-    }));
+// Always write to file (not just production)
+const logsDir = path.join('data', 'logs');
+if (!fs.existsSync(logsDir)) fs.mkdirSync(logsDir, { recursive: true });
 
-    logger.add(new winston.transports.File({
-        filename: path.join('data', 'logs', 'combined.log'),
-        format: fileFormat,
-        maxsize: 5242880,
-        maxFiles: 5
-    }));
-}
+
+logger.add(new winston.transports.File({
+    filename: path.join(logsDir, 'error.log'),
+    level: 'error',
+    format: fileFormat,
+    maxsize: 5242880, // 5MB
+    maxFiles: 5
+}));
+
+logger.add(new winston.transports.File({
+    filename: path.join(logsDir, 'combined.log'),
+    format: fileFormat,
+    maxsize: 5242880,
+    maxFiles: 5
+}));
 
 // In-memory log buffer for dashboard streaming
 const logBuffer = [];
@@ -95,6 +98,36 @@ export function subscribeToLogs(callback) {
  */
 export function getRecentLogs(count = 50) {
     return logBuffer.slice(-count);
+}
+
+/**
+ * Read the last N lines from the combined server log file.
+ * Falls back to in-memory buffer if the file doesn't exist yet.
+ * @param {number} lines - Number of lines to retrieve
+ */
+export function readServerLogs(lines = 50) {
+    const logFile = path.join('data', 'logs', 'combined.log');
+    try {
+        if (!fs.existsSync(logFile)) return getRecentLogs(lines);
+        const content = fs.readFileSync(logFile, 'utf-8');
+        const rawLines = content.trim().split('\n').filter(Boolean);
+        return rawLines
+            .slice(-lines)
+            .map(line => {
+                try {
+                    const entry = JSON.parse(line);
+                    return {
+                        timestamp: entry.timestamp,
+                        level: entry.level,
+                        message: entry.message
+                    };
+                } catch {
+                    return { timestamp: '', level: 'info', message: line };
+                }
+            });
+    } catch {
+        return getRecentLogs(lines);
+    }
 }
 
 export default logger;
