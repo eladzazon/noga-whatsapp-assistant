@@ -4,8 +4,7 @@ import logger from '../utils/logger.js';
 import db from '../database/DatabaseManager.js';
 import config from '../utils/config.js';
 import { getRecentLogs } from '../utils/logger.js';
-import fs from 'fs';
-import path from 'path';
+
 
 class MessageRouter {
     constructor() {
@@ -211,11 +210,6 @@ class MessageRouter {
                 return `📋 *לוגים אחרונים (30):*\n\n\`\`\`\n${logText}\n\`\`\``;
             }
 
-            case '/backup':
-            case '/גיבוי': {
-                if (!isAdmin) return '⛔ פקודה זו זמינה למנהל בלבד.';
-                return await this.handleBackupCommand(from);
-            }
 
             case '/restart':
             case '/reset':
@@ -242,7 +236,6 @@ class MessageRouter {
         const adminCommands = isAdmin ? `
 *פקודות מנהל (Admin Only):*
 /log - קבל 30 לוגים אחרונים של המערכת
-/backup - שלח גיבוי של כל הקבצים
 /restart - אתחל את המערכת` : '';
 
         return `שלום! אני נוגה 👋
@@ -291,63 +284,8 @@ class MessageRouter {
    Cost: $${formatCost(usage.month.cost)}`;
     }
 
-    /**
-     * Generate and send a backup file to the admin
-     */
-    async handleBackupCommand(chatId) {
-        try {
-            const knowledgeDir = path.resolve(process.cwd(), 'data', 'knowledge');
-            const skillsDir = path.resolve(process.cwd(), 'data', 'skills');
-            const backup = {
-                version: 2,
-                generated_at: new Date().toISOString(),
-                knowledge: {},
-                skills: {},
-                keywords: [],
-                ha_mappings: [],
-                scheduled_prompts: [],
-                settings: {}
-            };
-
-            if (fs.existsSync(knowledgeDir)) {
-                fs.readdirSync(knowledgeDir).forEach(file => {
-                    if (file.endsWith('.md')) backup.knowledge[file] = fs.readFileSync(path.join(knowledgeDir, file), 'utf8');
-                });
-            }
-            if (fs.existsSync(skillsDir)) {
-                fs.readdirSync(skillsDir).forEach(file => {
-                    if (file.endsWith('.md')) backup.skills[file] = fs.readFileSync(path.join(skillsDir, file), 'utf8');
-                });
-            }
-
-            // DB-backed data
-            backup.keywords = db.getKeywords().map(k => ({ keyword: k.keyword, response: k.response, type: k.type, enabled: k.enabled }));
-            backup.ha_mappings = db.getHaMappings().map(m => ({ entity_id: m.entity_id, nickname: m.nickname, location: m.location, type: m.type }));
-            backup.scheduled_prompts = db.getScheduledPrompts().map(p => ({ name: p.name, prompt: p.prompt, cron_expression: p.cron_expression, enabled: p.enabled }));
-            const allConfig = db.getAllConfig();
-            const ENV_PREFIX = 'env_';
-            for (const [key, value] of Object.entries(allConfig)) {
-                if (key.startsWith(ENV_PREFIX)) backup.settings[key.substring(ENV_PREFIX.length)] = value;
-            }
-
-            const kCount = Object.keys(backup.knowledge).length;
-            const sCount = Object.keys(backup.skills).length;
-
-            const backupPath = path.resolve(process.cwd(), 'data', `noga_full_backup_${Date.now()}.json`);
-            fs.writeFileSync(backupPath, JSON.stringify(backup, null, 2), 'utf8');
-
-            await whatsappManager.sendMediaMessage(chatId, backupPath,
-                `📦 גיבוי מלא | ${kCount} קבצי ידע, ${sCount} כישורים, ${backup.keywords.length} מילות מפתח, ${backup.ha_mappings.length} התאמות HA, ${backup.scheduled_prompts.length} משימות מתוזמנות`);
-
-            fs.unlinkSync(backupPath);
-            logger.info('Full backup sent via WhatsApp command', { chatId, kCount, sCount });
-            return null;
-        } catch (err) {
-            logger.error('Failed to generate/send full backup via command', { error: err.message });
-            return `❌ שגיאה ביצירת הגיבוי: ${err.message}`;
-        }
-    }
 }
+
 
 export default new MessageRouter();
 export { MessageRouter };

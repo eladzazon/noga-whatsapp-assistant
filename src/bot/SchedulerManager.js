@@ -103,23 +103,15 @@ class SchedulerManager {
     }
 
     /**
-     * Schedule an automated daily backup sent to the admin via WhatsApp
+     * Schedule an automated daily backup saved to disk (data/backups/)
      */
     _scheduleAutomatedBackup() {
-        if (!config.whatsapp.adminPhone) {
-            logger.info('Automated backup skipped: ADMIN_PHONE not configured.');
-            return;
-        }
-
         // Run every day at 02:00 AM (Israel time)
         cron.schedule('0 2 * * *', async () => {
             logger.info('Running automated daily backup...');
             try {
-                const { default: whatsappManager } = await import('./WhatsAppManager.js');
-                if (!whatsappManager.getStatus().isReady) {
-                    logger.warn('Automated backup skipped: WhatsApp not ready.');
-                    return;
-                }
+                const backupsDir = path.resolve(process.cwd(), 'data', 'backups');
+                if (!fs.existsSync(backupsDir)) fs.mkdirSync(backupsDir, { recursive: true });
 
                 const knowledgeDir = path.resolve(process.cwd(), 'data', 'knowledge');
                 const skillsDir = path.resolve(process.cwd(), 'data', 'skills');
@@ -155,24 +147,31 @@ class SchedulerManager {
                     if (key.startsWith(ENV_PREFIX)) backup.settings[key.substring(ENV_PREFIX.length)] = value;
                 }
 
-                const kCount = Object.keys(backup.knowledge).length;
-                const sCount = Object.keys(backup.skills).length;
-
-                const backupPath = path.resolve(process.cwd(), 'data', `noga_full_backup_${Date.now()}.json`);
+                // Save to data/backups/ with a timestamp filename
+                const dateStr = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+                const backupPath = path.join(backupsDir, `noga_backup_${dateStr}.json`);
                 fs.writeFileSync(backupPath, JSON.stringify(backup, null, 2), 'utf8');
 
-                const adminJid = `${config.whatsapp.adminPhone}@s.whatsapp.net`;
-                await whatsappManager.sendMediaMessage(adminJid, backupPath,
-                    `📦 גיבוי מלא אוטומטי יומי | ${kCount} קבצי ידע, ${sCount} כישורים, ${backup.keywords.length} מילות מפתח, ${backup.ha_mappings.length} התאמות HA`);
+                // Keep only the last 7 backups — delete older ones
+                const backupFiles = fs.readdirSync(backupsDir)
+                    .filter(f => f.startsWith('noga_backup_') && f.endsWith('.json'))
+                    .sort(); // ascending order (oldest first)
+                if (backupFiles.length > 7) {
+                    backupFiles.slice(0, backupFiles.length - 7).forEach(old => {
+                        fs.unlinkSync(path.join(backupsDir, old));
+                        logger.info('Deleted old backup', { file: old });
+                    });
+                }
 
-                fs.unlinkSync(backupPath);
-                logger.info('Automated full daily backup sent successfully', { kCount, sCount });
+                const kCount = Object.keys(backup.knowledge).length;
+                const sCount = Object.keys(backup.skills).length;
+                logger.info('Automated daily backup saved to disk', { path: backupPath, kCount, sCount });
             } catch (err) {
                 logger.error('Automated backup failed', { error: err.message });
             }
         }, { scheduled: true, timezone: 'Asia/Jerusalem' });
 
-        logger.info('Automated daily backup scheduled at 02:00 AM (Asia/Jerusalem)');
+        logger.info('Automated daily backup scheduled at 02:00 AM (Asia/Jerusalem) → saves to data/backups/');
     }
 }
 

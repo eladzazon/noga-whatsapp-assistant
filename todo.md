@@ -22,7 +22,8 @@
     - `/clear`: Clear current conversation history for the user.
     - `/backup`: Trigger a manual backup and receive the file.
     > ⚠️ Admin-only commands (`/log`, `/backup`, `/restart`) require `ADMIN_PHONE` to be set in `.env`.
-- [x] **Automated Backups**: Daily backup at 02:00 AM (Israel time) — sent automatically to the admin via WhatsApp if `ADMIN_PHONE` is configured.
+- [x] **Automated Backups**: Daily backup at 02:00 AM (Israel time) — saved to `data/backups/` on the server (keeps last 7). Download via the dashboard `/api/backup`.
+
 - [x] **Full System Backup**: Backup & Restore now covers all data — not just `.md` files:
     - AI Keywords & Custom Responses.
     - Home Assistant Entity Mappings & Nicknames.
