@@ -179,6 +179,7 @@ export function applyDbOverrides(db) {
 
             config.whatsapp.whitelist = parseList(process.env.WHATSAPP_WHITELIST);
             config.whatsapp.groupId = process.env.WHATSAPP_GROUP_ID || null;
+            config.whatsapp.adminPhone = process.env.ADMIN_PHONE || null;
 
             config.gemini.apiKey = process.env.GEMINI_API_KEY;
             config.gemini.model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';

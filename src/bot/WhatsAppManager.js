@@ -119,6 +119,13 @@ class WhatsAppManager {
                 if (this.onReadyCallback) {
                     this.onReadyCallback();
                 }
+
+                // Send boot notification to admin if configured
+                if (config.whatsapp.adminPhone) {
+                    const adminJid = `${config.whatsapp.adminPhone}@s.whatsapp.net`;
+                    const bootTime = new Date().toLocaleString('he-IL');
+                    this.sendMessage(adminJid, `🚀 *נוגה התחברה בהצלחה!*\nהסיסטם מוכן לפעולה.\nזמן חיבור: ${bootTime}`);
+                }
             }
         });
 

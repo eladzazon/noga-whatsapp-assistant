@@ -30,6 +30,8 @@
     - Scheduled Cronjobs & Automations.
     - User Preferences & Settings (DB-backed env overrides).
 
+- [x] **Boot Notification**: Send a WhatsApp message to `ADMIN_PHONE` when the assistant successfully connects and is ready.
+
 
 
 ## 🧠 AI & Context Improvements
