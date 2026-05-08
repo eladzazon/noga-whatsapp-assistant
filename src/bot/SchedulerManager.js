@@ -20,6 +20,7 @@ class SchedulerManager {
         logger.info('Initializing Scheduler Manager...');
         this.reload();
         this._scheduleAutomatedBackup();
+        this._scheduleBirthdayReminders();
         return this;
     }
 
@@ -173,6 +174,82 @@ class SchedulerManager {
         }, { scheduled: true, timezone: 'Asia/Jerusalem' });
 
         logger.info('Automated daily backup scheduled at 02:00 AM (Asia/Jerusalem) → saves to data/backups/');
+    }
+
+    /**
+     * Schedule daily birthday & yearly-event reminders at 08:00 AM
+     * Sends a WhatsApp message to ADMIN_PHONE (and group if configured)
+     * when there are birthdays or yearly events today or in the next 7 days.
+     */
+    _scheduleBirthdayReminders() {
+        // Run every day at 08:00 AM (Israel time)
+        cron.schedule('0 8 * * *', async () => {
+            logger.info('Running birthday/event reminder check...');
+            try {
+                // Check if calendar is configured
+                if (!config.google?.eventsCalendarId && !config.google?.birthdaysCalendarId) {
+                    logger.debug('Birthday reminders: no special calendars configured, skipping');
+                    return;
+                }
+
+                const { calendarManager } = await import('../skills/index.js');
+                const result = await calendarManager.checkUpcomingBirthdays(7);
+
+                if (!result.success || result.count === 0) {
+                    logger.info('Birthday reminder: no upcoming events in the next 7 days');
+                    return;
+                }
+
+                const whatsappManager = (await import('./WhatsAppManager.js')).default;
+                if (!whatsappManager.getStatus().isReady) {
+                    logger.warn('Birthday reminder: WhatsApp not ready, skipping');
+                    return;
+                }
+
+                // Build message
+                const today = result.events.filter(e => e.isToday);
+                const upcoming = result.events.filter(e => !e.isToday);
+
+                let lines = ['🎂 *תזכורת אירועים קרובים*\n'];
+
+                if (today.length > 0) {
+                    lines.push('*היום:*');
+                    today.forEach(e => lines.push(`  ${e.calendar} ${e.title}`));
+                }
+                if (upcoming.length > 0) {
+                    lines.push('\n*השבוע הקרוב:*');
+                    upcoming.forEach(e => {
+                        const inDays = e.daysUntil === 1 ? 'מחר' : `בעוד ${e.daysUntil} ימים`;
+                        lines.push(`  ${e.calendar} ${e.title} (${inDays})`);
+                    });
+                }
+
+                const message = lines.join('\n');
+
+                // Send to admin
+                if (config.whatsapp.adminPhone) {
+                    const adminJid = `${config.whatsapp.adminPhone}@s.whatsapp.net`;
+                    await whatsappManager.sendMessage(adminJid, message);
+                    logger.info('Birthday reminder sent to admin');
+                }
+
+                // Also send to group if there are events TODAY
+                if (today.length > 0 && config.whatsapp.groupId) {
+                    const eventTitles = today.map(e => e.title).join(', ');
+                    const groupMsg = this.geminiManager
+                        ? await this.geminiManager.processMessage('system_birthday',
+                            `כתוב הודעת ברכה קצרה וחמה לקבוצה המשפחתית בעברית עם אמוג'ים לאירועים: ${eventTitles}`,
+                            { keepHistory: false })
+                        : `🎉 ${eventTitles}`;
+                    await whatsappManager.sendMessage(config.whatsapp.groupId, groupMsg);
+                    logger.info('Birthday group message sent');
+                }
+            } catch (err) {
+                logger.error('Birthday reminder failed', { error: err.message });
+            }
+        }, { scheduled: true, timezone: 'Asia/Jerusalem' });
+
+        logger.info('Birthday/event reminder scheduled at 08:00 AM (Asia/Jerusalem)');
     }
 }
 

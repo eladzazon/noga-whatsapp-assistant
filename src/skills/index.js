@@ -19,7 +19,7 @@ export const functionDeclarations = [
     // ==================== Calendar Functions ====================
     {
         name: 'list_calendar_events',
-        description: 'רשימת אירועים מהיומן לטווח תאריכים. Get calendar events for a date range.',
+        description: 'רשימת אירועים מהיומן לטווח תאריכים. Get calendar events for a date range. Use calendar="all" to include birthdays and yearly events.',
         parameters: {
             type: 'object',
             properties: {
@@ -30,6 +30,11 @@ export const functionDeclarations = [
                 end_date: {
                     type: 'string',
                     description: 'תאריך סיום בפורמט YYYY-MM-DD (אופציונלי). End date in YYYY-MM-DD format (optional).'
+                },
+                calendar: {
+                    type: 'string',
+                    enum: ['main', 'events', 'birthdays', 'all'],
+                    description: 'Which calendar to query. main=יומן ראשי, events=אירועים חשובים (birthdays/anniversaries), birthdays=ימי הולדת עבריים, all=all calendars. Default: main.'
                 }
             },
             required: ['start_date']
@@ -37,7 +42,7 @@ export const functionDeclarations = [
     },
     {
         name: 'add_calendar_event',
-        description: 'הוסף אירוע חדש ליומן. Add a new event to the calendar.',
+        description: 'הוסף אירוע חדש ליומן. Add a new event to the calendar. For birthday/anniversary events use calendar="events".',
         parameters: {
             type: 'object',
             properties: {
@@ -60,9 +65,28 @@ export const functionDeclarations = [
                 description: {
                     type: 'string',
                     description: 'תיאור האירוע (אופציונלי). Event description (optional).'
+                },
+                calendar: {
+                    type: 'string',
+                    enum: ['main', 'events', 'birthdays'],
+                    description: 'Which calendar to add the event to. main=יומן ראשי, events=אירועים חשובים, birthdays=ימי הולדת עבריים. Default: main.'
                 }
             },
             required: ['title', 'date']
+        }
+    },
+    {
+        name: 'check_upcoming_birthdays',
+        description: 'בדוק ימי הולדת ואירועים שנתיים קרובים מיומני אירועים חשובים וימי הולדת. Check upcoming birthdays and yearly events from the special calendars.',
+        parameters: {
+            type: 'object',
+            properties: {
+                days_ahead: {
+                    type: 'number',
+                    description: 'כמה ימים קדימה לבדוק (ברירת מחדל 7). How many days ahead to check (default 7).'
+                }
+            },
+            required: []
         }
     },
 
@@ -270,7 +294,7 @@ export const functionHandlers = {
     // ==================== Calendar Handlers ====================
     list_calendar_events: async (args) => {
         logger.info('Executing: list_calendar_events', args);
-        return await calendarManager.listEvents(args.start_date, args.end_date);
+        return await calendarManager.listEvents(args.start_date, args.end_date, args.calendar || 'main');
     },
 
     add_calendar_event: async (args) => {
@@ -280,8 +304,14 @@ export const functionHandlers = {
             args.date,
             args.time || null,
             args.duration_minutes || 60,
-            args.description || ''
+            args.description || '',
+            args.calendar || 'main'
         );
+    },
+
+    check_upcoming_birthdays: async (args) => {
+        logger.info('Executing: check_upcoming_birthdays', args);
+        return await calendarManager.checkUpcomingBirthdays(args.days_ahead || 7);
     },
 
     // ==================== Shopping List Handlers Removed (Now a Skill) ====================

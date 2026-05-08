@@ -106,7 +106,11 @@ Always be warm and respond in Hebrew.`
             clientSecret: process.env.GOOGLE_OAUTH_CLIENT_SECRET,
             refreshToken: process.env.GOOGLE_OAUTH_REFRESH_TOKEN
         },
-        calendarId: process.env.CALENDAR_ID || 'primary'
+        calendarId: process.env.CALENDAR_ID || 'primary',
+        // "אירועים חשובים" — yearly events: birthdays, anniversaries, etc.
+        eventsCalendarId: process.env.CALENDAR_EVENTS_ID || null,
+        // Hebrew birthday calendar
+        birthdaysCalendarId: process.env.CALENDAR_BIRTHDAYS_ID || null
     },
 
     // Home Assistant
@@ -186,6 +190,8 @@ export function applyDbOverrides(db) {
 
             config.google.serviceAccountPath = process.env.GOOGLE_SERVICE_ACCOUNT_PATH || './credentials/service-account.json';
             config.google.calendarId = process.env.CALENDAR_ID || 'primary';
+            config.google.eventsCalendarId = process.env.CALENDAR_EVENTS_ID || null;
+            config.google.birthdaysCalendarId = process.env.CALENDAR_BIRTHDAYS_ID || null;
             config.google.oauth.clientId = process.env.GOOGLE_OAUTH_CLIENT_ID;
             config.google.oauth.clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET;
             config.google.oauth.refreshToken = process.env.GOOGLE_OAUTH_REFRESH_TOKEN;

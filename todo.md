@@ -47,9 +47,9 @@
 - [ ] **Remote Conversation Manager**: A WhatsApp-Web-like interface to view active conversations, message history, and send/receive messages remotely via the admin panel.
 
 ## 📅 Calendar Enhancements
-- [ ] **Multi-Calendar Support**: Extend the calendar skill to handle multiple calendars (not just "primary").
-- [ ] **Birthday & Event Reminders**: Add logic to scan specific calendars for birthdays and anniversaries.
-- [ ] **Reminder Cronjobs**: Implement scheduled jobs to send daily/weekly birthday and event summaries via WhatsApp.
+- [x] **Multi-Calendar Support**: Noga now queries 3 calendars — main, `אירועים חשובים` (events), and Hebrew birthdays. Gemini tools support `calendar=main|events|birthdays|all`.
+- [x] **Birthday & Event Reminders**: `checkUpcomingBirthdays()` scans both special calendars for events in the next N days. Works via chat ("מה ימי ההולדת השבוע?") or automated daily job.
+- [x] **Reminder Cronjobs**: Daily at 08:00 AM — sends birthday/event summary to `ADMIN_PHONE`; sends a Gemini-composed greeting to the family group if there are events **today**.
 
 ## ⚡ Performance & Optimization
 - [ ] **Dynamic Model Switching**: Implement logic in the message router to detect request complexity:
