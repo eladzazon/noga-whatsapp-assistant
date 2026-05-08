@@ -204,7 +204,7 @@ class MessageRouter {
 
                 const formatLogLines = (entries) =>
                     entries.map(l => {
-                        const time = l.timestamp ? new Date(l.timestamp).toLocaleTimeString('he-IL') : '??:??';
+                        const time = l.timestamp ? new Date(l.timestamp).toLocaleTimeString('he-IL', { timeZone: 'Asia/Jerusalem' }) : '??:??';
                         const level = (l.level || 'info').toUpperCase();
                         return `[${time}] ${level}: ${l.message}`;
                     }).join('\n');

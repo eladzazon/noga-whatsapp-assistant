@@ -123,7 +123,7 @@ class WhatsAppManager {
                 // Send boot notification to admin if configured
                 if (config.whatsapp.adminPhone) {
                     const adminJid = `${config.whatsapp.adminPhone}@s.whatsapp.net`;
-                    const bootTime = new Date().toLocaleString('he-IL');
+                    const bootTime = new Date().toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' });
                     this.sendMessage(adminJid, `🚀 *נוגה התחברה בהצלחה!*\nהסיסטם מוכן לפעולה.\nזמן חיבור: ${bootTime}`);
                 }
             }

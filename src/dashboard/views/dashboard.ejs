@@ -491,7 +491,7 @@
                             <% recentLogs.forEach(log=> { %>
                                 <div class="log-entry log-<%= log.level %>">
                                     <span class="log-time">
-                                        <%= new Date(log.timestamp).toLocaleTimeString('he-IL') %>
+                                        <%= new Date(log.timestamp).toLocaleTimeString('he-IL', { timeZone: 'Asia/Jerusalem' }) %>
                                     </span>
                                     <span class="log-level">
                                         <%= log.level.toUpperCase() %>

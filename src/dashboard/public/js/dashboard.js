@@ -216,7 +216,7 @@
         const entry = document.createElement('div');
         entry.className = `log-entry log-${log.level}`;
 
-        const time = new Date(log.timestamp).toLocaleTimeString('he-IL');
+        const time = new Date(log.timestamp).toLocaleTimeString('he-IL', { timeZone: 'Asia/Jerusalem' });
 
         entry.innerHTML = `
             <span class="log-time">${time}</span>
@@ -1113,7 +1113,7 @@
                 const level = (log.level || 'info').toLowerCase();
                 entry.className = `log-entry log-${level}`;
 
-                const time = log.timestamp ? new Date(log.timestamp).toLocaleString('he-IL') : '';
+                const time = log.timestamp ? new Date(log.timestamp).toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' }) : '';
 
                 // Build message from log fields
                 let msg = log.message || '';
@@ -1288,7 +1288,7 @@
                 </tr></thead>
                 <tbody>
                     ${backups.map(b => {
-                        const date = new Date(b.created_at).toLocaleString('he-IL');
+                        const date = new Date(b.created_at).toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' });
                         return `<tr>
                             <td><code dir="ltr" style="font-size: 12px;">${escapeHtml(b.filename)}</code></td>
                             <td>${escapeHtml(formatBytes(b.size))}</td>
