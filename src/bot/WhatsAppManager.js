@@ -408,6 +408,11 @@ class WhatsAppManager {
             throw new Error('WhatsApp client is not ready');
         }
 
+        let formattedJid = chatId;
+        if (!formattedJid.includes('@')) {
+            formattedJid = `${chatId}@s.whatsapp.net`;
+        }
+
         // Simplistic implementation for generic media sending using Baileys
         try {
             const buffer = fs.readFileSync(mediaPath);
@@ -425,10 +430,10 @@ class WhatsAppManager {
                 messageContent = { document: buffer, mimetype: 'application/octet-stream', fileName: path.basename(mediaPath), caption: caption };
             }
 
-            await this.client.sendMessage(chatId, messageContent);
-            logger.info('Media message sent', { to: chatId, caption });
+            await this.client.sendMessage(formattedJid, messageContent);
+            logger.info('Media message sent', { to: formattedJid, caption });
         } catch (err) {
-            logger.error('Failed to send media message', { error: err.message, to: chatId });
+            logger.error('Failed to send media message', { error: err.message, to: formattedJid });
             throw err;
         }
     }

@@ -281,8 +281,8 @@ class DashboardServer {
             logger.info('Webhook received', { event });
 
             try {
-                // Generate message using AI
-                const message = await this.geminiManager.generateBroadcastMessage({ event, ...data });
+                // Generate message: Use raw event text for images, or AI for text-only broadcasts
+                const message = req.file ? event : await this.geminiManager.generateBroadcastMessage({ event, ...data });
 
                 // Send to WhatsApp Group
                 if (config.whatsapp.groupId) {
