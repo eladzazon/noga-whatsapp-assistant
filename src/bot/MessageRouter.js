@@ -202,16 +202,31 @@ class MessageRouter {
             case '/log':
             case '/לוג': {
                 if (!isAdmin) return '⛔ פקודה זו זמינה למנהל בלבד.';
-                const logs = readServerLogs(50);
-                if (logs.length === 0) return '📋 אין לוגים זמינים כרגע.';
-                const logText = logs
-                    .map(l => {
-                        const time = l.timestamp ? new Date(l.timestamp).toLocaleTimeString('he-IL') : '';
+
+                const formatLogLines = (entries) =>
+                    entries.map(l => {
+                        const time = l.timestamp ? new Date(l.timestamp).toLocaleTimeString('he-IL') : '??:??';
                         const level = (l.level || 'info').toUpperCase();
                         return `[${time}] ${level}: ${l.message}`;
-                    })
-                    .join('\n');
-                return `📋 *לוג שרת (50 שורות אחרונות):*\n\n\`\`\`\n${logText}\n\`\`\``;
+                    }).join('\n');
+
+                // 1️⃣ Live Log — in-memory buffer since last restart
+                const liveLogs = getRecentLogs(30);
+                const liveText = liveLogs.length > 0
+                    ? formatLogLines(liveLogs)
+                    : '(אין לוגים בזיכרון)';
+                const liveMsg = `🟢 *לוג חי (מאז ההפעלה האחרונה):*\n\n\`\`\`\n${liveText}\n\`\`\``;
+
+                // 2️⃣ Server Log — persistent file on disk
+                const serverLogs = readServerLogs(30);
+                const serverText = serverLogs.length > 0
+                    ? formatLogLines(serverLogs)
+                    : '(אין קובץ לוג)';
+                const serverMsg = `📁 *לוג שרת (קובץ — 30 שורות אחרונות):*\n\n\`\`\`\n${serverText}\n\`\`\``;
+
+                // Send live log immediately, return server log as reply
+                await whatsappManager.sendMessage(from, liveMsg);
+                return serverMsg;
             }
 
             case '/restart':
