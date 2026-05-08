@@ -100,17 +100,61 @@ action:
 Run this at 7:00 AM:
 
 ```yaml
-alias: "Morning Announcement"
+alias: "Announce Good Morning"
 trigger:
   - platform: time
     at: "07:00:00"
 action:
   - service: rest_command.noga_notify
     data:
-      event: "Good Morning"
+      event: "Morning Routine"
       data:
-        temperature: "{{ states('sensor.outdoor_temperature') }}"
+        weather: "Sunny, 25°C"
+        calendar_events: "Doctor appointment at 10:00 AM"
 ```
+**Noga will say:** "Good morning everyone! ☀️ It's a beautiful sunny day (25°C). Just a quick reminder about the doctor appointment at 10:00 AM. Have a great day!"
+
+### Example: Camera Snapshot with Image 📷
+Noga supports receiving images via `multipart/form-data`. Since Home Assistant's `rest_command` doesn't support file uploads easily, you can use a `shell_command` with `curl` to send a camera snapshot along with an event.
+
+First, add a `shell_command` to your `configuration.yaml`:
+
+```yaml
+shell_command:
+  noga_notify_image: >
+    curl -X POST "http://YOUR_NOGA_IP:3000/api/notify"
+    -H "x-webhook-secret: my_super_secret_webhook_key_123"
+    -F "event={{ event }}"
+    -F "image=@{{ image_path }}"
+```
+
+Then, you can use it in an automation. For example, when motion is detected at the front door:
+
+```yaml
+alias: "Camera Snapshot on Motion"
+trigger:
+  - platform: state
+    entity_id: binary_sensor.front_door_motion
+    to: "on"
+action:
+  # 1. Take the snapshot and save it to a temporary location
+  - service: camera.snapshot
+    target:
+      entity_id: camera.front_door
+    data:
+      filename: "/config/www/tmp/front_door_snapshot.jpg"
+  
+  # 2. Give Home Assistant a second to save the file
+  - delay: "00:00:01"
+  
+  # 3. Send it to Noga
+  - service: shell_command.noga_notify_image
+    data:
+      event: "Motion detected at the front door"
+      image_path: "/config/www/tmp/front_door_snapshot.jpg"
+```
+**Noga will send:** The image of the front door with an AI-generated caption like: "⚠️ תנועה זוהתה בדלת הקדמית! הנה תמונה ממה שקורה עכשיו."
+
 ## 5. Control from WhatsApp (Entity Mapping)
 
 You can now control your Home Assistant devices directly from WhatsApp using friendly Hebrew nicknames.

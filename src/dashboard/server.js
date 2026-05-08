@@ -8,6 +8,13 @@ import { fileURLToPath } from 'url';
 import config from '../utils/config.js';
 import logger, { subscribeToLogs, getRecentLogs } from '../utils/logger.js';
 import db from '../database/DatabaseManager.js';
+import multer from 'multer';
+
+const uploadDir = path.resolve(process.cwd(), 'data', 'temp');
+if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+}
+const upload = multer({ dest: uploadDir });
 
 
 const __filename = fileURLToPath(import.meta.url);
@@ -245,9 +252,19 @@ class DashboardServer {
         });
 
         // Notification webhook (for Home Assistant)
-        this.app.post('/api/notify', async (req, res) => {
-            const { event, data } = req.body;
-            const secret = req.headers['x-webhook-secret'] || req.query.secret;
+        // Accepts application/json OR multipart/form-data (for image uploads)
+        this.app.post('/api/notify', upload.single('image'), async (req, res) => {
+            const event = req.body.event;
+            let data = {};
+            if (req.body.data) {
+                try {
+                    data = typeof req.body.data === 'string' ? JSON.parse(req.body.data) : req.body.data;
+                } catch (e) {
+                    logger.warn('Failed to parse webhook data', { error: e.message });
+                }
+            }
+            
+            const secret = req.headers['x-webhook-secret'] || req.query.secret || req.body.secret;
 
             // 1. Verify Secret
             if (!config.dashboard.webhookSecret || secret !== config.dashboard.webhookSecret) {
@@ -269,26 +286,53 @@ class DashboardServer {
 
                 // Send to WhatsApp Group
                 if (config.whatsapp.groupId) {
-                    // Use the WhatsAppManager instance we can access via global import 
-                    // (since this.getWhatsAppStatus is just a status getter)
-                    // Better approach: Import WhatsAppManager at the top
-                    // check if isReady
                     const whatsappStatus = this.getWhatsAppStatus ? this.getWhatsAppStatus() : { isReady: false };
 
                     if (whatsappStatus.isReady) {
-                        // Assuming we can access the manager instance globally or pass it in.
-                        // For now, let's use a dynamic import or assume it's available via the singleton export
                         const { default: whatsappManager } = await import('../bot/WhatsAppManager.js');
-                        await whatsappManager.sendMessage(config.whatsapp.groupId, message);
-                        return res.json({ success: true, message });
+                        
+                        let messageSent = false;
+                        
+                        // If an image was uploaded, send it as media
+                        if (req.file) {
+                            try {
+                                // Provide a default extension if missing so WhatsApp knows it's an image
+                                const fileExt = path.extname(req.file.originalname) || '.jpg';
+                                const tempPath = req.file.path;
+                                const mediaPath = tempPath + fileExt;
+                                fs.renameSync(tempPath, mediaPath);
+                                
+                                await whatsappManager.sendMediaMessage(config.whatsapp.groupId, mediaPath, message);
+                                
+                                // Clean up
+                                fs.unlinkSync(mediaPath);
+                                messageSent = true;
+                            } catch (uploadErr) {
+                                logger.error('Failed to send media message', { error: uploadErr.message });
+                                // Fallback to text
+                            }
+                        }
+                        
+                        // Send as text if no image or image failed
+                        if (!messageSent) {
+                            await whatsappManager.sendMessage(config.whatsapp.groupId, message);
+                        }
+                        
+                        return res.json({ success: true, message, hasImage: !!req.file });
                     } else {
+                        // Clean up file if WA not ready
+                        if (req.file) fs.unlinkSync(req.file.path);
                         return res.status(503).json({ error: 'WhatsApp client not ready' });
                     }
                 } else {
+                    if (req.file) fs.unlinkSync(req.file.path);
                     return res.status(400).json({ error: 'WHATSAPP_GROUP_ID not configured' });
                 }
 
             } catch (err) {
+                if (req.file) {
+                    try { fs.unlinkSync(req.file.path); } catch(e){}
+                }
                 logger.error('Webhook processing error', { error: err.message, stack: err.stack });
                 return res.status(500).json({ error: 'Internal server error', details: err.message });
             }

@@ -57,7 +57,7 @@
     - Use **Gemini 2.5 Flash** for simple responses, direct lookups, or high-speed interactions.
 
 ## 🏠 Home Assistant Integrations
-- [ ] **Camera Snapshot Integration**: Implement a way for Home Assistant to trigger a camera snapshot and send it to Noga, so she can forward the image to the designated WhatsApp group.
+- [x] **Camera Snapshot Integration**: Implement a way for Home Assistant to trigger a camera snapshot and send it to Noga, so she can forward the image to the designated WhatsApp group. add documentation in Noga-Home-Assistant-Guide.md for this feature.
 - [x] **Presence Awareness**: Implement a skill to check who is currently at home by querying Home Assistant `person` entities (e.g., "Noga, who is home right now?").
 - [x] **Webhook API Documentation & Validation**:
     - Verify minimum payload for `/api/notify`. (Done: `event` is required, `data` is optional).
