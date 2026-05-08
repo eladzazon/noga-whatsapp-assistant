@@ -675,8 +675,18 @@ class DashboardServer {
             try {
                 const knowledgeDir = path.resolve(process.cwd(), 'data', 'knowledge');
                 const skillsDir = path.resolve(process.cwd(), 'data', 'skills');
-                const backup = { knowledge: {}, skills: {} };
+                const backup = {
+                    version: 2,
+                    generated_at: new Date().toISOString(),
+                    knowledge: {},
+                    skills: {},
+                    keywords: [],
+                    ha_mappings: [],
+                    scheduled_prompts: [],
+                    settings: {}
+                };
 
+                // MD files
                 if (fs.existsSync(knowledgeDir)) {
                     fs.readdirSync(knowledgeDir).forEach(file => {
                         if (file.endsWith('.md')) {
@@ -684,7 +694,6 @@ class DashboardServer {
                         }
                     });
                 }
-                
                 if (fs.existsSync(skillsDir)) {
                     fs.readdirSync(skillsDir).forEach(file => {
                         if (file.endsWith('.md')) {
@@ -693,7 +702,28 @@ class DashboardServer {
                     });
                 }
 
-                res.setHeader('Content-disposition', `attachment; filename=noga_backup_${Date.now()}.json`);
+                // DB-backed data
+                if (this.db) {
+                    backup.keywords = this.db.getKeywords().map(k => ({
+                        keyword: k.keyword, response: k.response, type: k.type, enabled: k.enabled
+                    }));
+                    backup.ha_mappings = this.db.getHaMappings().map(m => ({
+                        entity_id: m.entity_id, nickname: m.nickname, location: m.location, type: m.type
+                    }));
+                    backup.scheduled_prompts = this.db.getScheduledPrompts().map(p => ({
+                        name: p.name, prompt: p.prompt, cron_expression: p.cron_expression, enabled: p.enabled
+                    }));
+                    // Settings (env overrides stored in DB)
+                    const allConfig = this.db.getAllConfig();
+                    const ENV_PREFIX = 'env_';
+                    for (const [key, value] of Object.entries(allConfig)) {
+                        if (key.startsWith(ENV_PREFIX)) {
+                            backup.settings[key.substring(ENV_PREFIX.length)] = value;
+                        }
+                    }
+                }
+
+                res.setHeader('Content-disposition', `attachment; filename=noga_full_backup_${Date.now()}.json`);
                 res.setHeader('Content-type', 'application/json');
                 res.send(JSON.stringify(backup, null, 2));
             } catch (err) {
@@ -704,14 +734,15 @@ class DashboardServer {
 
         this.app.post('/api/restore', requireAuth, express.json({limit: '10mb'}), (req, res) => {
             try {
-                const { knowledge, skills } = req.body;
-                if (!knowledge && !skills) {
+                const { knowledge, skills, keywords, ha_mappings, scheduled_prompts, settings } = req.body;
+                if (!knowledge && !skills && !keywords && !ha_mappings && !scheduled_prompts && !settings) {
                     return res.status(400).json({ error: 'Invalid backup format' });
                 }
 
                 const knowledgeDir = path.resolve(process.cwd(), 'data', 'knowledge');
                 const skillsDir = path.resolve(process.cwd(), 'data', 'skills');
 
+                // Restore MD files
                 if (knowledge) {
                     if (!fs.existsSync(knowledgeDir)) fs.mkdirSync(knowledgeDir, { recursive: true });
                     for (const [file, content] of Object.entries(knowledge)) {
@@ -720,7 +751,6 @@ class DashboardServer {
                         }
                     }
                 }
-
                 if (skills) {
                     if (!fs.existsSync(skillsDir)) fs.mkdirSync(skillsDir, { recursive: true });
                     for (const [file, content] of Object.entries(skills)) {
@@ -730,13 +760,54 @@ class DashboardServer {
                     }
                 }
 
+                // Restore DB-backed data
+                if (this.db) {
+                    if (keywords && Array.isArray(keywords)) {
+                        // Clear existing keywords and re-insert
+                        this.db.db.exec('DELETE FROM keywords');
+                        for (const k of keywords) {
+                            try { this.db.addKeyword(k.keyword, k.response, k.type || 'static'); } catch { /* skip duplicates */ }
+                        }
+                        logger.info('Restored keywords', { count: keywords.length });
+                    }
+
+                    if (ha_mappings && Array.isArray(ha_mappings)) {
+                        this.db.db.exec('DELETE FROM ha_mappings');
+                        for (const m of ha_mappings) {
+                            try { this.db.addHaMapping(m.entity_id, m.nickname, m.location, m.type); } catch { /* skip duplicates */ }
+                        }
+                        logger.info('Restored HA mappings', { count: ha_mappings.length });
+                    }
+
+                    if (scheduled_prompts && Array.isArray(scheduled_prompts)) {
+                        this.db.db.exec('DELETE FROM scheduled_prompts');
+                        for (const p of scheduled_prompts) {
+                            try { this.db.addScheduledPrompt(p.name, p.prompt, p.cron_expression, p.enabled); } catch { /* skip */ }
+                        }
+                        logger.info('Restored scheduled prompts', { count: scheduled_prompts.length });
+                    }
+
+                    if (settings && typeof settings === 'object') {
+                        const ENV_PREFIX = 'env_';
+                        for (const [key, value] of Object.entries(settings)) {
+                            this.db.setConfig(`${ENV_PREFIX}${key}`, value);
+                        }
+                        logger.info('Restored settings', { count: Object.keys(settings).length });
+                    }
+                }
+
                 // Notify UI to refresh
                 if (this.io) {
                     this.io.emit('file_changed', { type: 'knowledge' });
                     this.io.emit('file_changed', { type: 'skills' });
                 }
 
-                res.json({ success: true, message: 'Backup restored successfully' });
+                // Re-initialize Gemini with updated files
+                if (this.geminiManager) {
+                    this.geminiManager.reinit();
+                }
+
+                res.json({ success: true, message: 'Full system backup restored successfully' });
             } catch (err) {
                 logger.error('Failed to restore backup', { error: err.message });
                 res.status(500).json({ error: 'Failed to restore backup' });

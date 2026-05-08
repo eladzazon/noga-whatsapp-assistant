@@ -23,11 +23,12 @@
     - `/backup`: Trigger a manual backup and receive the file.
     > ⚠️ Admin-only commands (`/log`, `/backup`, `/restart`) require `ADMIN_PHONE` to be set in `.env`.
 - [x] **Automated Backups**: Daily backup at 02:00 AM (Israel time) — sent automatically to the admin via WhatsApp if `ADMIN_PHONE` is configured.
-- [ ] **Full System Backup**: Expand the Backup & Restore feature to include more than just `.md` files:
+- [x] **Full System Backup**: Backup & Restore now covers all data — not just `.md` files:
     - AI Keywords & Custom Responses.
     - Home Assistant Entity Mappings & Nicknames.
     - Scheduled Cronjobs & Automations.
-    - User Preferences & Settings.
+    - User Preferences & Settings (DB-backed env overrides).
+
 
 
 ## 🧠 AI & Context Improvements

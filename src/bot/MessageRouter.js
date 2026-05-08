@@ -298,39 +298,52 @@ class MessageRouter {
         try {
             const knowledgeDir = path.resolve(process.cwd(), 'data', 'knowledge');
             const skillsDir = path.resolve(process.cwd(), 'data', 'skills');
-            const backup = { knowledge: {}, skills: {}, generated_at: new Date().toISOString() };
+            const backup = {
+                version: 2,
+                generated_at: new Date().toISOString(),
+                knowledge: {},
+                skills: {},
+                keywords: [],
+                ha_mappings: [],
+                scheduled_prompts: [],
+                settings: {}
+            };
 
             if (fs.existsSync(knowledgeDir)) {
                 fs.readdirSync(knowledgeDir).forEach(file => {
-                    if (file.endsWith('.md')) {
-                        backup.knowledge[file] = fs.readFileSync(path.join(knowledgeDir, file), 'utf8');
-                    }
+                    if (file.endsWith('.md')) backup.knowledge[file] = fs.readFileSync(path.join(knowledgeDir, file), 'utf8');
                 });
             }
             if (fs.existsSync(skillsDir)) {
                 fs.readdirSync(skillsDir).forEach(file => {
-                    if (file.endsWith('.md')) {
-                        backup.skills[file] = fs.readFileSync(path.join(skillsDir, file), 'utf8');
-                    }
+                    if (file.endsWith('.md')) backup.skills[file] = fs.readFileSync(path.join(skillsDir, file), 'utf8');
                 });
             }
 
-            const knowledgeCount = Object.keys(backup.knowledge).length;
-            const skillsCount = Object.keys(backup.skills).length;
+            // DB-backed data
+            backup.keywords = db.getKeywords().map(k => ({ keyword: k.keyword, response: k.response, type: k.type, enabled: k.enabled }));
+            backup.ha_mappings = db.getHaMappings().map(m => ({ entity_id: m.entity_id, nickname: m.nickname, location: m.location, type: m.type }));
+            backup.scheduled_prompts = db.getScheduledPrompts().map(p => ({ name: p.name, prompt: p.prompt, cron_expression: p.cron_expression, enabled: p.enabled }));
+            const allConfig = db.getAllConfig();
+            const ENV_PREFIX = 'env_';
+            for (const [key, value] of Object.entries(allConfig)) {
+                if (key.startsWith(ENV_PREFIX)) backup.settings[key.substring(ENV_PREFIX.length)] = value;
+            }
 
-            // Save to a temp file and send as document
-            const backupPath = path.resolve(process.cwd(), 'data', `noga_backup_${Date.now()}.json`);
+            const kCount = Object.keys(backup.knowledge).length;
+            const sCount = Object.keys(backup.skills).length;
+
+            const backupPath = path.resolve(process.cwd(), 'data', `noga_full_backup_${Date.now()}.json`);
             fs.writeFileSync(backupPath, JSON.stringify(backup, null, 2), 'utf8');
 
-            await whatsappManager.sendMediaMessage(chatId, backupPath, `📦 גיבוי נוגה | ${knowledgeCount} קבצי ידע, ${skillsCount} כישורים`);
+            await whatsappManager.sendMediaMessage(chatId, backupPath,
+                `📦 גיבוי מלא | ${kCount} קבצי ידע, ${sCount} כישורים, ${backup.keywords.length} מילות מפתח, ${backup.ha_mappings.length} התאמות HA, ${backup.scheduled_prompts.length} משימות מתוזמנות`);
 
-            // Clean up temp file
             fs.unlinkSync(backupPath);
-
-            logger.info('Backup sent via WhatsApp command', { chatId, knowledgeCount, skillsCount });
-            return null; // Response already sent via media message
+            logger.info('Full backup sent via WhatsApp command', { chatId, kCount, sCount });
+            return null;
         } catch (err) {
-            logger.error('Failed to generate/send backup via command', { error: err.message });
+            logger.error('Failed to generate/send full backup via command', { error: err.message });
             return `❌ שגיאה ביצירת הגיבוי: ${err.message}`;
         }
     }

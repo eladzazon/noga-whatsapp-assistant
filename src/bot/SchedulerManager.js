@@ -123,7 +123,16 @@ class SchedulerManager {
 
                 const knowledgeDir = path.resolve(process.cwd(), 'data', 'knowledge');
                 const skillsDir = path.resolve(process.cwd(), 'data', 'skills');
-                const backup = { knowledge: {}, skills: {}, generated_at: new Date().toISOString() };
+                const backup = {
+                    version: 2,
+                    generated_at: new Date().toISOString(),
+                    knowledge: {},
+                    skills: {},
+                    keywords: [],
+                    ha_mappings: [],
+                    scheduled_prompts: [],
+                    settings: {}
+                };
 
                 if (fs.existsSync(knowledgeDir)) {
                     fs.readdirSync(knowledgeDir).forEach(file => {
@@ -136,17 +145,28 @@ class SchedulerManager {
                     });
                 }
 
+                // DB-backed data
+                backup.keywords = db.getKeywords().map(k => ({ keyword: k.keyword, response: k.response, type: k.type, enabled: k.enabled }));
+                backup.ha_mappings = db.getHaMappings().map(m => ({ entity_id: m.entity_id, nickname: m.nickname, location: m.location, type: m.type }));
+                backup.scheduled_prompts = db.getScheduledPrompts().map(p => ({ name: p.name, prompt: p.prompt, cron_expression: p.cron_expression, enabled: p.enabled }));
+                const allConfig = db.getAllConfig();
+                const ENV_PREFIX = 'env_';
+                for (const [key, value] of Object.entries(allConfig)) {
+                    if (key.startsWith(ENV_PREFIX)) backup.settings[key.substring(ENV_PREFIX.length)] = value;
+                }
+
                 const kCount = Object.keys(backup.knowledge).length;
                 const sCount = Object.keys(backup.skills).length;
 
-                const backupPath = path.resolve(process.cwd(), 'data', `noga_backup_${Date.now()}.json`);
+                const backupPath = path.resolve(process.cwd(), 'data', `noga_full_backup_${Date.now()}.json`);
                 fs.writeFileSync(backupPath, JSON.stringify(backup, null, 2), 'utf8');
 
                 const adminJid = `${config.whatsapp.adminPhone}@s.whatsapp.net`;
-                await whatsappManager.sendMediaMessage(adminJid, backupPath, `📦 גיבוי אוטומטי יומי | ${kCount} קבצי ידע, ${sCount} כישורים`);
+                await whatsappManager.sendMediaMessage(adminJid, backupPath,
+                    `📦 גיבוי מלא אוטומטי יומי | ${kCount} קבצי ידע, ${sCount} כישורים, ${backup.keywords.length} מילות מפתח, ${backup.ha_mappings.length} התאמות HA`);
 
                 fs.unlinkSync(backupPath);
-                logger.info('Automated daily backup sent successfully', { kCount, sCount });
+                logger.info('Automated full daily backup sent successfully', { kCount, sCount });
             } catch (err) {
                 logger.error('Automated backup failed', { error: err.message });
             }
