@@ -814,6 +814,144 @@ class DashboardServer {
             }
         });
 
+        // ---- Backup Management API ----
+
+        const getBackupsDir = () => path.resolve(process.cwd(), 'data', 'backups');
+
+        // GET /api/backups — list all saved backups
+        this.app.get('/api/backups', requireAuth, (req, res) => {
+            try {
+                const backupsDir = getBackupsDir();
+                if (!fs.existsSync(backupsDir)) return res.json({ backups: [] });
+
+                const files = fs.readdirSync(backupsDir)
+                    .filter(f => f.endsWith('.json'))
+                    .map(f => {
+                        const stat = fs.statSync(path.join(backupsDir, f));
+                        return { filename: f, size: stat.size, created_at: stat.mtime.toISOString() };
+                    })
+                    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at)); // newest first
+
+                res.json({ backups: files });
+            } catch (err) {
+                logger.error('Failed to list backups', { error: err.message });
+                res.status(500).json({ error: 'Failed to list backups' });
+            }
+        });
+
+        // POST /api/backups/create — create a new backup now
+        this.app.post('/api/backups/create', requireAuth, (req, res) => {
+            try {
+                const backupsDir = getBackupsDir();
+                if (!fs.existsSync(backupsDir)) fs.mkdirSync(backupsDir, { recursive: true });
+
+                const knowledgeDir = path.resolve(process.cwd(), 'data', 'knowledge');
+                const skillsDir = path.resolve(process.cwd(), 'data', 'skills');
+                const backup = {
+                    version: 2,
+                    generated_at: new Date().toISOString(),
+                    knowledge: {}, skills: {}, keywords: [],
+                    ha_mappings: [], scheduled_prompts: [], settings: {}
+                };
+
+                if (fs.existsSync(knowledgeDir)) {
+                    fs.readdirSync(knowledgeDir).forEach(f => {
+                        if (f.endsWith('.md')) backup.knowledge[f] = fs.readFileSync(path.join(knowledgeDir, f), 'utf8');
+                    });
+                }
+                if (fs.existsSync(skillsDir)) {
+                    fs.readdirSync(skillsDir).forEach(f => {
+                        if (f.endsWith('.md')) backup.skills[f] = fs.readFileSync(path.join(skillsDir, f), 'utf8');
+                    });
+                }
+                if (this.db) {
+                    backup.keywords = this.db.getKeywords().map(k => ({ keyword: k.keyword, response: k.response, type: k.type, enabled: k.enabled }));
+                    backup.ha_mappings = this.db.getHaMappings().map(m => ({ entity_id: m.entity_id, nickname: m.nickname, location: m.location, type: m.type }));
+                    backup.scheduled_prompts = this.db.getScheduledPrompts().map(p => ({ name: p.name, prompt: p.prompt, cron_expression: p.cron_expression, enabled: p.enabled }));
+                    const allConfig = this.db.getAllConfig();
+                    for (const [key, value] of Object.entries(allConfig)) {
+                        if (key.startsWith('env_')) backup.settings[key.substring(4)] = value;
+                    }
+                }
+
+                // Timestamped filename with seconds to allow multiple per day
+                const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+                const filename = `noga_backup_${ts}.json`;
+                const backupPath = path.join(backupsDir, filename);
+                fs.writeFileSync(backupPath, JSON.stringify(backup, null, 2), 'utf8');
+
+                // Enforce retention limit
+                const retention = parseInt(this.db?.getConfig('backup_retention', 7)) || 7;
+                const allFiles = fs.readdirSync(backupsDir)
+                    .filter(f => f.endsWith('.json'))
+                    .sort(); // ascending = oldest first
+                if (allFiles.length > retention) {
+                    allFiles.slice(0, allFiles.length - retention).forEach(old => {
+                        fs.unlinkSync(path.join(backupsDir, old));
+                        logger.info('Auto-deleted old backup', { file: old });
+                    });
+                }
+
+                logger.info('Manual backup created', { filename });
+                res.json({ success: true, filename });
+            } catch (err) {
+                logger.error('Failed to create backup', { error: err.message });
+                res.status(500).json({ error: 'Failed to create backup' });
+            }
+        });
+
+        // GET /api/backups/:filename/download — download a specific backup
+        this.app.get('/api/backups/:filename/download', requireAuth, (req, res) => {
+            try {
+                const filename = path.basename(req.params.filename); // sanitize
+                if (!filename.endsWith('.json')) return res.status(400).json({ error: 'Invalid filename' });
+                const filePath = path.join(getBackupsDir(), filename);
+                if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Backup not found' });
+                res.setHeader('Content-disposition', `attachment; filename=${filename}`);
+                res.setHeader('Content-type', 'application/json');
+                fs.createReadStream(filePath).pipe(res);
+            } catch (err) {
+                res.status(500).json({ error: 'Failed to download backup' });
+            }
+        });
+
+        // DELETE /api/backups/:filename — delete a specific backup
+        this.app.delete('/api/backups/:filename', requireAuth, (req, res) => {
+            try {
+                const filename = path.basename(req.params.filename);
+                if (!filename.endsWith('.json')) return res.status(400).json({ error: 'Invalid filename' });
+                const filePath = path.join(getBackupsDir(), filename);
+                if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Backup not found' });
+                fs.unlinkSync(filePath);
+                logger.info('Backup deleted', { filename });
+                res.json({ success: true });
+            } catch (err) {
+                res.status(500).json({ error: 'Failed to delete backup' });
+            }
+        });
+
+        // GET /api/backup-settings — get retention setting
+        this.app.get('/api/backup-settings', requireAuth, (req, res) => {
+            const retention = parseInt(this.db?.getConfig('backup_retention', 7)) || 7;
+            res.json({ retention });
+        });
+
+        // POST /api/backup-settings — save retention setting
+        this.app.post('/api/backup-settings', requireAuth, express.json(), (req, res) => {
+            try {
+                const retention = parseInt(req.body.retention);
+                if (isNaN(retention) || retention < 1 || retention > 30) {
+                    return res.status(400).json({ error: 'Retention must be between 1 and 30' });
+                }
+                this.db?.setConfig('backup_retention', retention);
+                logger.info('Backup retention updated', { retention });
+                res.json({ success: true, retention });
+            } catch (err) {
+                res.status(500).json({ error: 'Failed to save backup settings' });
+            }
+        });
+
+
         // ==================== Home Assistant Mapping API ====================
 
         // Get all Home Assistant mappings

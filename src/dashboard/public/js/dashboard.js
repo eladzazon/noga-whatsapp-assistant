@@ -1229,55 +1229,170 @@
         saveSettingsBtn.addEventListener('click', saveSettings);
     }
 
-    // ==================== Backup & Restore ====================
-    
+    // ==================== Backup Management ====================
+
     const btnRestore = document.getElementById('btn-restore');
     const restoreStatus = document.getElementById('restore-status');
+    const btnCreateBackup = document.getElementById('btn-create-backup');
+    const backupsListContainer = document.getElementById('backups-list-container');
+    const backupStatusEl = document.getElementById('backup-status');
+    const backupRetentionInput = document.getElementById('backup-retention');
+    const btnSaveBackupSettings = document.getElementById('btn-save-backup-settings');
 
+    function showBackupStatus(text, type) {
+        if (!backupStatusEl) return;
+        backupStatusEl.textContent = text;
+        backupStatusEl.className = `save-status ${type}`;
+        setTimeout(() => { backupStatusEl.textContent = ''; backupStatusEl.className = 'save-status'; }, 4000);
+    }
+
+    function formatBytes(bytes) {
+        if (bytes < 1024) return `${bytes} B`;
+        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+        return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    }
+
+    async function loadBackups() {
+        if (!backupsListContainer) return;
+        try {
+            const res = await fetch('/api/backups');
+            const data = await res.json();
+            renderBackupsList(data.backups || []);
+        } catch (err) {
+            backupsListContainer.innerHTML = '<div style="color: var(--danger); padding: 20px;">שגיאה בטעינת גיבויים</div>';
+        }
+    }
+
+    async function loadBackupSettings() {
+        try {
+            const res = await fetch('/api/backup-settings');
+            const data = await res.json();
+            if (backupRetentionInput) backupRetentionInput.value = data.retention || 7;
+        } catch { /* ignore */ }
+    }
+
+    function renderBackupsList(backups) {
+        if (!backupsListContainer) return;
+        if (backups.length === 0) {
+            backupsListContainer.innerHTML = '<div style="text-align: center; color: var(--gray); padding: 30px;">אין גיבויים שמורים. לחצו "צור גיבוי עכשיו" ליצירת הגיבוי הראשון.</div>';
+            return;
+        }
+
+        backupsListContainer.innerHTML = `
+            <table class="keywords-table" style="width: 100%;">
+                <thead><tr>
+                    <th>שם קובץ</th>
+                    <th>גודל</th>
+                    <th>תאריך</th>
+                    <th>פעולות</th>
+                </tr></thead>
+                <tbody>
+                    ${backups.map(b => {
+                        const date = new Date(b.created_at).toLocaleString('he-IL');
+                        return `<tr>
+                            <td><code dir="ltr" style="font-size: 12px;">${escapeHtml(b.filename)}</code></td>
+                            <td>${escapeHtml(formatBytes(b.size))}</td>
+                            <td style="font-size: 13px; color: var(--gray);">${date}</td>
+                            <td class="kw-actions">
+                                <a href="/api/backups/${encodeURIComponent(b.filename)}/download" class="btn btn-small btn-action" title="הורד">⬇️</a>
+                                <button class="btn btn-small btn-action btn-danger-action" onclick="window._deleteBackup('${escapeAttr(b.filename)}')" title="מחק">🗑️</button>
+                            </td>
+                        </tr>`;
+                    }).join('')}
+                </tbody>
+            </table>
+        `;
+    }
+
+    window._deleteBackup = async function(filename) {
+        const confirmed = await showConfirmModal('מחיקת גיבוי', `האם אתה בטוח שברצונך למחוק את הגיבוי "${filename}"?`);
+        if (!confirmed) return;
+        try {
+            const res = await fetch(`/api/backups/${encodeURIComponent(filename)}`, { method: 'DELETE' });
+            const data = await res.json();
+            if (data.success) { showBackupStatus('נמחק בהצלחה ✓', 'success'); loadBackups(); }
+            else showBackupStatus(data.error || 'שגיאה במחיקה', 'error');
+        } catch { showBackupStatus('שגיאה במחיקה', 'error'); }
+    };
+
+    if (btnCreateBackup) {
+        btnCreateBackup.addEventListener('click', async () => {
+            btnCreateBackup.disabled = true;
+            btnCreateBackup.textContent = 'יוצר...';
+            try {
+                const res = await fetch('/api/backups/create', { method: 'POST' });
+                const data = await res.json();
+                if (data.success) {
+                    showBackupStatus(`נשמר: ${data.filename} ✓`, 'success');
+                    loadBackups();
+                } else {
+                    showBackupStatus(data.error || 'שגיאה ביצירת גיבוי', 'error');
+                }
+            } catch { showBackupStatus('שגיאה ביצירת גיבוי', 'error'); }
+            finally {
+                btnCreateBackup.disabled = false;
+                btnCreateBackup.textContent = '➕ צור גיבוי עכשיו';
+            }
+        });
+    }
+
+    if (btnSaveBackupSettings) {
+        btnSaveBackupSettings.addEventListener('click', async () => {
+            const retention = parseInt(backupRetentionInput?.value);
+            if (isNaN(retention) || retention < 1 || retention > 30) {
+                showBackupStatus('ערך לא תקין (1-30)', 'error');
+                return;
+            }
+            try {
+                const res = await fetch('/api/backup-settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ retention })
+                });
+                const data = await res.json();
+                showBackupStatus(data.success ? 'נשמר ✓' : (data.error || 'שגיאה'), data.success ? 'success' : 'error');
+            } catch { showBackupStatus('שגיאה בשמירה', 'error'); }
+        });
+    }
+
+    // Restore from file upload
     if (btnRestore) {
         btnRestore.addEventListener('change', async (e) => {
             const file = e.target.files[0];
             if (!file) return;
 
-            const confirmed = await showConfirmModal('שחזור מגיבוי', 'אזהרה: שחזור ידרוס את קבצי הידע והמיומנויות הקיימים. להמשיך?');
-            if (!confirmed) {
-                e.target.value = '';
-                return;
-            }
+            const confirmed = await showConfirmModal('שחזור מגיבוי', 'אזהרה: שחזור ידרוס את קבצי הידע, המיומנויות, מילות המפתח ועוד. להמשיך?');
+            if (!confirmed) { e.target.value = ''; return; }
 
-            restoreStatus.textContent = 'משחזר...';
-            restoreStatus.style.color = 'var(--primary)';
+            if (restoreStatus) { restoreStatus.textContent = 'משחזר...'; restoreStatus.style.color = 'var(--primary)'; }
 
             try {
                 const text = await file.text();
                 const json = JSON.parse(text);
-
                 const res = await fetch('/api/restore', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(json)
                 });
-                
                 const data = await res.json();
-                if (data.success) {
-                    restoreStatus.textContent = 'שוחזר בהצלחה ✓';
-                    restoreStatus.style.color = 'var(--success)';
-                } else {
-                    restoreStatus.textContent = data.error || 'שגיאה בשחזור';
-                    restoreStatus.style.color = 'var(--danger)';
+                if (restoreStatus) {
+                    restoreStatus.textContent = data.success ? 'שוחזר בהצלחה ✓' : (data.error || 'שגיאה בשחזור');
+                    restoreStatus.style.color = data.success ? 'var(--success)' : 'var(--danger)';
                 }
-            } catch (err) {
-                restoreStatus.textContent = 'קובץ גיבוי לא תקין';
-                restoreStatus.style.color = 'var(--danger)';
+            } catch {
+                if (restoreStatus) { restoreStatus.textContent = 'קובץ גיבוי לא תקין'; restoreStatus.style.color = 'var(--danger)'; }
             }
-            
-            setTimeout(() => {
-                restoreStatus.textContent = '';
-            }, 5000);
-            
-            e.target.value = ''; // Reset input
+
+            setTimeout(() => { if (restoreStatus) restoreStatus.textContent = ''; }, 5000);
+            e.target.value = '';
         });
     }
+
+    // Load backups when tab is clicked
+    document.querySelector('[data-tab="tab-backup"]')?.addEventListener('click', () => {
+        loadBackups();
+        loadBackupSettings();
+    });
 
     // ==================== Initialization ====================
 
@@ -1306,4 +1421,6 @@
     loadSchedules();
     loadSettings();
     loadHaMappings();
+    loadBackups();
+    loadBackupSettings();
 })();

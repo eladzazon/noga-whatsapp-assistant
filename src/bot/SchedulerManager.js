@@ -152,12 +152,13 @@ class SchedulerManager {
                 const backupPath = path.join(backupsDir, `noga_backup_${dateStr}.json`);
                 fs.writeFileSync(backupPath, JSON.stringify(backup, null, 2), 'utf8');
 
-                // Keep only the last 7 backups — delete older ones
+                // Keep only last N backups (configured in admin UI, default 7)
+                const retention = parseInt(db.getConfig('backup_retention', 7)) || 7;
                 const backupFiles = fs.readdirSync(backupsDir)
-                    .filter(f => f.startsWith('noga_backup_') && f.endsWith('.json'))
-                    .sort(); // ascending order (oldest first)
-                if (backupFiles.length > 7) {
-                    backupFiles.slice(0, backupFiles.length - 7).forEach(old => {
+                    .filter(f => f.endsWith('.json'))
+                    .sort(); // ascending = oldest first
+                if (backupFiles.length > retention) {
+                    backupFiles.slice(0, backupFiles.length - retention).forEach(old => {
                         fs.unlinkSync(path.join(backupsDir, old));
                         logger.info('Deleted old backup', { file: old });
                     });
