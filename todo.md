@@ -34,6 +34,10 @@
     2. A completely new topic.
     This ensures Noga maintains conversation continuity when the user sends short/partial follow-ups.
 - [ ] **Private-to-Group Delegation**: Enable Noga to receive a private message from the user (admin) and understand instructions to perform actions or relay messages to a specific WhatsApp group (e.g., "Ask my wife in the group if we need milk").
+- [ ] **🎙️ Voice Note Processing**:
+    - Automatically transcribe incoming WhatsApp voice notes using an AI transcription service.
+    - Provide a concise summary for long recordings.
+
 
 ## 🖥️ Dashboard Expansion
 - [ ] **AI Interaction Page**: A dedicated "Chat" tab to interact with Noga directly from the dashboard for testing and debugging.
@@ -51,4 +55,45 @@
 
 ## 🏠 Home Assistant Integrations
 - [ ] **Camera Snapshot Integration**: Implement a way for Home Assistant to trigger a camera snapshot and send it to Noga, so she can forward the image to the designated WhatsApp group.
+- [x] **Presence Awareness**: Implement a skill to check who is currently at home by querying Home Assistant `person` entities (e.g., "Noga, who is home right now?").
+- [x] **Webhook API Documentation & Validation**:
+    - Verify minimum payload for `/api/notify`. (Done: `event` is required, `data` is optional).
+    - Update `Noga-Home-Assistant-Guide.md` with safe payload template (`default({})`) to avoid HA serialization errors.
+
+
+
+
+
+## ✨ New Skills & Knowledge Domains
+- [ ] **💰 Financial Tracking**:
+    - **Expense Logging**: Log daily expenses (e.g., "Noga, I spent 50 NIS on fuel") to a `FINANCE.md` or a DB.
+    - **Kids' Allowance/Savings**:
+        - Log money received for each child (e.g., "Noga, Grandma gave 100 NIS to [Child]").
+        - Track running balances and savings for each child.
+        - Log expenditures when they use their saved money.
+    - **Reports**: Generate detailed spending and savings summaries whenever prompted.
+
+
+- [ ] **🍳 Kitchen Intelligence**:
+    - **Recipe Manager**: Store and retrieve recipes.
+    - **Meal Planning**: Suggest meals based on current `INVENTORY.md` stock.
+    - **Expiration Alerts**: Track and notify about items near their expiration date.
+- [ ] **🏥 Family & Health Memory**:
+    - **Health Log**: Track symptoms, medications, or doctor visits.
+    - **Kids' Sizes**: Store shoe/clothing sizes for the children to reference when shopping.
+- [ ] **🔧 Home Maintenance Registry**:
+    - **General Home**: Log last time filters were changed or garden was treated.
+    - **🚗 Cars Maintenance**:
+        - Track service history, oil changes, and annual inspections (Test).
+        - Log fuel consumption and mileage.
+        - Set reminders for insurance and license renewals.
+    - **Reminders**: Set automated alerts for all maintenance tasks.
+
+- [ ] **📰 Knowledge Aggregation**:
+    - **Link Saver**: Save and categorize links shared in chat to a `LINKS.md`.
+    - **News Summaries**: Integration with news APIs to provide a "Morning Briefing" tailored to user interests.
+- [ ] **🎮 Gamification & Persona**:
+    - Enhance Noga's personality with varied responses based on "mood" or time of day.
+    - Implement a "Karma" or "Efficiency" score for household tasks.
+
 

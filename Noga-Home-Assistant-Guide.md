@@ -22,7 +22,7 @@ rest_command:
     headers:
       x-webhook-secret: "my_super_secret_webhook_key_123"  # Must match your .env
     content_type:  'application/json; charset=utf-8'
-    payload: '{"event": "{{ event }}", "data": {{ data | to_json }} }'
+    payload: '{"event": "{{ event }}", "data": {{ data | default({}) | to_json }} }'
 ```
 
 > **Note**: You must restart Home Assistant after editing `configuration.yaml`.
