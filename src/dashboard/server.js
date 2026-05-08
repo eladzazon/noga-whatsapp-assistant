@@ -7,6 +7,8 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import config from '../utils/config.js';
 import logger, { subscribeToLogs, getRecentLogs } from '../utils/logger.js';
+import db from '../database/DatabaseManager.js';
+
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -18,7 +20,7 @@ class DashboardServer {
         this.io = null;
         this.qrCode = null;
         this.geminiManager = null;
-        this.db = null;
+        db = null;
     }
 
     /**
@@ -135,7 +137,7 @@ class DashboardServer {
                 whatsapp: this.getWhatsAppStatus ? this.getWhatsAppStatus() : { isReady: false },
                 gemini: this.getGeminiStatus ? this.getGeminiStatus() : { isInitialized: false },
                 skills: this.getSkillsStatus ? this.getSkillsStatus() : {},
-                usage: this.db ? this.db.getUsageStats() : { today: {}, month: {} }
+                usage: db ? db.getUsageStats() : { today: {}, month: {} }
             });
         });
 
@@ -239,7 +241,7 @@ class DashboardServer {
                 whatsapp: this.getWhatsAppStatus ? this.getWhatsAppStatus() : { isReady: false },
                 gemini: this.getGeminiStatus ? this.getGeminiStatus() : { isInitialized: false },
                 skills: this.getSkillsStatus ? this.getSkillsStatus() : {},
-                usage: this.db ? this.db.getUsageStats() : { today: {}, month: {} }
+                usage: db ? db.getUsageStats() : { today: {}, month: {} }
             });
         });
 
@@ -429,9 +431,9 @@ class DashboardServer {
 
         // Get all keywords
         this.app.get('/api/keywords', requireAuth, (req, res) => {
-            if (!this.db) return res.status(500).json({ error: 'DB not initialized' });
+            if (!db) return res.status(500).json({ error: 'DB not initialized' });
             try {
-                const keywords = this.db.getKeywords();
+                const keywords = db.getKeywords();
                 res.json({ keywords });
             } catch (err) {
                 res.status(500).json({ error: err.message });
@@ -444,9 +446,9 @@ class DashboardServer {
             if (!keyword || !response) {
                 return res.status(400).json({ error: 'keyword and response are required' });
             }
-            if (!this.db) return res.status(500).json({ error: 'DB not initialized' });
+            if (!db) return res.status(500).json({ error: 'DB not initialized' });
             try {
-                const id = this.db.addKeyword(keyword, response, type || 'static');
+                const id = db.addKeyword(keyword, response, type || 'static');
                 logger.info('Keyword added via dashboard', { keyword, type: type || 'static' });
                 res.json({ success: true, id });
             } catch (err) {
@@ -464,9 +466,9 @@ class DashboardServer {
             if (!keyword || !response) {
                 return res.status(400).json({ error: 'keyword and response are required' });
             }
-            if (!this.db) return res.status(500).json({ error: 'DB not initialized' });
+            if (!db) return res.status(500).json({ error: 'DB not initialized' });
             try {
-                this.db.updateKeyword(parseInt(id), keyword, response, enabled !== false, type || 'static');
+                db.updateKeyword(parseInt(id), keyword, response, enabled !== false, type || 'static');
                 logger.info('Keyword updated via dashboard', { id, keyword, type: type || 'static' });
                 res.json({ success: true });
             } catch (err) {
@@ -480,9 +482,9 @@ class DashboardServer {
         // Delete keyword
         this.app.delete('/api/keywords/:id', requireAuth, (req, res) => {
             const { id } = req.params;
-            if (!this.db) return res.status(500).json({ error: 'DB not initialized' });
+            if (!db) return res.status(500).json({ error: 'DB not initialized' });
             try {
-                this.db.deleteKeyword(parseInt(id));
+                db.deleteKeyword(parseInt(id));
                 logger.info('Keyword deleted via dashboard', { id });
                 res.json({ success: true });
             } catch (err) {
@@ -494,9 +496,9 @@ class DashboardServer {
 
         // Get all scheduled prompts
         this.app.get('/api/scheduled-prompts', requireAuth, (req, res) => {
-            if (!this.db) return res.status(500).json({ error: 'DB not initialized' });
+            if (!db) return res.status(500).json({ error: 'DB not initialized' });
             try {
-                const prompts = this.db.getScheduledPrompts();
+                const prompts = db.getScheduledPrompts();
                 res.json({ prompts });
             } catch (err) {
                 res.status(500).json({ error: err.message });
@@ -509,10 +511,10 @@ class DashboardServer {
             if (!name || !prompt || !cronExpression) {
                 return res.status(400).json({ error: 'Name, prompt, and cron expression are required' });
             }
-            if (!this.db) return res.status(500).json({ error: 'DB not initialized' });
+            if (!db) return res.status(500).json({ error: 'DB not initialized' });
 
             try {
-                const id = this.db.addScheduledPrompt(name, prompt, cronExpression, enabled);
+                const id = db.addScheduledPrompt(name, prompt, cronExpression, enabled);
                 logger.info('Scheduled prompt added via dashboard', { name });
 
                 // Reload scheduling engine
@@ -532,10 +534,10 @@ class DashboardServer {
             if (!name || !prompt || !cronExpression) {
                 return res.status(400).json({ error: 'Name, prompt, and cron expression are required' });
             }
-            if (!this.db) return res.status(500).json({ error: 'DB not initialized' });
+            if (!db) return res.status(500).json({ error: 'DB not initialized' });
 
             try {
-                this.db.updateScheduledPrompt(parseInt(id), name, prompt, cronExpression, enabled);
+                db.updateScheduledPrompt(parseInt(id), name, prompt, cronExpression, enabled);
                 logger.info('Scheduled prompt updated via dashboard', { id, name });
 
                 // Reload scheduling engine
@@ -551,10 +553,10 @@ class DashboardServer {
         // Delete scheduled prompt
         this.app.delete('/api/scheduled-prompts/:id', requireAuth, async (req, res) => {
             const { id } = req.params;
-            if (!this.db) return res.status(500).json({ error: 'DB not initialized' });
+            if (!db) return res.status(500).json({ error: 'DB not initialized' });
 
             try {
-                this.db.deleteScheduledPrompt(parseInt(id));
+                db.deleteScheduledPrompt(parseInt(id));
                 logger.info('Scheduled prompt deleted via dashboard', { id });
 
                 // Reload scheduling engine
@@ -590,8 +592,8 @@ class DashboardServer {
                 }
 
                 // 2. Override with DB-stored settings (these take priority)
-                if (this.db) {
-                    const dbOverrides = this.db.getAllConfig();
+                if (db) {
+                    const dbOverrides = db.getAllConfig();
                     const ENV_PREFIX = 'env_';
                     for (const [key, value] of Object.entries(dbOverrides)) {
                         if (key.startsWith(ENV_PREFIX)) {
@@ -616,14 +618,14 @@ class DashboardServer {
             }
 
             try {
-                if (!this.db) {
+                if (!db) {
                     return res.status(500).json({ error: 'DB not initialized' });
                 }
 
                 const ENV_PREFIX = 'env_';
                 for (const [key, value] of Object.entries(settings)) {
                     // Save to DB with env_ prefix to distinguish from other config
-                    this.db.setConfig(`${ENV_PREFIX}${key}`, value);
+                    db.setConfig(`${ENV_PREFIX}${key}`, value);
 
                     // Apply to process.env immediately
                     process.env[key] = value;
@@ -703,18 +705,18 @@ class DashboardServer {
                 }
 
                 // DB-backed data
-                if (this.db) {
-                    backup.keywords = this.db.getKeywords().map(k => ({
+                if (db) {
+                    backup.keywords = db.getKeywords().map(k => ({
                         keyword: k.keyword, response: k.response, type: k.type, enabled: k.enabled
                     }));
-                    backup.ha_mappings = this.db.getHaMappings().map(m => ({
+                    backup.ha_mappings = db.getHaMappings().map(m => ({
                         entity_id: m.entity_id, nickname: m.nickname, location: m.location, type: m.type
                     }));
-                    backup.scheduled_prompts = this.db.getScheduledPrompts().map(p => ({
+                    backup.scheduled_prompts = db.getScheduledPrompts().map(p => ({
                         name: p.name, prompt: p.prompt, cron_expression: p.cron_expression, enabled: p.enabled
                     }));
                     // Settings (env overrides stored in DB)
-                    const allConfig = this.db.getAllConfig();
+                    const allConfig = db.getAllConfig();
                     const ENV_PREFIX = 'env_';
                     for (const [key, value] of Object.entries(allConfig)) {
                         if (key.startsWith(ENV_PREFIX)) {
@@ -761,28 +763,28 @@ class DashboardServer {
                 }
 
                 // Restore DB-backed data
-                if (this.db) {
+                if (db) {
                     if (keywords && Array.isArray(keywords)) {
                         // Clear existing keywords and re-insert
-                        this.db.db.exec('DELETE FROM keywords');
+                        db.db.exec('DELETE FROM keywords');
                         for (const k of keywords) {
-                            try { this.db.addKeyword(k.keyword, k.response, k.type || 'static'); } catch { /* skip duplicates */ }
+                            try { db.addKeyword(k.keyword, k.response, k.type || 'static'); } catch { /* skip duplicates */ }
                         }
                         logger.info('Restored keywords', { count: keywords.length });
                     }
 
                     if (ha_mappings && Array.isArray(ha_mappings)) {
-                        this.db.db.exec('DELETE FROM ha_mappings');
+                        db.db.exec('DELETE FROM ha_mappings');
                         for (const m of ha_mappings) {
-                            try { this.db.addHaMapping(m.entity_id, m.nickname, m.location, m.type); } catch { /* skip duplicates */ }
+                            try { db.addHaMapping(m.entity_id, m.nickname, m.location, m.type); } catch { /* skip duplicates */ }
                         }
                         logger.info('Restored HA mappings', { count: ha_mappings.length });
                     }
 
                     if (scheduled_prompts && Array.isArray(scheduled_prompts)) {
-                        this.db.db.exec('DELETE FROM scheduled_prompts');
+                        db.db.exec('DELETE FROM scheduled_prompts');
                         for (const p of scheduled_prompts) {
-                            try { this.db.addScheduledPrompt(p.name, p.prompt, p.cron_expression, p.enabled); } catch { /* skip */ }
+                            try { db.addScheduledPrompt(p.name, p.prompt, p.cron_expression, p.enabled); } catch { /* skip */ }
                         }
                         logger.info('Restored scheduled prompts', { count: scheduled_prompts.length });
                     }
@@ -790,7 +792,7 @@ class DashboardServer {
                     if (settings && typeof settings === 'object') {
                         const ENV_PREFIX = 'env_';
                         for (const [key, value] of Object.entries(settings)) {
-                            this.db.setConfig(`${ENV_PREFIX}${key}`, value);
+                            db.setConfig(`${ENV_PREFIX}${key}`, value);
                         }
                         logger.info('Restored settings', { count: Object.keys(settings).length });
                     }
@@ -864,11 +866,11 @@ class DashboardServer {
                         if (f.endsWith('.md')) backup.skills[f] = fs.readFileSync(path.join(skillsDir, f), 'utf8');
                     });
                 }
-                if (this.db) {
-                    backup.keywords = this.db.getKeywords().map(k => ({ keyword: k.keyword, response: k.response, type: k.type, enabled: k.enabled }));
-                    backup.ha_mappings = this.db.getHaMappings().map(m => ({ entity_id: m.entity_id, nickname: m.nickname, location: m.location, type: m.type }));
-                    backup.scheduled_prompts = this.db.getScheduledPrompts().map(p => ({ name: p.name, prompt: p.prompt, cron_expression: p.cron_expression, enabled: p.enabled }));
-                    const allConfig = this.db.getAllConfig();
+                if (db) {
+                    backup.keywords = db.getKeywords().map(k => ({ keyword: k.keyword, response: k.response, type: k.type, enabled: k.enabled }));
+                    backup.ha_mappings = db.getHaMappings().map(m => ({ entity_id: m.entity_id, nickname: m.nickname, location: m.location, type: m.type }));
+                    backup.scheduled_prompts = db.getScheduledPrompts().map(p => ({ name: p.name, prompt: p.prompt, cron_expression: p.cron_expression, enabled: p.enabled }));
+                    const allConfig = db.getAllConfig();
                     for (const [key, value] of Object.entries(allConfig)) {
                         if (key.startsWith('env_')) backup.settings[key.substring(4)] = value;
                     }
@@ -881,7 +883,7 @@ class DashboardServer {
                 fs.writeFileSync(backupPath, JSON.stringify(backup, null, 2), 'utf8');
 
                 // Enforce retention limit
-                const retention = parseInt(this.db?.getConfig('backup_retention', 7)) || 7;
+                const retention = parseInt(db.getConfig('backup_retention', 7)) || 7;
                 const allFiles = fs.readdirSync(backupsDir)
                     .filter(f => f.endsWith('.json'))
                     .sort(); // ascending = oldest first
@@ -932,7 +934,7 @@ class DashboardServer {
 
         // GET /api/backup-settings — get retention setting
         this.app.get('/api/backup-settings', requireAuth, (req, res) => {
-            const retention = parseInt(this.db?.getConfig('backup_retention', 7)) || 7;
+            const retention = parseInt(db.getConfig('backup_retention', 7)) || 7;
             res.json({ retention });
         });
 
@@ -943,7 +945,7 @@ class DashboardServer {
                 if (isNaN(retention) || retention < 1 || retention > 30) {
                     return res.status(400).json({ error: 'Retention must be between 1 and 30' });
                 }
-                this.db?.setConfig('backup_retention', retention);
+                db.setConfig('backup_retention', retention);
                 logger.info('Backup retention updated', { retention });
                 res.json({ success: true, retention });
             } catch (err) {
@@ -956,9 +958,9 @@ class DashboardServer {
 
         // Get all Home Assistant mappings
         this.app.get('/api/ha/mappings', requireAuth, (req, res) => {
-            if (!this.db) return res.status(500).json({ error: 'DB not initialized' });
+            if (!db) return res.status(500).json({ error: 'DB not initialized' });
             try {
-                const mappings = this.db.getHaMappings();
+                const mappings = db.getHaMappings();
                 res.json({ mappings });
             } catch (err) {
                 res.status(500).json({ error: err.message });
@@ -971,9 +973,9 @@ class DashboardServer {
             if (!entityId || !nickname) {
                 return res.status(400).json({ error: 'entityId and nickname are required' });
             }
-            if (!this.db) return res.status(500).json({ error: 'DB not initialized' });
+            if (!db) return res.status(500).json({ error: 'DB not initialized' });
             try {
-                const id = this.db.addHaMapping(entityId, nickname, location, type);
+                const id = db.addHaMapping(entityId, nickname, location, type);
                 logger.info('HA mapping added via dashboard', { entityId, nickname });
                 res.json({ success: true, id });
             } catch (err) {
@@ -991,9 +993,9 @@ class DashboardServer {
             if (!entityId || !nickname) {
                 return res.status(400).json({ error: 'entityId and nickname are required' });
             }
-            if (!this.db) return res.status(500).json({ error: 'DB not initialized' });
+            if (!db) return res.status(500).json({ error: 'DB not initialized' });
             try {
-                this.db.updateHaMapping(parseInt(id), entityId, nickname, location, type);
+                db.updateHaMapping(parseInt(id), entityId, nickname, location, type);
                 logger.info('HA mapping updated via dashboard', { id, entityId });
                 res.json({ success: true });
             } catch (err) {
@@ -1004,9 +1006,9 @@ class DashboardServer {
         // Delete Home Assistant mapping
         this.app.delete('/api/ha/mappings/:id', requireAuth, (req, res) => {
             const { id } = req.params;
-            if (!this.db) return res.status(500).json({ error: 'DB not initialized' });
+            if (!db) return res.status(500).json({ error: 'DB not initialized' });
             try {
-                this.db.deleteHaMapping(parseInt(id));
+                db.deleteHaMapping(parseInt(id));
                 logger.info('HA mapping deleted via dashboard', { id });
                 res.json({ success: true });
             } catch (err) {
@@ -1126,7 +1128,7 @@ class DashboardServer {
      */
     setManagers(geminiManager, db) {
         this.geminiManager = geminiManager;
-        this.db = db;
+        db = db;
     }
 
     /**
