@@ -704,23 +704,33 @@ class DashboardServer {
                 }
 
                 // DB-backed data
-                if (db) {
-                    backup.keywords = db.getKeywords().map(k => ({
-                        keyword: k.keyword, response: k.response, type: k.type, enabled: k.enabled
-                    }));
-                    backup.ha_mappings = db.getHaMappings().map(m => ({
-                        entity_id: m.entity_id, nickname: m.nickname, location: m.location, type: m.type
-                    }));
-                    backup.scheduled_prompts = db.getScheduledPrompts().map(p => ({
-                        name: p.name, prompt: p.prompt, cron_expression: p.cron_expression, enabled: p.enabled
-                    }));
-                    // Settings (env overrides stored in DB)
-                    const allConfig = db.getAllConfig();
-                    const ENV_PREFIX = 'env_';
-                    for (const [key, value] of Object.entries(allConfig)) {
-                        if (key.startsWith(ENV_PREFIX)) {
-                            backup.settings[key.substring(ENV_PREFIX.length)] = value;
-                        }
+                backup.keywords = db.getKeywords().map(k => ({
+                    keyword: k.keyword, response: k.response, type: k.type, enabled: k.enabled
+                }));
+                backup.ha_mappings = db.getHaMappings().map(m => ({
+                    entity_id: m.entity_id, nickname: m.nickname, location: m.location, type: m.type
+                }));
+                backup.scheduled_prompts = db.getScheduledPrompts().map(p => ({
+                    name: p.name, prompt: p.prompt, cron_expression: p.cron_expression, enabled: p.enabled
+                }));
+
+                // Settings: .env baseline + DB overrides (same as GET /api/settings)
+                const envPath = path.resolve(process.cwd(), '.env');
+                if (fs.existsSync(envPath)) {
+                    const content = fs.readFileSync(envPath, 'utf-8');
+                    content.split('\n').forEach(line => {
+                        const trimmed = line.trim();
+                        if (!trimmed || trimmed.startsWith('#')) return;
+                        const eqIdx = trimmed.indexOf('=');
+                        if (eqIdx === -1) return;
+                        backup.settings[trimmed.substring(0, eqIdx).trim()] = trimmed.substring(eqIdx + 1).trim();
+                    });
+                }
+                const ENV_PREFIX = 'env_';
+                const dbOverrides = db.getAllConfig();
+                for (const [key, value] of Object.entries(dbOverrides)) {
+                    if (key.startsWith(ENV_PREFIX)) {
+                        backup.settings[key.substring(ENV_PREFIX.length)] = value;
                     }
                 }
 
@@ -865,15 +875,27 @@ class DashboardServer {
                         if (f.endsWith('.md')) backup.skills[f] = fs.readFileSync(path.join(skillsDir, f), 'utf8');
                     });
                 }
-                if (db) {
-                    backup.keywords = db.getKeywords().map(k => ({ keyword: k.keyword, response: k.response, type: k.type, enabled: k.enabled }));
-                    backup.ha_mappings = db.getHaMappings().map(m => ({ entity_id: m.entity_id, nickname: m.nickname, location: m.location, type: m.type }));
-                    backup.scheduled_prompts = db.getScheduledPrompts().map(p => ({ name: p.name, prompt: p.prompt, cron_expression: p.cron_expression, enabled: p.enabled }));
-                    const allConfig = db.getAllConfig();
-                    for (const [key, value] of Object.entries(allConfig)) {
-                        if (key.startsWith('env_')) backup.settings[key.substring(4)] = value;
-                    }
+                backup.keywords = db.getKeywords().map(k => ({ keyword: k.keyword, response: k.response, type: k.type, enabled: k.enabled }));
+                backup.ha_mappings = db.getHaMappings().map(m => ({ entity_id: m.entity_id, nickname: m.nickname, location: m.location, type: m.type }));
+                backup.scheduled_prompts = db.getScheduledPrompts().map(p => ({ name: p.name, prompt: p.prompt, cron_expression: p.cron_expression, enabled: p.enabled }));
+
+                // Settings: .env baseline + DB overrides
+                const envPath2 = path.resolve(process.cwd(), '.env');
+                if (fs.existsSync(envPath2)) {
+                    const content = fs.readFileSync(envPath2, 'utf-8');
+                    content.split('\n').forEach(line => {
+                        const trimmed = line.trim();
+                        if (!trimmed || trimmed.startsWith('#')) return;
+                        const eqIdx = trimmed.indexOf('=');
+                        if (eqIdx === -1) return;
+                        backup.settings[trimmed.substring(0, eqIdx).trim()] = trimmed.substring(eqIdx + 1).trim();
+                    });
                 }
+                const dbOverrides2 = db.getAllConfig();
+                for (const [key, value] of Object.entries(dbOverrides2)) {
+                    if (key.startsWith('env_')) backup.settings[key.substring(4)] = value;
+                }
+
 
                 // Timestamped filename with seconds to allow multiple per day
                 const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
