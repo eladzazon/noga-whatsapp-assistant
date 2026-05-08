@@ -4,6 +4,8 @@ import memoryManager from './MemoryManager.js';
 import db from '../database/DatabaseManager.js';
 import { findActionAndEntity } from '../utils/HaRecognition.js';
 import logger from '../utils/logger.js';
+import config from '../utils/config.js';
+import whatsappManager from '../bot/WhatsAppManager.js';
 
 let globalGeminiManager = null;
 
@@ -19,7 +21,7 @@ export const functionDeclarations = [
     // ==================== Calendar Functions ====================
     {
         name: 'list_calendar_events',
-        description: 'רשימת אירועים מהיומן לטווח תאריכים. Get calendar events for a date range. Use calendar="all" to include birthdays and yearly events.',
+        description: 'רשימת אירועים מהיומן לטווח תאריכים. Get calendar events for a date range.',
         parameters: {
             type: 'object',
             properties: {
@@ -30,11 +32,6 @@ export const functionDeclarations = [
                 end_date: {
                     type: 'string',
                     description: 'תאריך סיום בפורמט YYYY-MM-DD (אופציונלי). End date in YYYY-MM-DD format (optional).'
-                },
-                calendar: {
-                    type: 'string',
-                    enum: ['main', 'events', 'birthdays', 'all'],
-                    description: 'Which calendar to query. main=יומן ראשי, events=אירועים חשובים (birthdays/anniversaries), birthdays=ימי הולדת עבריים, all=all calendars. Default: main.'
                 }
             },
             required: ['start_date']
@@ -42,7 +39,7 @@ export const functionDeclarations = [
     },
     {
         name: 'add_calendar_event',
-        description: 'הוסף אירוע חדש ליומן. Add a new event to the calendar. For birthday/anniversary events use calendar="events".',
+        description: 'הוסף אירוע חדש ליומן. Add a new event to the calendar.',
         parameters: {
             type: 'object',
             properties: {
@@ -65,28 +62,9 @@ export const functionDeclarations = [
                 description: {
                     type: 'string',
                     description: 'תיאור האירוע (אופציונלי). Event description (optional).'
-                },
-                calendar: {
-                    type: 'string',
-                    enum: ['main', 'events', 'birthdays'],
-                    description: 'Which calendar to add the event to. main=יומן ראשי, events=אירועים חשובים, birthdays=ימי הולדת עבריים. Default: main.'
                 }
             },
             required: ['title', 'date']
-        }
-    },
-    {
-        name: 'check_upcoming_birthdays',
-        description: 'בדוק ימי הולדת ואירועים שנתיים קרובים מיומני אירועים חשובים וימי הולדת. Check upcoming birthdays and yearly events from the special calendars.',
-        parameters: {
-            type: 'object',
-            properties: {
-                days_ahead: {
-                    type: 'number',
-                    description: 'כמה ימים קדימה לבדוק (ברירת מחדל 7). How many days ahead to check (default 7).'
-                }
-            },
-            required: []
         }
     },
 
@@ -123,6 +101,24 @@ export const functionDeclarations = [
                 }
             },
             required: ['filename', 'content']
+        }
+    },
+    {
+        name: 'send_whatsapp_message',
+        description: 'שלח הודעת וואטסאפ לאדם אחר או לקבוצה. השתמש בזה כשהמשתמש מבקש ממך למסור הודעה או לשלוח משהו לקבוצה המשפחתית. Send a WhatsApp message to the family group or admin.',
+        parameters: {
+            type: 'object',
+            properties: {
+                recipient: {
+                    type: 'string',
+                    description: 'הנמען. השתמש בערך "group" עבור הקבוצה המשפחתית, "admin" עבור המנהל, או מספר טלפון ספציפי.'
+                },
+                message: {
+                    type: 'string',
+                    description: 'ההודעה שברצונך לשלוח (נסח בצורה טבעית וחברית בעברית).'
+                }
+            },
+            required: ['recipient', 'message']
         }
     },
     {
@@ -294,7 +290,7 @@ export const functionHandlers = {
     // ==================== Calendar Handlers ====================
     list_calendar_events: async (args) => {
         logger.info('Executing: list_calendar_events', args);
-        return await calendarManager.listEvents(args.start_date, args.end_date, args.calendar || 'main');
+        return await calendarManager.listEvents(args.start_date, args.end_date);
     },
 
     add_calendar_event: async (args) => {
@@ -304,14 +300,8 @@ export const functionHandlers = {
             args.date,
             args.time || null,
             args.duration_minutes || 60,
-            args.description || '',
-            args.calendar || 'main'
+            args.description || ''
         );
-    },
-
-    check_upcoming_birthdays: async (args) => {
-        logger.info('Executing: check_upcoming_birthdays', args);
-        return await calendarManager.checkUpcomingBirthdays(args.days_ahead || 7);
     },
 
     // ==================== Shopping List Handlers Removed (Now a Skill) ====================
@@ -353,6 +343,31 @@ export const functionHandlers = {
             globalGeminiManager.reinit();
         }
         return result;
+    },
+
+    send_whatsapp_message: async (args) => {
+        logger.info('Executing: send_whatsapp_message', args);
+        try {
+            let targetJid;
+            
+            if (args.recipient.toLowerCase() === 'group' || args.recipient === 'קבוצה' || args.recipient === 'הקבוצה') {
+                if (!config.whatsapp.groupId) return { error: 'Group ID is not configured in settings. Cannot send to group.' };
+                targetJid = config.whatsapp.groupId.includes('@') ? config.whatsapp.groupId : `${config.whatsapp.groupId}@g.us`;
+            } else if (args.recipient.toLowerCase() === 'admin' || args.recipient === 'מנהל') {
+                if (!config.whatsapp.adminPhone) return { error: 'Admin phone is not configured in settings.' };
+                targetJid = config.whatsapp.adminPhone.includes('@') ? config.whatsapp.adminPhone : `${config.whatsapp.adminPhone}@s.whatsapp.net`;
+            } else {
+                // Assume it's a specific number
+                const cleanNumber = args.recipient.replace(/[^0-9]/g, '');
+                targetJid = `${cleanNumber}@s.whatsapp.net`;
+            }
+
+            await whatsappManager.sendMessage(targetJid, args.message);
+            return { success: true, status: `Message sent successfully to ${args.recipient}` };
+        } catch (err) {
+            logger.error('Failed to execute send_whatsapp_message', { error: err.message });
+            return { error: err.message };
+        }
     },
 
     // ==================== Home Assistant Handlers ====================

@@ -51,6 +51,7 @@ CRITICAL RULES FOR FUNCTION CALLING:
 3. When the user asks about device state, you MUST call get_device_state.
 4. When the user asks about calendar, you MUST call list_calendar_events or add_calendar_event.
 5. When the user asks about shopping list, you MUST call the appropriate shopping function.
+6. When the user asks you to send a message to someone or to a group, you MUST call send_whatsapp_message.
 
 DEVICE HANDLING:
 1. If user provides an entity_id (like "light.living_room" or "tz3000_xxx"), use it directly in control_device.
@@ -106,11 +107,7 @@ Always be warm and respond in Hebrew.`
             clientSecret: process.env.GOOGLE_OAUTH_CLIENT_SECRET,
             refreshToken: process.env.GOOGLE_OAUTH_REFRESH_TOKEN
         },
-        calendarId: process.env.CALENDAR_ID || 'primary',
-        // "אירועים חשובים" — yearly events: birthdays, anniversaries, etc.
-        eventsCalendarId: process.env.CALENDAR_EVENTS_ID || null,
-        // Hebrew birthday calendar
-        birthdaysCalendarId: process.env.CALENDAR_BIRTHDAYS_ID || null
+        calendarId: process.env.CALENDAR_ID || 'primary'
     },
 
     // Home Assistant
@@ -187,11 +184,12 @@ export function applyDbOverrides(db) {
 
             config.gemini.apiKey = process.env.GEMINI_API_KEY;
             config.gemini.model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+            if (process.env.GEMINI_SYSTEM_PROMPT) {
+                config.gemini.systemPrompt = process.env.GEMINI_SYSTEM_PROMPT;
+            }
 
             config.google.serviceAccountPath = process.env.GOOGLE_SERVICE_ACCOUNT_PATH || './credentials/service-account.json';
             config.google.calendarId = process.env.CALENDAR_ID || 'primary';
-            config.google.eventsCalendarId = process.env.CALENDAR_EVENTS_ID || null;
-            config.google.birthdaysCalendarId = process.env.CALENDAR_BIRTHDAYS_ID || null;
             config.google.oauth.clientId = process.env.GOOGLE_OAUTH_CLIENT_ID;
             config.google.oauth.clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET;
             config.google.oauth.refreshToken = process.env.GOOGLE_OAUTH_REFRESH_TOKEN;

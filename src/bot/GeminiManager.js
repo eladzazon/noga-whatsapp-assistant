@@ -48,7 +48,9 @@ class GeminiManager {
     _buildDynamicSystemPrompt() {
         const knowledgeDir = path.resolve(process.cwd(), 'data', 'knowledge');
         const skillsDir = path.resolve(process.cwd(), 'data', 'skills');
-        let promptParts = [];
+        
+        // Base system prompt is ALWAYS included
+        let promptParts = [config.gemini.systemPrompt];
 
         try {
             if (fs.existsSync(knowledgeDir)) {
@@ -79,13 +81,9 @@ class GeminiManager {
             logger.error('Failed to read skills files', { error: err.message });
         }
 
-        if (promptParts.length === 0) {
-            // Fallback
-            return config.gemini.systemPrompt;
-        }
-
         return promptParts.join('\n\n');
     }
+
 
     /**
      * Re-initialize the model to pick up file changes

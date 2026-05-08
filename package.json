@@ -19,6 +19,7 @@
     "express-session": "*",
     "googleapis": "*",
     "node-cron": "*",
+    "node-ical": "^0.26.1",
     "pino": "^10.3.1",
     "qrcode": "*",
     "qrcode-terminal": "^0.12.0",
