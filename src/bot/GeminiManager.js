@@ -387,8 +387,15 @@ class GeminiManager {
         logger.info('Generating broadcast message', { event: eventData.event });
 
         try {
+            // Use a lightweight, tool-less model instance for generating broadcasts
+            // This prevents Gemini from trying to use the 'send_whatsapp_message' tool and returning an empty text response.
+            const broadcastModel = this.genAI.getGenerativeModel({
+                model: config.gemini.model,
+                systemInstruction: "You are a helpful home assistant. Your job is to format system events into friendly, natural WhatsApp messages."
+            });
+
             // Start chat session with no history
-            const chat = this._getModel().startChat({
+            const chat = broadcastModel.startChat({
                 generationConfig: {
                     maxOutputTokens: 1024,
                     temperature: 0.7 // Higher temperature for more creative/friendly announcements
