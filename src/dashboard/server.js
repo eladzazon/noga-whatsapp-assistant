@@ -1180,6 +1180,30 @@ class DashboardServer {
             // Send recent logs
             socket.emit('logs', getRecentLogs(50));
 
+            // Dashboard Chat: Receive message from dashboard
+            socket.on('dashboard_message', async (text) => {
+                if (!this.geminiManager) {
+                    return socket.emit('dashboard_response', { 
+                        error: 'Gemini Manager not initialized' 
+                    });
+                }
+
+                try {
+                    const response = await this.geminiManager.processMessage('dashboard_admin', text);
+                    socket.emit('dashboard_response', { text: response });
+                } catch (err) {
+                    socket.emit('dashboard_response', { error: err.message });
+                }
+            });
+
+            // Dashboard Chat: Clear history
+            socket.on('clear_chat', () => {
+                if (this.geminiManager) {
+                    this.geminiManager.clearHistory('dashboard_admin');
+                    socket.emit('chat_cleared');
+                }
+            });
+
             socket.on('disconnect', () => {
                 logger.debug('Dashboard client disconnected', { id: socket.id });
             });

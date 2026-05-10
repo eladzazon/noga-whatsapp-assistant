@@ -48,17 +48,14 @@
 
 
 ## 🖥️ Dashboard Expansion
-- [ ] **AI Interaction Page**: A dedicated "Chat" tab to interact with Noga directly from the dashboard for testing and debugging.
+- [x] **AI Interaction Page**: A dedicated "Chat" tab to interact with Noga directly from the dashboard for testing and debugging.
 - [ ] **Remote Conversation Manager**: A WhatsApp-Web-like interface to view active conversations, message history, and send/receive messages remotely via the admin panel.
 
 ## 📅 Calendar & Reminders
-- [ ] **Multi-Calendar Support**: Extend the calendar skill to handle multiple calendars (not just "primary").
-- [ ] **Birthday & Event Reminders**: Add logic to scan specific calendars for birthdays and anniversaries.
-- [ ] **Reminder Cronjobs**: Implement scheduled jobs to send daily/weekly birthday and event summaries via WhatsApp.
 - [ ] **Nudge Expiration**: Automatically stop nudging or mark as "expired" if a reminder has been nudged more than 10 times without response.
 - [ ] **Backup & Restore Extension**: Include the `reminders` table in the automated daily backups and restore logic and the dashboard backup and restore logic.
 - [x] **Reminder Nudge Updates**: Added instructions for Noga to tell users they can mark a reminder as done by reacting with a "Like" (👍) emoji.
-- [ ] **Next Nudge Field**: Add "נדנוד הבא" column to the admin panel reminders table.
+- [x] **Next Nudge Field**: Add "נדנוד הבא" column to the admin panel reminders table.
 
 ## ⚡ Performance & Optimization
 - [ ] **Dynamic Model Switching**: Implement logic in the message router to detect request complexity:

@@ -884,3 +884,85 @@ select.form-input {
         gap: 5px;
     }
 }
+/* ==================== Chat Tab ==================== */
+.chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    margin-bottom: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.message {
+    max-width: 80%;
+    padding: 10px 15px;
+    border-radius: 18px;
+    font-size: 14px;
+    line-height: 1.5;
+    position: relative;
+    word-wrap: break-word;
+}
+
+.user-message {
+    align-self: flex-start;
+    background: var(--primary);
+    color: white;
+    border-bottom-right-radius: 4px;
+}
+
+.noga-message {
+    align-self: flex-end;
+    background: white;
+    color: var(--dark);
+    border: 1px solid var(--border);
+    border-bottom-left-radius: 4px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+.message-tool-call {
+    font-family: monospace;
+    font-size: 11px;
+    background: #edf2f7;
+    color: #4a5568;
+    padding: 4px 8px;
+    border-radius: 4px;
+    margin-top: 5px;
+    border-left: 3px solid var(--primary);
+}
+
+.chat-input-container {
+    display: flex;
+    gap: 10px;
+}
+
+.chat-input-container input {
+    flex: 1;
+    padding: 12px 18px;
+    border: 2px solid var(--gray-light);
+    border-radius: 25px;
+    outline: none;
+    font-size: 14px;
+    transition: border-color 0.2s;
+}
+
+.chat-input-container input:focus {
+    border-color: var(--primary);
+}
+
+.typing-indicator {
+    font-style: italic;
+    color: var(--gray);
+    font-size: 12px;
+    margin-bottom: 5px;
+}
+
+/* Ensure the chat panel takes full height */
+.chat-panel {
+    display: flex;
+    flex-direction: column;
+}
