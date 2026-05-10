@@ -13,9 +13,9 @@
 - [ ] **Token Usage accuracy**: Ensure cumulative usage across tool calls is correctly logged to the DB.
 - [ ] **Error Boundaries**: Better UI feedback when a file fails to save or load remotely.
 - [ ] **Dependency Updates**: Fix deprecated build log warnings:
-    - [ ] check full build log from github actions and get warning and errors from there. and fix them, explicit:
-        - [ ] `node-domexception@1.0.0`: Use native DOMException instead.
-        - [ ] `glob@10.5.0`: Update to a newer version to address security vulnerabilities.
+    - [x] check full build log from github actions and get warning and errors from there. and fix them, explicit:
+        - [ ] `node-domexception@1.0.0`: Use native DOMException instead (Blocked by deep upstream dependencies in googleapis/gaxios).
+        - [x] `glob@10.5.0`: Update to a newer version to address security vulnerabilities.
 
 ## 🛠️ Debugging & Maintenance
 - [x] **Remote Admin Commands**: Implemented a suite of commands starting with `/` for remote management via WhatsApp:

@@ -38,5 +38,9 @@
     "chatbot"
   ],
   "author": "",
-  "license": "MIT"
+  "license": "MIT",
+  "overrides": {
+    "glob": "^13.0.6",
+    "fetch-blob": "^4.0.0"
+  }
 }
