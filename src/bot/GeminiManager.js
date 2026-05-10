@@ -121,7 +121,16 @@ class GeminiManager {
         const currentTime = now.toLocaleTimeString('he-IL', options);
         const dayOfWeek = now.toLocaleDateString('he-IL', { ...options, weekday: 'long' });
 
-        const dynamicPrompt = `${this.systemPrompt}\n\n[SYSTEM INFO: Today is ${dayOfWeek}, ${currentDate}, Current time is ${currentTime}]`;
+        // Inject pending reminders so the AI knows what the user might be referring to
+        let pendingRemindersInfo = '';
+        if (db) {
+            const reminders = db.getPendingReminders();
+            if (reminders && reminders.length > 0) {
+                pendingRemindersInfo = `\nPending Reminders (To-Do): ${reminders.map(r => `[ID: ${r.id}] ${r.title}`).join(', ')}. If the user says "done" or "I did it", they are likely referring to one of these tasks. Use update_reminder_status to mark it done.`;
+            }
+        }
+
+        const dynamicPrompt = `${this.systemPrompt}\n\n[SYSTEM INFO: Today is ${dayOfWeek}, ${currentDate}, Current time is ${currentTime}${pendingRemindersInfo}]`;
 
         return this.genAI.getGenerativeModel({
             model: config.gemini.model,

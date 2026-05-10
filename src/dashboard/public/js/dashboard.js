@@ -1512,7 +1512,8 @@
     };
 
     window._deleteReminder = async (id) => {
-        if (!confirm('\u05d4\u05d0\u05dd \u05dc\u05de\u05d7\u05d5\u05e7 \u05ea\u05d6\u05db\u05d5\u05e8\u05ea \u05d6\u05d5?')) return;
+        const confirmed = await showConfirmModal('מחיקת תזכורת', 'האם למחוק תזכורת זו? פעולה זו אינה הפיכה.');
+        if (!confirmed) return;
         try {
             await fetch(`/api/reminders/${id}`, { method: 'DELETE' });
             loadReminders();
