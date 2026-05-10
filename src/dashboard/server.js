@@ -78,14 +78,7 @@ class DashboardServer {
         this.app.set('view engine', 'ejs');
         this.app.set('views', path.join(__dirname, 'views'));
 
-        // Logging middleware
-        this.app.use((req, res, next) => {
-            logger.debug('HTTP Request', {
-                method: req.method,
-                path: req.path
-            });
-            next();
-        });
+
     }
 
     /**
