@@ -120,6 +120,7 @@ class GeminiManager {
         const currentDate = now.toLocaleDateString('he-IL', options);
         const currentTime = now.toLocaleTimeString('he-IL', options);
         const dayOfWeek = now.toLocaleDateString('he-IL', { ...options, weekday: 'long' });
+        const utcISO = now.toISOString();
 
         // Inject pending reminders so the AI knows what the user might be referring to
         let pendingRemindersInfo = '';
@@ -130,7 +131,7 @@ class GeminiManager {
             }
         }
 
-        const dynamicPrompt = `${this.systemPrompt}\n\n[SYSTEM INFO: Today is ${dayOfWeek}, ${currentDate}, Current time is ${currentTime}${pendingRemindersInfo}]`;
+        const dynamicPrompt = `${this.systemPrompt}\n\n[SYSTEM INFO: Today is ${dayOfWeek}, ${currentDate}, Current local time is ${currentTime}, Current UTC ISO is ${utcISO}${pendingRemindersInfo}]`;
 
         return this.genAI.getGenerativeModel({
             model: config.gemini.model,

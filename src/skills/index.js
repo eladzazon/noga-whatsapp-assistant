@@ -77,7 +77,7 @@ export const functionDeclarations = [
             type: 'object',
             properties: {
                 title: { type: 'string', description: 'תיאור התזכורת. Task description.' },
-                due_date_iso: { type: 'string', description: 'מתי להזכיר לראשונה (פורמט ISO Date string). Due date in ISO string format.' },
+                due_date_iso: { type: 'string', description: 'מתי להזכיר לראשונה. חובה להשתמש בפורמט UTC ISO (למשל סיומת Z). Use UTC ISO format (ending with Z).' },
                 nudge_interval_minutes: { type: 'number', description: 'תדירות תזכורות חוזרות בדקות. ברירת מחדל 60.' }
             },
             required: ['title', 'due_date_iso']
@@ -107,7 +107,7 @@ export const functionDeclarations = [
             type: 'object',
             properties: {
                 id: { type: 'number', description: 'מזהה התזכורת. Reminder ID.' },
-                new_due_date_iso: { type: 'string', description: 'תאריך ושעה חדשים לתזכורת (פורמט ISO Date string).' }
+                new_due_date_iso: { type: 'string', description: 'תאריך ושעה חדשים לתזכורת. חובה להשתמש בפורמט UTC ISO (למשל סיומת Z).' }
             },
             required: ['id', 'new_due_date_iso']
         }
