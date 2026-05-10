@@ -132,24 +132,24 @@
                     </div>
                 </section>
             </div>
-            
+
             <!-- ==================== Chat Tab ==================== -->
             <div class="tab-pane" id="tab-chat">
-                <section class="panel chat-panel" style="display: flex; flex-direction: column; height: calc(100vh - 160px);">
+                <section class="panel chat-panel"
+                    style="display: flex; flex-direction: column; height: calc(100vh - 160px);">
                     <h2>
                         💬 צ'אט עם נוגה
                         <div class="prompt-actions">
                             <button id="clear-chat-btn" class="btn btn-secondary btn-small">🧹 נקה שיחה</button>
                         </div>
                     </h2>
-                    <p class="panel-hint">דברו עם נוגה ישירות מכאן לבדיקה וניפוי שגיאות. השיחה נשמרת בבסיס הנתונים תחת המשתמש "dashboard_admin".</p>
-                    
+                    <p class="panel-hint">דברו עם נוגה ישירות מכאן לבדיקה וניפוי שגיאות. השיחה נשמרת בבסיס הנתונים תחת
+                        המשתמש "dashboard_admin".</p>
+
                     <div id="chat-messages" class="chat-messages">
-                        <div class="message noga-message">
-                            שלום! אני כאן לעזור. איך אני יכולה לסייע היום? 😊
-                        </div>
+                        <div class="message noga-message">שלום! אני כאן לעזור. איך אני יכולה לסייע היום? 😊</div>
                     </div>
-                    
+
                     <div class="chat-input-container">
                         <input type="text" id="chat-input" placeholder="הקלידו הודעה..." autocomplete="off">
                         <button id="chat-send-btn" class="btn btn-primary">🚀</button>
@@ -159,7 +159,8 @@
 
             <!-- ==================== Knowledge Base Tab ==================== -->
             <div class="tab-pane" id="tab-knowledge">
-                <section class="panel knowledge-panel" style="display: flex; flex-direction: column; height: calc(100vh - 160px);">
+                <section class="panel knowledge-panel"
+                    style="display: flex; flex-direction: column; height: calc(100vh - 160px);">
                     <h2>
                         🧠 בסיס ידע
                         <div class="prompt-actions">
@@ -169,23 +170,34 @@
                         </div>
                     </h2>
                     <p class="panel-hint">ערוך את קבצי הידע של נוגה. כל שינוי מעדכן את המוח שלה מיידית.</p>
-                    
+
                     <div class="split-pane" style="display: flex; flex: 1; gap: 20px; min-height: 0;">
                         <!-- Sidebar -->
-                        <div class="file-sidebar" style="width: 250px; background: var(--light-bg); border-radius: 8px; border: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden;">
-                            <div style="padding: 10px; background: rgba(0,0,0,0.02); border-bottom: 1px solid var(--border); font-weight: bold; font-size: 14px;">📁 קבצים</div>
-                            <ul id="knowledge-file-list" style="list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1;">
+                        <div class="file-sidebar"
+                            style="width: 250px; background: var(--light-bg); border-radius: 8px; border: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden;">
+                            <div
+                                style="padding: 10px; background: rgba(0,0,0,0.02); border-bottom: 1px solid var(--border); font-weight: bold; font-size: 14px;">
+                                📁 קבצים</div>
+                            <ul id="knowledge-file-list"
+                                style="list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1;">
                                 <!-- Populated via JS -->
                             </ul>
                         </div>
-                        
+
                         <!-- Editor -->
-                        <div class="file-editor" style="flex: 1; display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; position: relative;">
-                            <div style="padding: 10px; background: var(--light-bg); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
-                                <span id="current-knowledge-filename" style="font-weight: bold; font-size: 14px;">בחר קובץ</span>
-                                <button id="delete-knowledge-file" class="btn btn-danger-small" style="display: none;">🗑️ מחק</button>
+                        <div class="file-editor"
+                            style="flex: 1; display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; position: relative;">
+                            <div
+                                style="padding: 10px; background: var(--light-bg); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+                                <span id="current-knowledge-filename" style="font-weight: bold; font-size: 14px;">בחר
+                                    קובץ</span>
+                                <button id="delete-knowledge-file" class="btn btn-danger-small"
+                                    style="display: none;">🗑️ מחק</button>
                             </div>
-                            <textarea id="knowledge-editor" class="prompt-textarea" placeholder="בחר קובץ לעריכה..." dir="rtl" style="border: none; border-radius: 0; flex: 1; resize: none; text-align: right;" disabled></textarea>
+                            <textarea id="knowledge-editor" class="prompt-textarea" placeholder="בחר קובץ לעריכה..."
+                                dir="rtl"
+                                style="border: none; border-radius: 0; flex: 1; resize: none; text-align: right;"
+                                disabled></textarea>
                         </div>
                     </div>
                 </section>
@@ -193,7 +205,8 @@
 
             <!-- ==================== Skills Library Tab ==================== -->
             <div class="tab-pane" id="tab-skills">
-                <section class="panel skills-panel" style="display: flex; flex-direction: column; height: calc(100vh - 160px);">
+                <section class="panel skills-panel"
+                    style="display: flex; flex-direction: column; height: calc(100vh - 160px);">
                     <h2>
                         🛠️ מיומנויות
                         <div class="prompt-actions">
@@ -202,24 +215,36 @@
                             <button id="save-skill" class="btn btn-primary btn-small">שמור</button>
                         </div>
                     </h2>
-                    <p class="panel-hint">הוסף או ערוך נהלים (Skills) כדי ללמד את נוגה כיצד לבצע משימות מורכבות שלב אחר שלב.</p>
-                    
+                    <p class="panel-hint">הוסף או ערוך נהלים (Skills) כדי ללמד את נוגה כיצד לבצע משימות מורכבות שלב אחר
+                        שלב.</p>
+
                     <div class="split-pane" style="display: flex; flex: 1; gap: 20px; min-height: 0;">
                         <!-- Sidebar -->
-                        <div class="file-sidebar" style="width: 250px; background: var(--light-bg); border-radius: 8px; border: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden;">
-                            <div style="padding: 10px; background: rgba(0,0,0,0.02); border-bottom: 1px solid var(--border); font-weight: bold; font-size: 14px;">🛠️ מיומנויות</div>
-                            <ul id="skills-file-list" style="list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1;">
+                        <div class="file-sidebar"
+                            style="width: 250px; background: var(--light-bg); border-radius: 8px; border: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden;">
+                            <div
+                                style="padding: 10px; background: rgba(0,0,0,0.02); border-bottom: 1px solid var(--border); font-weight: bold; font-size: 14px;">
+                                🛠️ מיומנויות</div>
+                            <ul id="skills-file-list"
+                                style="list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1;">
                                 <!-- Populated via JS -->
                             </ul>
                         </div>
-                        
+
                         <!-- Editor -->
-                        <div class="file-editor" style="flex: 1; display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; position: relative;">
-                            <div style="padding: 10px; background: var(--light-bg); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
-                                <span id="current-skill-filename" style="font-weight: bold; font-size: 14px;">בחר קובץ</span>
-                                <button id="delete-skill-file" class="btn btn-danger-small" style="display: none;">🗑️ מחק</button>
+                        <div class="file-editor"
+                            style="flex: 1; display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; position: relative;">
+                            <div
+                                style="padding: 10px; background: var(--light-bg); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+                                <span id="current-skill-filename" style="font-weight: bold; font-size: 14px;">בחר
+                                    קובץ</span>
+                                <button id="delete-skill-file" class="btn btn-danger-small" style="display: none;">🗑️
+                                    מחק</button>
                             </div>
-                            <textarea id="skill-editor" class="prompt-textarea" placeholder="בחר מיומנות לעריכה..." dir="rtl" style="border: none; border-radius: 0; flex: 1; resize: none; text-align: right;" disabled></textarea>
+                            <textarea id="skill-editor" class="prompt-textarea" placeholder="בחר מיומנות לעריכה..."
+                                dir="rtl"
+                                style="border: none; border-radius: 0; flex: 1; resize: none; text-align: right;"
+                                disabled></textarea>
                         </div>
                     </div>
                 </section>
@@ -357,7 +382,8 @@
                         ✅ תזכורות (To-Do)
                         <button id="add-reminder-btn" class="btn btn-primary btn-small">+ הוסף</button>
                     </h2>
-                    <p class="panel-hint">תזכורות הן משימות שנוגה תנדנד עליהן עד שיסומנו כבוצעות. שונות מאירועי יומן בכך שתזכורות אינן נשמרות ביומן.</p>
+                    <p class="panel-hint">תזכורות הן משימות שנוגה תנדנד עליהן עד שיסומנו כבוצעות. שונות מאירועי יומן בכך
+                        שתזכורות אינן נשמרות ביומן.</p>
 
                     <!-- Add/Edit Form -->
                     <div id="reminder-form" class="keyword-form" style="display: none;">
@@ -365,11 +391,13 @@
                         <div class="form-row">
                             <div class="form-group form-group-grow">
                                 <label for="reminder-title">תיאור התזכורת</label>
-                                <input type="text" id="reminder-title" class="form-input" placeholder="למשל: להעביר את הכביסה למייבש" dir="rtl">
+                                <input type="text" id="reminder-title" class="form-input"
+                                    placeholder="למשל: להעביר את הכביסה למייבש" dir="rtl">
                             </div>
                             <div class="form-group">
                                 <label for="reminder-interval">תדירות נדנוד (דקות)</label>
-                                <input type="number" id="reminder-interval" class="form-input" value="60" min="1" style="width: 100px;" dir="ltr">
+                                <input type="number" id="reminder-interval" class="form-input" value="60" min="1"
+                                    style="width: 100px;" dir="ltr">
                             </div>
                         </div>
                         <div class="form-row">
@@ -398,7 +426,9 @@
                                 </tr>
                             </thead>
                             <tbody id="reminders-tbody">
-                                <tr class="empty-row"><td colspan="6">טוען...</td></tr>
+                                <tr class="empty-row">
+                                    <td colspan="6">טוען...</td>
+                                </tr>
                             </tbody>
                         </table>
                     </div>
@@ -415,7 +445,8 @@
                             <button id="save-settings" class="btn btn-primary btn-small">💾 שמור הגדרות</button>
                         </div>
                     </h2>
-                    <p class="panel-hint">ניהול הגדרות מערכת. השינויים נשמרים בבסיס הנתונים ורוב ההגדרות נכנסות <strong>לתוקף מיידי</strong>.</p>
+                    <p class="panel-hint">ניהול הגדרות מערכת. השינויים נשמרים בבסיס הנתונים ורוב ההגדרות נכנסות
+                        <strong>לתוקף מיידי</strong>.</p>
 
                     <!-- Dashboard Settings -->
                     <div class="settings-group">
@@ -423,22 +454,26 @@
                         <div class="settings-grid">
                             <div class="setting-item">
                                 <label for="setting-DASHBOARD_PORT">פורט</label>
-                                <input type="number" id="setting-DASHBOARD_PORT" class="form-input" data-env="DASHBOARD_PORT" placeholder="3000" dir="ltr">
+                                <input type="number" id="setting-DASHBOARD_PORT" class="form-input"
+                                    data-env="DASHBOARD_PORT" placeholder="3000" dir="ltr">
                                 <small>פורט לשרת לוח הבקרה</small>
                             </div>
                             <div class="setting-item">
                                 <label for="setting-DASHBOARD_USER">שם משתמש</label>
-                                <input type="text" id="setting-DASHBOARD_USER" class="form-input" data-env="DASHBOARD_USER" placeholder="admin" dir="ltr">
+                                <input type="text" id="setting-DASHBOARD_USER" class="form-input"
+                                    data-env="DASHBOARD_USER" placeholder="admin" dir="ltr">
                                 <small>שם משתמש להתחברות ללוח הבקרה</small>
                             </div>
                             <div class="setting-item">
                                 <label for="setting-DASHBOARD_PASSWORD">סיסמה</label>
-                                <input type="password" id="setting-DASHBOARD_PASSWORD" class="form-input" data-env="DASHBOARD_PASSWORD" placeholder="••••••" dir="ltr">
+                                <input type="password" id="setting-DASHBOARD_PASSWORD" class="form-input"
+                                    data-env="DASHBOARD_PASSWORD" placeholder="••••••" dir="ltr">
                                 <small>סיסמת התחברות ללוח הבקרה</small>
                             </div>
                             <div class="setting-item">
                                 <label for="setting-SESSION_SECRET">Session Secret</label>
-                                <input type="password" id="setting-SESSION_SECRET" class="form-input" data-env="SESSION_SECRET" placeholder="••••••" dir="ltr">
+                                <input type="password" id="setting-SESSION_SECRET" class="form-input"
+                                    data-env="SESSION_SECRET" placeholder="••••••" dir="ltr">
                                 <small>מפתח הצפנה לסשנים</small>
                             </div>
                         </div>
@@ -450,12 +485,14 @@
                         <div class="settings-grid">
                             <div class="setting-item setting-item-wide">
                                 <label for="setting-WHATSAPP_WHITELIST">רשימת מורשים (Whitelist)</label>
-                                <input type="text" id="setting-WHATSAPP_WHITELIST" class="form-input" data-env="WHATSAPP_WHITELIST" placeholder="972501234567,972509876543" dir="ltr">
+                                <input type="text" id="setting-WHATSAPP_WHITELIST" class="form-input"
+                                    data-env="WHATSAPP_WHITELIST" placeholder="972501234567,972509876543" dir="ltr">
                                 <small>מספרי טלפון מופרדים בפסיקים (עם קידומת מדינה, ללא + או רווחים)</small>
                             </div>
                             <div class="setting-item setting-item-wide">
                                 <label for="setting-WHATSAPP_GROUP_ID">מזהה קבוצה</label>
-                                <input type="text" id="setting-WHATSAPP_GROUP_ID" class="form-input" data-env="WHATSAPP_GROUP_ID" placeholder="120363404881552670@g.us" dir="ltr">
+                                <input type="text" id="setting-WHATSAPP_GROUP_ID" class="form-input"
+                                    data-env="WHATSAPP_GROUP_ID" placeholder="120363404881552670@g.us" dir="ltr">
                                 <small>מזהה קבוצת WhatsApp לשליחת הודעות (ניתן למצוא בלוגים)</small>
                             </div>
                         </div>
@@ -467,12 +504,15 @@
                         <div class="settings-grid">
                             <div class="setting-item setting-item-wide">
                                 <label for="setting-GEMINI_API_KEY">API Key</label>
-                                <input type="password" id="setting-GEMINI_API_KEY" class="form-input" data-env="GEMINI_API_KEY" placeholder="AIza..." dir="ltr">
-                                <small>מפתח API של Google Gemini (<a href="https://aistudio.google.com/apikey" target="_blank">קבל מפתח</a>)</small>
+                                <input type="password" id="setting-GEMINI_API_KEY" class="form-input"
+                                    data-env="GEMINI_API_KEY" placeholder="AIza..." dir="ltr">
+                                <small>מפתח API של Google Gemini (<a href="https://aistudio.google.com/apikey"
+                                        target="_blank">קבל מפתח</a>)</small>
                             </div>
                             <div class="setting-item">
                                 <label for="setting-GEMINI_MODEL">מודל</label>
-                                <input type="text" id="setting-GEMINI_MODEL" class="form-input" data-env="GEMINI_MODEL" placeholder="gemini-2.5-flash" dir="ltr">
+                                <input type="text" id="setting-GEMINI_MODEL" class="form-input" data-env="GEMINI_MODEL"
+                                    placeholder="gemini-2.5-flash" dir="ltr">
                                 <small>שם המודל (למשל: gemini-2.5-flash, gemini-2.5-pro)</small>
                             </div>
                         </div>
@@ -484,27 +524,33 @@
                         <div class="settings-grid">
                             <div class="setting-item setting-item-wide">
                                 <label for="setting-GOOGLE_SERVICE_ACCOUNT_PATH">Service Account Path</label>
-                                <input type="text" id="setting-GOOGLE_SERVICE_ACCOUNT_PATH" class="form-input" data-env="GOOGLE_SERVICE_ACCOUNT_PATH" placeholder="./credentials/service-account.json" dir="ltr">
+                                <input type="text" id="setting-GOOGLE_SERVICE_ACCOUNT_PATH" class="form-input"
+                                    data-env="GOOGLE_SERVICE_ACCOUNT_PATH"
+                                    placeholder="./credentials/service-account.json" dir="ltr">
                                 <small>נתיב לקובץ Service Account JSON (ליומן)</small>
                             </div>
                             <div class="setting-item setting-item-wide">
                                 <label for="setting-CALENDAR_ID">Calendar ID</label>
-                                <input type="text" id="setting-CALENDAR_ID" class="form-input" data-env="CALENDAR_ID" placeholder="primary" dir="ltr">
+                                <input type="text" id="setting-CALENDAR_ID" class="form-input" data-env="CALENDAR_ID"
+                                    placeholder="primary" dir="ltr">
                                 <small>מזהה יומן Google (primary או מזהה יומן ספציפי)</small>
                             </div>
                             <div class="setting-item setting-item-wide">
                                 <label for="setting-GOOGLE_OAUTH_CLIENT_ID">OAuth Client ID</label>
-                                <input type="password" id="setting-GOOGLE_OAUTH_CLIENT_ID" class="form-input" data-env="GOOGLE_OAUTH_CLIENT_ID" placeholder="your-client-id" dir="ltr">
+                                <input type="password" id="setting-GOOGLE_OAUTH_CLIENT_ID" class="form-input"
+                                    data-env="GOOGLE_OAUTH_CLIENT_ID" placeholder="your-client-id" dir="ltr">
                                 <small>OAuth Client ID (למשימות)</small>
                             </div>
                             <div class="setting-item setting-item-wide">
                                 <label for="setting-GOOGLE_OAUTH_CLIENT_SECRET">OAuth Client Secret</label>
-                                <input type="password" id="setting-GOOGLE_OAUTH_CLIENT_SECRET" class="form-input" data-env="GOOGLE_OAUTH_CLIENT_SECRET" placeholder="your-client-secret" dir="ltr">
+                                <input type="password" id="setting-GOOGLE_OAUTH_CLIENT_SECRET" class="form-input"
+                                    data-env="GOOGLE_OAUTH_CLIENT_SECRET" placeholder="your-client-secret" dir="ltr">
                                 <small>OAuth Client Secret (למשימות)</small>
                             </div>
                             <div class="setting-item setting-item-wide">
                                 <label for="setting-GOOGLE_OAUTH_REFRESH_TOKEN">OAuth Refresh Token</label>
-                                <input type="password" id="setting-GOOGLE_OAUTH_REFRESH_TOKEN" class="form-input" data-env="GOOGLE_OAUTH_REFRESH_TOKEN" placeholder="your-refresh-token" dir="ltr">
+                                <input type="password" id="setting-GOOGLE_OAUTH_REFRESH_TOKEN" class="form-input"
+                                    data-env="GOOGLE_OAUTH_REFRESH_TOKEN" placeholder="your-refresh-token" dir="ltr">
                                 <small>OAuth Refresh Token (למשימות)</small>
                             </div>
                         </div>
@@ -516,12 +562,14 @@
                         <div class="settings-grid">
                             <div class="setting-item setting-item-wide">
                                 <label for="setting-HOME_ASSISTANT_URL">URL</label>
-                                <input type="text" id="setting-HOME_ASSISTANT_URL" class="form-input" data-env="HOME_ASSISTANT_URL" placeholder="https://ha.example.com" dir="ltr">
+                                <input type="text" id="setting-HOME_ASSISTANT_URL" class="form-input"
+                                    data-env="HOME_ASSISTANT_URL" placeholder="https://ha.example.com" dir="ltr">
                                 <small>כתובת שרת Home Assistant</small>
                             </div>
                             <div class="setting-item setting-item-wide">
                                 <label for="setting-HOME_ASSISTANT_TOKEN">Access Token</label>
-                                <input type="password" id="setting-HOME_ASSISTANT_TOKEN" class="form-input" data-env="HOME_ASSISTANT_TOKEN" placeholder="eyJ..." dir="ltr">
+                                <input type="password" id="setting-HOME_ASSISTANT_TOKEN" class="form-input"
+                                    data-env="HOME_ASSISTANT_TOKEN" placeholder="eyJ..." dir="ltr">
                                 <small>Long-Lived Access Token של Home Assistant</small>
                             </div>
                         </div>
@@ -543,7 +591,8 @@
                             </div>
                             <div class="setting-item setting-item-wide">
                                 <label for="setting-WEBHOOK_SECRET">Webhook Secret</label>
-                                <input type="password" id="setting-WEBHOOK_SECRET" class="form-input" data-env="WEBHOOK_SECRET" placeholder="your-webhook-secret" dir="ltr">
+                                <input type="password" id="setting-WEBHOOK_SECRET" class="form-input"
+                                    data-env="WEBHOOK_SECRET" placeholder="your-webhook-secret" dir="ltr">
                                 <small>מפתח אימות ל-webhooks נכנסים</small>
                             </div>
                         </div>
@@ -572,7 +621,8 @@
                             <% recentLogs.forEach(log=> { %>
                                 <div class="log-entry log-<%= log.level %>">
                                     <span class="log-time">
-                                        <%= new Date(log.timestamp).toLocaleTimeString('he-IL', { timeZone: 'Asia/Jerusalem' }) %>
+                                        <%= new Date(log.timestamp).toLocaleTimeString('he-IL', {
+                                            timeZone: 'Asia/Jerusalem' }) %>
                                     </span>
                                     <span class="log-level">
                                         <%= log.level.toUpperCase() %>
@@ -687,7 +737,8 @@
                         <h3>🔌 מכשירים זמינים ב-Home Assistant</h3>
                         <p class="panel-hint">לחץ על מכשיר כדי להוסיף אותו למיפויים.</p>
                         <div style="margin-bottom: 10px;">
-                            <input type="text" id="ha-entities-filter" class="form-input" placeholder="חפש מכשיר (למשל: light, switch, salon...)" dir="rtl">
+                            <input type="text" id="ha-entities-filter" class="form-input"
+                                placeholder="חפש מכשיר (למשל: light, switch, salon...)" dir="rtl">
                         </div>
                         <div
                             style="max-height: 400px; overflow-y: auto; background: var(--light-bg); border-radius: 8px;">
@@ -710,7 +761,8 @@
                             <button id="btn-create-backup" class="btn btn-primary btn-small">➕ צור גיבוי עכשיו</button>
                         </div>
                     </h2>
-                    <p class="panel-hint">גיבוי מלא של כל הידע, מיומנויות, מילות מפתח, מיפויי HA, תזמונים והגדרות. הגיבויים נשמרים בשרת בתיקיית <code>data/backups/</code>.</p>
+                    <p class="panel-hint">גיבוי מלא של כל הידע, מיומנויות, מילות מפתח, מיפויי HA, תזמונים והגדרות.
+                        הגיבויים נשמרים בשרת בתיקיית <code>data/backups/</code>.</p>
 
                     <!-- Backup Settings Card -->
                     <div class="settings-group" style="margin-bottom: 20px;">
@@ -719,15 +771,19 @@
                             <div class="setting-item">
                                 <label for="backup-retention">שמור גיבויים אחרונים</label>
                                 <div style="display: flex; align-items: center; gap: 10px;">
-                                    <input type="number" id="backup-retention" class="form-input" min="1" max="30" value="7" style="width: 80px;" dir="ltr">
-                                    <button id="btn-save-backup-settings" class="btn btn-secondary btn-small">שמור</button>
+                                    <input type="number" id="backup-retention" class="form-input" min="1" max="30"
+                                        value="7" style="width: 80px;" dir="ltr">
+                                    <button id="btn-save-backup-settings"
+                                        class="btn btn-secondary btn-small">שמור</button>
                                 </div>
                                 <small>גיבויים ישנים יותר יימחקו אוטומטית בכל גיבוי חדש (ברירת מחדל: 7)</small>
                             </div>
                             <div class="setting-item">
                                 <label>גיבוי אוטומטי</label>
-                                <div style="font-size: 14px; color: var(--gray); margin-top: 6px;">⏰ כל יום ב-02:00 בבוקר (שעון ישראל)</div>
-                                <small>הגיבוי האוטומטי רץ ברקע ושומר קובץ בשם <code>noga_backup_YYYY-MM-DD.json</code></small>
+                                <div style="font-size: 14px; color: var(--gray); margin-top: 6px;">⏰ כל יום ב-02:00
+                                    בבוקר (שעון ישראל)</div>
+                                <small>הגיבוי האוטומטי רץ ברקע ושומר קובץ בשם
+                                    <code>noga_backup_YYYY-MM-DD.json</code></small>
                             </div>
                         </div>
                     </div>
@@ -754,7 +810,7 @@
                 </section>
             </div>
 
-            
+
         </main>
     </div>
 
@@ -775,12 +831,14 @@
         <div class="modal-content" style="max-width: 500px; width: 90%;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                 <h2>הוספת תזכורת</h2>
-                <span class="close" onclick="closeModal('modal-reminder')" style="cursor: pointer; font-size: 24px;">&times;</span>
+                <span class="close" onclick="closeModal('modal-reminder')"
+                    style="cursor: pointer; font-size: 24px;">&times;</span>
             </div>
             <form id="form-reminder">
                 <div class="form-group" style="margin-bottom: 15px;">
                     <label style="display: block; margin-bottom: 5px;">תיאור התזכורת:</label>
-                    <input type="text" id="reminder-title" class="form-input" required placeholder="למשל: להעביר את הכביסה למייבש">
+                    <input type="text" id="reminder-title" class="form-input" required
+                        placeholder="למשל: להעביר את הכביסה למייבש">
                 </div>
                 <div class="form-group" style="margin-bottom: 15px;">
                     <label style="display: block; margin-bottom: 5px;">תאריך יעד:</label>
