@@ -639,6 +639,22 @@ class DatabaseManager {
         const stmt = this.db.prepare("SELECT * FROM reminders WHERE status = 'pending'");
         return stmt.all();
     }
+
+    /**
+     * Get all reminders (pending, done, cancelled)
+     */
+    getAllReminders() {
+        const stmt = this.db.prepare("SELECT * FROM reminders ORDER BY created_at DESC");
+        return stmt.all();
+    }
+
+    /**
+     * Delete a reminder
+     */
+    deleteReminder(id) {
+        const stmt = this.db.prepare("DELETE FROM reminders WHERE id = ?");
+        return stmt.run(id).changes > 0;
+    }
 }
 
 // Export singleton instance

@@ -1394,6 +1394,138 @@
         loadBackupSettings();
     });
 
+    // ==================== Reminders Management ====================
+
+    const remindersTbody = document.querySelector('#reminders-table tbody');
+    const formReminder = document.getElementById('form-reminder');
+
+    window.loadReminders = async () => {
+        try {
+            const res = await fetch('/api/reminders');
+            const data = await res.json();
+            if (data.success) {
+                renderReminders(data.reminders);
+            }
+        } catch (err) {
+            console.error('Failed to load reminders:', err);
+        }
+    };
+
+    function renderReminders(reminders) {
+        if (!remindersTbody) return;
+        remindersTbody.innerHTML = '';
+        if (reminders.length === 0) {
+            remindersTbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--gray);">אין תזכורות במערכת</td></tr>';
+            return;
+        }
+
+        reminders.forEach(r => {
+            const tr = document.createElement('tr');
+            
+            // Format dates
+            const dueDateObj = new Date(r.due_date);
+            const dueDateStr = isNaN(dueDateObj) ? r.due_date : dueDateObj.toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' });
+            
+            const nudgedStr = r.last_nudged ? new Date(r.last_nudged).toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' }) : '-';
+
+            // Status Badge
+            let statusHtml = '';
+            if (r.status === 'pending') statusHtml = '<span class="status-badge loading">בהמתנה</span>';
+            else if (r.status === 'done') statusHtml = '<span class="status-badge success">בוצע</span>';
+            else statusHtml = '<span class="status-badge" style="background:var(--gray)">מבוטל</span>';
+
+            tr.innerHTML = `
+                <td>${r.id}</td>
+                <td>${escapeHtml(r.title)}</td>
+                <td dir="ltr" style="text-align:right;">${dueDateStr}</td>
+                <td dir="ltr" style="text-align:right;">${nudgedStr}</td>
+                <td>${statusHtml}</td>
+                <td>
+                    <div class="action-buttons">
+                        ${r.status === 'pending' ? `<button class="btn btn-secondary btn-small" onclick="updateReminderStatus(${r.id}, 'done')">✔️ סמן כבוצע</button>` : ''}
+                        <button class="btn btn-danger-small" onclick="deleteReminder(${r.id})">🗑️ מחק</button>
+                    </div>
+                </td>
+            `;
+            remindersTbody.appendChild(tr);
+        });
+    }
+
+    window.showAddReminderModal = () => {
+        document.getElementById('form-reminder').reset();
+        
+        // Set default due date to 10 minutes from now
+        const now = new Date();
+        now.setMinutes(now.getMinutes() + 10);
+        // Format to YYYY-MM-DDThh:mm for datetime-local input
+        const tzoffset = (now.getTimezoneOffset() * 60000); 
+        const localISOTime = (new Date(now - tzoffset)).toISOString().slice(0, 16);
+        document.getElementById('reminder-dueDate').value = localISOTime;
+
+        showModal('modal-reminder');
+    };
+
+    if (formReminder) {
+        formReminder.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const title = document.getElementById('reminder-title').value;
+            const dueDate = document.getElementById('reminder-dueDate').value; // already local ISO
+            const nudgeInterval = document.getElementById('reminder-interval').value;
+
+            try {
+                const res = await fetch('/api/reminders', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        title, 
+                        dueDate: new Date(dueDate).toISOString(), 
+                        nudgeIntervalMinutes: parseInt(nudgeInterval) 
+                    })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    closeModal('modal-reminder');
+                    loadReminders();
+                } else {
+                    alert('שגיאה בהוספת תזכורת: ' + data.error);
+                }
+            } catch (err) {
+                console.error(err);
+                alert('שגיאת תקשורת');
+            }
+        });
+    }
+
+    window.updateReminderStatus = async (id, status) => {
+        try {
+            const res = await fetch(\`/api/reminders/\${id}/status\`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status })
+            });
+            if (res.ok) {
+                loadReminders();
+            }
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
+    window.deleteReminder = async (id) => {
+        if (!confirm('האם למחוק תזכורת זו?')) return;
+        try {
+            const res = await fetch(\`/api/reminders/\${id}\`, { method: 'DELETE' });
+            if (res.ok) {
+                loadReminders();
+            }
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
+    // Load reminders when tab is clicked
+    document.querySelector('[data-tab="tab-reminders"]')?.addEventListener('click', loadReminders);
+
     // ==================== Initialization ====================
 
     let usdToIlsRate = 3.65; // Fallback rate
@@ -1419,6 +1551,7 @@
     skillsController.loadFiles();
     loadKeywords();
     loadSchedules();
+    loadReminders();
     loadSettings();
     loadHaMappings();
     loadBackups();
