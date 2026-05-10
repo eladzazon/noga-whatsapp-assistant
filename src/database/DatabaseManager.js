@@ -71,6 +71,20 @@ class DatabaseManager {
             );
         `);
 
+        // Migration: Create reminders table if missing
+        this.db.exec(`
+            CREATE TABLE IF NOT EXISTS reminders (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                due_date DATETIME NOT NULL,
+                last_nudged DATETIME,
+                nudge_interval_minutes INTEGER DEFAULT 60,
+                status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'done', 'cancelled')),
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            );
+        `);
+
         console.log('[Database] Initialized successfully');
         return this;
     }
@@ -578,6 +592,52 @@ class DatabaseManager {
                 cost: month.cost || 0
             }
         };
+    }
+
+    // ==================== Reminders ====================
+
+    /**
+     * Add a new reminder
+     * @param {string} title 
+     * @param {string} dueDate (ISO string or datetime)
+     * @param {number} nudgeIntervalMinutes 
+     */
+    addReminder(title, dueDate, nudgeIntervalMinutes = 60) {
+        const stmt = this.db.prepare('INSERT INTO reminders (title, due_date, nudge_interval_minutes) VALUES (?, ?, ?)');
+        const result = stmt.run(title, dueDate, nudgeIntervalMinutes);
+        return result.lastInsertRowid;
+    }
+
+    /**
+     * Update the status of a reminder
+     */
+    updateReminderStatus(id, status) {
+        const stmt = this.db.prepare("UPDATE reminders SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+        return stmt.run(status, id).changes > 0;
+    }
+
+    /**
+     * Update the due date of a reminder (also sets status back to pending)
+     */
+    updateReminderDueDate(id, dueDate) {
+        const stmt = this.db.prepare("UPDATE reminders SET due_date = ?, status = 'pending', updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+        return stmt.run(dueDate, id).changes > 0;
+    }
+
+    /**
+     * Update the last_nudged timestamp
+     */
+    updateReminderLastNudged(id) {
+        const stmt = this.db.prepare("UPDATE reminders SET last_nudged = CURRENT_TIMESTAMP WHERE id = ?");
+        return stmt.run(id).changes > 0;
+    }
+
+    /**
+     * Get all pending reminders
+     */
+    getPendingReminders() {
+        const stmt = this.db.prepare("SELECT * FROM reminders WHERE status = 'pending'");
+        return stmt.all();
     }
 }
 

@@ -20,6 +20,7 @@ class SchedulerManager {
         logger.info('Initializing Scheduler Manager...');
         this.reload();
         this._scheduleAutomatedBackup();
+        this._scheduleReminderNudger();
         return this;
     }
 
@@ -173,6 +174,63 @@ class SchedulerManager {
         }, { scheduled: true, timezone: 'Asia/Jerusalem' });
 
         logger.info('Automated daily backup scheduled at 02:00 AM (Asia/Jerusalem) → saves to data/backups/');
+    }
+
+    /**
+     * Schedule a task that checks for pending reminders every minute
+     */
+    _scheduleReminderNudger() {
+        cron.schedule('* * * * *', async () => {
+            try {
+                if (!config.whatsapp.groupId) return;
+
+                const { default: whatsappManager } = await import('./WhatsAppManager.js');
+                if (!whatsappManager.isReady) return;
+
+                const reminders = db.getPendingReminders();
+                const now = new Date();
+
+                for (const reminder of reminders) {
+                    const dueDate = new Date(reminder.due_date);
+                    if (now < dueDate) continue; // Not due yet
+
+                    let shouldNudge = false;
+                    if (!reminder.last_nudged) {
+                        shouldNudge = true; // Never nudged
+                    } else {
+                        const lastNudgedDate = new Date(reminder.last_nudged);
+                        const minutesSinceLastNudge = (now - lastNudgedDate) / (1000 * 60);
+                        if (minutesSinceLastNudge >= reminder.nudge_interval_minutes) {
+                            shouldNudge = true;
+                        }
+                    }
+
+                    if (shouldNudge) {
+                        // We found a reminder that needs a nudge
+                        const prompt = `System Event: Reminder Nudge
+You need to remind the user about this pending task: "${reminder.title}"
+The task was originally due on: ${dueDate.toLocaleString('en-US', { timeZone: 'Asia/Jerusalem' })}
+Keep it short, friendly, and nudging. Use emojis. Respond in Hebrew.
+Ask if they have completed it yet. If not, remind them they can reply "עשיתי" to mark it done, or snooze it.
+DO NOT use the send_whatsapp_message tool. Just return the text.`;
+
+                        const response = await this.geminiManager.processMessage(
+                            'system_scheduler',
+                            prompt,
+                            { keepHistory: false }
+                        );
+
+                        if (response && response.trim()) {
+                            await whatsappManager.sendMessage(config.whatsapp.groupId, response);
+                            db.updateReminderLastNudged(reminder.id);
+                            logger.info(`Sent nudge for reminder ${reminder.id}`);
+                        }
+                    }
+                }
+            } catch (err) {
+                logger.error('Failed to run reminder nudger', { error: err.message });
+            }
+        });
     }
 }
 

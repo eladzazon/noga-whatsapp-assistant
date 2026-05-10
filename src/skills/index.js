@@ -68,6 +68,54 @@ export const functionDeclarations = [
         }
     },
 
+            required: ['title', 'date']
+        }
+    },
+
+    // ==================== Reminders ====================
+    {
+        name: 'add_reminder',
+        description: 'הוסף תזכורת או משימה שיש לבצע (To-Do). Noga will nudge the user until it is done. Add a new reminder.',
+        parameters: {
+            type: 'object',
+            properties: {
+                title: { type: 'string', description: 'תיאור התזכורת. Task description.' },
+                due_date_iso: { type: 'string', description: 'מתי להזכיר לראשונה (פורמט ISO Date string). Due date in ISO string format.' },
+                nudge_interval_minutes: { type: 'number', description: 'תדירות תזכורות חוזרות בדקות. ברירת מחדל 60.' }
+            },
+            required: ['title', 'due_date_iso']
+        }
+    },
+    {
+        name: 'get_pending_reminders',
+        description: 'הצג את כל התזכורות והמשימות שממתינות לביצוע. Get all pending reminders.',
+        parameters: { type: 'object', properties: {} }
+    },
+    {
+        name: 'update_reminder_status',
+        description: 'עדכן סטטוס של תזכורת (לסמן כבוצע או מבוטל). Mark reminder as done or cancelled.',
+        parameters: {
+            type: 'object',
+            properties: {
+                id: { type: 'number', description: 'מזהה התזכורת. Reminder ID.' },
+                status: { type: 'string', description: 'סטטוס חדש: "done" או "cancelled".' }
+            },
+            required: ['id', 'status']
+        }
+    },
+    {
+        name: 'snooze_reminder',
+        description: 'דחה תזכורת קיימת לזמן מאוחר יותר. Snooze a reminder.',
+        parameters: {
+            type: 'object',
+            properties: {
+                id: { type: 'number', description: 'מזהה התזכורת. Reminder ID.' },
+                new_due_date_iso: { type: 'string', description: 'תאריך ושעה חדשים לתזכורת (פורמט ISO Date string).' }
+            },
+            required: ['id', 'new_due_date_iso']
+        }
+    },
+
     // ==================== Shopping List Functions Removed (Now a Skill) ====================
 
     // ==================== Memory/Agentic Functions ====================
@@ -302,6 +350,31 @@ export const functionHandlers = {
             args.duration_minutes || 60,
             args.description || ''
         );
+    },
+
+    // ==================== Reminder Handlers ====================
+    add_reminder: async (args) => {
+        logger.info('Executing: add_reminder', args);
+        const id = db.addReminder(args.title, args.due_date_iso, args.nudge_interval_minutes || 60);
+        return { success: true, reminder_id: id, message: `Reminder added successfully.` };
+    },
+
+    get_pending_reminders: async () => {
+        logger.info('Executing: get_pending_reminders');
+        const reminders = db.getPendingReminders();
+        return { success: true, count: reminders.length, reminders };
+    },
+
+    update_reminder_status: async (args) => {
+        logger.info('Executing: update_reminder_status', args);
+        const success = db.updateReminderStatus(args.id, args.status);
+        return { success, message: success ? `Reminder marked as ${args.status}` : 'Reminder not found' };
+    },
+
+    snooze_reminder: async (args) => {
+        logger.info('Executing: snooze_reminder', args);
+        const success = db.updateReminderDueDate(args.id, args.new_due_date_iso);
+        return { success, message: success ? 'Reminder snoozed' : 'Reminder not found' };
     },
 
     // ==================== Shopping List Handlers Removed (Now a Skill) ====================
