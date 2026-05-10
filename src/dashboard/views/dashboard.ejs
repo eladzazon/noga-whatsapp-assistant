@@ -661,8 +661,11 @@
                         style="display: none; margin-top: 30px; border-top: 1px solid var(--border); padding-top: 20px;">
                         <h3>🔌 מכשירים זמינים ב-Home Assistant</h3>
                         <p class="panel-hint">לחץ על מכשיר כדי להוסיף אותו למיפויים.</p>
+                        <div style="margin-bottom: 10px;">
+                            <input type="text" id="ha-entities-filter" class="form-input" placeholder="חפש מכשיר (למשל: light, switch, salon...)" dir="rtl">
+                        </div>
                         <div
-                            style="max-height: 400px; overflow-y: auto; background: var(--light-bg); border-radius: 8px; margin-top: 10px;">
+                            style="max-height: 400px; overflow-y: auto; background: var(--light-bg); border-radius: 8px;">
                             <table class="keywords-table">
                                 <tbody id="ha-entities-tbody">
                                     <!-- Populated via JS -->

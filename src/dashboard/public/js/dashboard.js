@@ -113,6 +113,9 @@
     const haMappingsTbody = document.getElementById('ha-mappings-tbody');
     const haDiscoverySection = document.getElementById('ha-discovery-section');
     const haEntitiesTbody = document.getElementById('ha-entities-tbody');
+    const haEntitiesFilter = document.getElementById('ha-entities-filter');
+
+    let allHaEntities = []; // Cache for filtering
 
     // ==================== Tab Navigation ====================
 
@@ -511,23 +514,39 @@
                 return;
             }
 
-            if (!data.entities || data.entities.length === 0) {
-                if (haEntitiesTbody) haEntitiesTbody.innerHTML = '<tr><td style="text-align: center; padding: 20px;">לא נמצאו מכשירים.</td></tr>';
-                return;
-            }
-
-            if (haEntitiesTbody) {
-                haEntitiesTbody.innerHTML = data.entities.map(e => `
-                    <tr style="cursor: pointer; hover: background: rgba(0,0,0,0.05);" onclick="window._selectHaEntity('${escapeAttr(e.id)}', '${escapeAttr(e.name)}', '${e.type}')">
-                        <td dir="ltr" style="font-size: 11px; width: 40%; color: var(--gray);">${escapeHtml(e.id)}</td>
-                        <td style="width: 50%;"><strong>${escapeHtml(e.name)}</strong></td>
-                        <td style="width: 10%; text-align: left;"><span class="type-badge">${escapeHtml(e.type)}</span></td>
-                    </tr>
-                `).join('');
-            }
+            allHaEntities = data.entities || [];
+            renderHaEntitiesList(allHaEntities);
         } catch (err) {
             if (haEntitiesTbody) haEntitiesTbody.innerHTML = '<tr><td style="text-align: center; padding: 20px; color: var(--danger);">שגיאה בתקשורת מול השרת</td></tr>';
         }
+    }
+
+    function renderHaEntitiesList(entities) {
+        if (!haEntitiesTbody) return;
+        
+        if (entities.length === 0) {
+            haEntitiesTbody.innerHTML = '<tr><td style="text-align: center; padding: 20px;">לא נמצאו מכשירים.</td></tr>';
+            return;
+        }
+
+        haEntitiesTbody.innerHTML = entities.map(e => `
+            <tr style="cursor: pointer; hover: background: rgba(0,0,0,0.05);" onclick="window._selectHaEntity('${escapeAttr(e.id)}', '${escapeAttr(e.name)}', '${e.type}')">
+                <td dir="ltr" style="font-size: 11px; width: 40%; color: var(--gray);">${escapeHtml(e.id)}</td>
+                <td style="width: 50%;"><strong>${escapeHtml(e.name)}</strong></td>
+                <td style="width: 10%; text-align: left;"><span class="type-badge">${escapeHtml(e.type)}</span></td>
+            </tr>
+        `).join('');
+    }
+
+    if (haEntitiesFilter) {
+        haEntitiesFilter.addEventListener('input', (e) => {
+            const query = e.target.value.toLowerCase();
+            const filtered = allHaEntities.filter(ent => 
+                ent.id.toLowerCase().includes(query) || 
+                ent.name.toLowerCase().includes(query)
+            );
+            renderHaEntitiesList(filtered);
+        });
     }
 
     function showHaMappingForm(id = '', entityId = '', nickname = '', location = '', type = 'light') {
