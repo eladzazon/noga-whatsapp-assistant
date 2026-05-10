@@ -1420,14 +1420,36 @@
     function renderReminders(reminders) {
         if (!remindersTbody) return;
         if (reminders.length === 0) {
-            remindersTbody.innerHTML = '<tr class="empty-row"><td colspan="5">\u05d0\u05d9\u05df \u05ea\u05d6\u05db\u05d5\u05e8\u05d5\u05ea. \u05dc\u05d7\u05e6\u05d5 \"\u05d4\u05d5\u05e1\u05e3\" \u05db\u05d3\u05d9 \u05dc\u05d4\u05ea\u05d7\u05d9\u05dc.</td></tr>';
+            remindersTbody.innerHTML = '<tr class="empty-row"><td colspan="6">\u05d0\u05d9\u05df \u05ea\u05d6\u05db\u05d5\u05e8\u05d5\u05ea. \u05dc\u05d7\u05e6\u05d5 \"\u05d4\u05d5\u05e1\u05e3\" \u05db\u05d3\u05d9 \u05dc\u05d4\u05ea\u05d7\u05d9\u05dc.</td></tr>';
             return;
         }
         remindersTbody.innerHTML = reminders.map(r => {
-            const dueDateStr = r.due_date ? new Date(r.due_date).toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' }) : '-';
+            const now = new Date();
+            const dueDate = new Date(r.due_date);
+            const dueDateStr = r.due_date ? dueDate.toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' }) : '-';
             const nudgedStr = r.last_nudged ? new Date(r.last_nudged).toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' }) : '-';
 
-            const isOverdue = r.status === 'pending' && new Date(r.due_date) < new Date();
+            // Calculate Next Nudge
+            let nextNudgeStr = '-';
+            if (r.status === 'pending') {
+                if (now < dueDate) {
+                    // First nudge at due date
+                    nextNudgeStr = dueDate.toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' });
+                } else {
+                    // Already overdue
+                    if (!r.last_nudged) {
+                        nextNudgeStr = 'מיידי (בדקה הקרובה)';
+                    } else {
+                        const nextNudgeDate = new Date(new Date(r.last_nudged).getTime() + (r.nudge_interval_minutes * 60000));
+                        nextNudgeStr = nextNudgeDate.toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' });
+                        if (nextNudgeDate < now) {
+                             nextNudgeStr = 'מיידי (בדקה הקרובה)';
+                        }
+                    }
+                }
+            }
+
+            const isOverdue = r.status === 'pending' && dueDate < now;
             let statusHtml;
             if (r.status === 'done') statusHtml = '<span class="kw-type ai">\u05d1\u05d5\u05e6\u05e2</span>';
             else if (r.status === 'cancelled') statusHtml = '<span class="kw-type">\u05de\u05d1\u05d5\u05d8\u05dc</span>';
@@ -1439,6 +1461,7 @@
                 <td class="kw-keyword"><strong>${escapeHtml(r.title)}</strong><br><small style="color:var(--gray)">נדנוד כל ${r.nudge_interval_minutes} דק'</small></td>
                 <td><code dir="ltr" style="background:var(--light-bg);padding:2px 6px;border-radius:4px;">${dueDateStr}</code></td>
                 <td>${nudgedStr}</td>
+                <td><code dir="ltr" style="background:var(--light-bg);padding:2px 6px;border-radius:4px;">${nextNudgeStr}</code></td>
                 <td>${statusHtml}</td>
                 <td class="kw-actions">
                     ${r.status === 'pending' ? `<button class="btn btn-small btn-action" onclick="window._markReminderDone(${r.id})" title="\u05e1\u05de\u05df \u05db\u05d1\u05d5\u05e6\u05e2">\u2714\ufe0f</button>` : ''}
