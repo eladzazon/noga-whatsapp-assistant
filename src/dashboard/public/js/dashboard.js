@@ -1498,7 +1498,7 @@
 
     window.updateReminderStatus = async (id, status) => {
         try {
-            const res = await fetch(\`/api/reminders/\${id}/status\`, {
+            const res = await fetch(`/api/reminders/${id}/status`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ status })
@@ -1514,7 +1514,7 @@
     window.deleteReminder = async (id) => {
         if (!confirm('האם למחוק תזכורת זו?')) return;
         try {
-            const res = await fetch(\`/api/reminders/\${id}\`, { method: 'DELETE' });
+            const res = await fetch(`/api/reminders/${id}`, { method: 'DELETE' });
             if (res.ok) {
                 loadReminders();
             }
