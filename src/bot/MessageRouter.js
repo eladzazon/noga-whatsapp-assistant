@@ -104,46 +104,47 @@ class MessageRouter {
      * Handle text messages
      */
     async handleTextMessage(message) {
-        const { from, body, isGroup } = message;
+        const { from, body } = message;
 
         logger.info('Processing text message', { from, preview: body.substring(0, 50) });
 
+        return await this.processText(from, body, message);
+    }
+
+    /**
+     * Core text processing logic - shared between WhatsApp and Dashboard
+     * @param {string} userId - ID for context tracking
+     * @param {string} text - The input text
+     * @param {Object} message - (Optional) The original WhatsApp message object
+     */
+    async processText(userId, text, message = null) {
         // Check for keyword match before sending to Gemini
-        const keywordMatch = db.getKeywordByText(body.trim());
+        const keywordMatch = db.getKeywordByText(text.trim());
         if (keywordMatch) {
-            logger.info('Keyword matched', { from, keyword: keywordMatch.keyword, type: keywordMatch.type });
+            logger.info('Keyword matched', { from: userId, keyword: keywordMatch.keyword, type: keywordMatch.type });
 
             if (keywordMatch.type === 'ai') {
-                try {
-                    await whatsappManager.reactToMessage(message.key, '🤖');
-                } catch {
-                    // Ignore reaction errors
+                if (message) {
+                    try { await whatsappManager.reactToMessage(message.key, '🤖'); } catch (e) {}
                 }
-                const augmentedMessage = `[Custom Instructions: ${keywordMatch.response}]\n\nUser message: ${body}`;
-                const response = await geminiManager.processMessage(from, augmentedMessage, { keepHistory: true });
-                return response;
+                const augmentedMessage = `[Custom Instructions: ${keywordMatch.response}]\n\nUser message: ${text}`;
+                return await geminiManager.processMessage(userId, augmentedMessage, { keepHistory: true });
             }
 
             // Static keyword: return the response directly
-            try {
-                await whatsappManager.reactToMessage(message.key, '⚡');
-            } catch {
-                // Ignore reaction errors
+            if (message) {
+                try { await whatsappManager.reactToMessage(message.key, '⚡'); } catch (e) {}
             }
             return keywordMatch.response;
         }
 
-        // React to show we received the message
-        try {
-            await whatsappManager.reactToMessage(message.key, '🤖');
-        } catch {
-            // Ignore reaction errors
+        // React to show we received the message (WhatsApp only)
+        if (message) {
+            try { await whatsappManager.reactToMessage(message.key, '🤖'); } catch (e) {}
         }
 
         // Process with Gemini, passing message context
-        const response = await geminiManager.processMessage(from, body, { message });
-
-        return response;
+        return await geminiManager.processMessage(userId, text, { message });
     }
 
     /**

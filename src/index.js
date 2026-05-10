@@ -80,7 +80,7 @@ async function main() {
         );
 
         // Set manager references for dashboard API routes
-        dashboardServer.setManagers(geminiManager, db);
+        dashboardServer.setManagers(geminiManager, db, messageRouter);
 
         // Start dashboard server
         dashboardServer.start();

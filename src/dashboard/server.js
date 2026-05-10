@@ -27,6 +27,7 @@ class DashboardServer {
         this.io = null;
         this.qrCode = null;
         this.geminiManager = null;
+        this.messageRouter = null;
     }
 
     /**
@@ -1182,14 +1183,14 @@ class DashboardServer {
 
             // Dashboard Chat: Receive message from dashboard
             socket.on('dashboard_message', async (text) => {
-                if (!this.geminiManager) {
+                if (!this.messageRouter) {
                     return socket.emit('dashboard_response', { 
-                        error: 'Gemini Manager not initialized' 
+                        error: 'Message Router not initialized' 
                     });
                 }
 
                 try {
-                    const response = await this.geminiManager.processMessage('dashboard_admin', text);
+                    const response = await this.messageRouter.processText('dashboard_admin', text);
                     socket.emit('dashboard_response', { text: response });
                 } catch (err) {
                     socket.emit('dashboard_response', { error: err.message });
@@ -1280,9 +1281,10 @@ class DashboardServer {
     /**
      * Set manager references for API routes
      */
-    setManagers(geminiManager, db) {
+    setManagers(geminiManager, db, messageRouter) {
         this.geminiManager = geminiManager;
-        db = db;
+        this.db = db;
+        this.messageRouter = messageRouter;
     }
 
     /**

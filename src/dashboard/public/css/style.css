@@ -141,7 +141,7 @@ body {
 }
 
 .tab-btn {
-    padding: 8px 18px;
+    padding: 8px 14px;
     border: 2px solid var(--gray-light);
     background: var(--white);
     color: var(--gray);
