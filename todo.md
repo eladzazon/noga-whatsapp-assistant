@@ -57,6 +57,8 @@
 - [ ] **Reminder Cronjobs**: Implement scheduled jobs to send daily/weekly birthday and event summaries via WhatsApp.
 - [ ] **Nudge Expiration**: Automatically stop nudging or mark as "expired" if a reminder has been nudged more than 10 times without response.
 - [ ] **Backup & Restore Extension**: Include the `reminders` table in the automated daily backups and restore logic and the dashboard backup and restore logic.
+- [x] **Reminder Nudge Updates**: Added instructions for Noga to tell users they can mark a reminder as done by reacting with a "Like" (👍) emoji.
+- [ ] **Next Nudge Field**: Add "נדנוד הבא" column to the admin panel reminders table.
 
 ## ⚡ Performance & Optimization
 - [ ] **Dynamic Model Switching**: Implement logic in the message router to detect request complexity:

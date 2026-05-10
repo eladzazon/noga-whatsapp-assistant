@@ -219,7 +219,7 @@ class SchedulerManager {
                             data: {
                                 task: reminder.title,
                                 due: dueDate.toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' }),
-                                instruction: 'Send a short, friendly, nudging Hebrew WhatsApp message. Use emojis. Ask if they completed it. Remind them they can reply "עשיתי" to mark it done or ask to snooze it.'
+                                instruction: 'Send a short, friendly, nudging Hebrew WhatsApp message. Use emojis. Ask if they completed it. Mention they can mark it as done by reacting with a Like (👍) to this message, or by replying "עשיתי". They can also ask to snooze it.'
                             }
                         };
 
