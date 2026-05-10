@@ -1436,17 +1436,27 @@
 
             return `
             <tr data-id="${r.id}">
-                <td class="kw-keyword"><strong>${escapeHtml(r.title)}</strong></td>
+                <td class="kw-keyword"><strong>${escapeHtml(r.title)}</strong><br><small style="color:var(--gray)">נדנוד כל ${r.nudge_interval_minutes} דק'</small></td>
                 <td><code dir="ltr" style="background:var(--light-bg);padding:2px 6px;border-radius:4px;">${dueDateStr}</code></td>
                 <td>${nudgedStr}</td>
                 <td>${statusHtml}</td>
                 <td class="kw-actions">
                     ${r.status === 'pending' ? `<button class="btn btn-small btn-action" onclick="window._markReminderDone(${r.id})" title="\u05e1\u05de\u05df \u05db\u05d1\u05d5\u05e6\u05e2">\u2714\ufe0f</button>` : ''}
+                    <button class="btn btn-small btn-action" onclick="window._editReminder(${r.id}, '${escapeAttr(r.title)}', '${r.due_date}', ${r.nudge_interval_minutes})" title="ערוך">✏️</button>
                     <button class="btn btn-small btn-action btn-danger-action" onclick="window._deleteReminder(${r.id})" title="\u05de\u05d7\u05e7">\ud83d\uddd1\ufe0f</button>
                 </td>
             </tr>`;
         }).join('');
     }
+
+    window._editReminder = function(id, title, dueDate, interval) {
+        // Convert ISO date to local datetime-local format
+        const date = new Date(dueDate);
+        const tzoffset = (date.getTimezoneOffset() * 60000); 
+        const localISOTime = (new Date(date - tzoffset)).toISOString().slice(0, 16);
+        
+        showReminderForm(id, title, localISOTime, interval);
+    };
 
     function showReminderForm(id = '', title = '', dueDate = '', interval = 60) {
         reminderEditId.value = id;
@@ -1479,6 +1489,7 @@
 
     if (reminderSaveBtn) {
         reminderSaveBtn.addEventListener('click', async () => {
+            const id = reminderEditId.value;
             const title = reminderTitle.value.trim();
             const dueDate = reminderDueDate.value;
             const interval = parseInt(reminderInterval.value) || 60;
@@ -1487,13 +1498,16 @@
 
             reminderSaveBtn.disabled = true;
             try {
-                const res = await fetch('/api/reminders', {
-                    method: 'POST',
+                const method = id ? 'PUT' : 'POST';
+                const url = id ? `/api/reminders/${id}` : '/api/reminders';
+                
+                const res = await fetch(url, {
+                    method,
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ title, dueDate: new Date(dueDate).toISOString(), nudgeIntervalMinutes: interval })
                 });
                 const data = await res.json();
-                if (data.success) { hideReminderForm(); loadReminders(); }
+                if (data.success || data.id) { hideReminderForm(); loadReminders(); }
                 else alert(data.error || '\u05e9\u05d2\u05d9\u05d0\u05d4 \u05d1\u05e9\u05de\u05d9\u05e8\u05ea \u05ea\u05d6\u05db\u05d5\u05e8\u05ea');
             } catch { alert('\u05e9\u05d2\u05d9\u05d0\u05ea \u05ea\u05e7\u05e9\u05d5\u05e8\u05ea'); }
             finally { reminderSaveBtn.disabled = false; }

@@ -449,7 +449,7 @@ class DatabaseManager {
      * Delete a scheduled prompt
      */
     deleteScheduledPrompt(id) {
-        const stmt = this.db.prepare('DELETE FROM scheduled_prompts WHERE id ?');
+        const stmt = this.db.prepare('DELETE FROM scheduled_prompts WHERE id = ?');
         stmt.run(id);
     }
 
@@ -646,6 +646,14 @@ class DatabaseManager {
     getAllReminders() {
         const stmt = this.db.prepare("SELECT * FROM reminders ORDER BY created_at DESC");
         return stmt.all();
+    }
+
+    /**
+     * Update a reminder's core details
+     */
+    updateReminder(id, title, dueDate, nudgeInterval) {
+        const stmt = this.db.prepare("UPDATE reminders SET title = ?, due_date = ?, nudge_interval_minutes = ? WHERE id = ?");
+        return stmt.run(title, dueDate, nudgeInterval, id).changes > 0;
     }
 
     /**

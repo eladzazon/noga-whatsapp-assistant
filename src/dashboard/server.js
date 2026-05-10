@@ -640,6 +640,22 @@ class DashboardServer {
             }
         });
 
+        // Update reminder details
+        this.app.put('/api/reminders/:id', requireAuth, (req, res) => {
+            const { id } = req.params;
+            const { title, dueDate, nudgeIntervalMinutes } = req.body;
+            if (!title || !dueDate) {
+                return res.status(400).json({ error: 'Title and due date are required' });
+            }
+            if (!db) return res.status(500).json({ error: 'DB not initialized' });
+            try {
+                db.updateReminder(parseInt(id), title, dueDate, nudgeIntervalMinutes || 60);
+                res.json({ success: true });
+            } catch (err) {
+                res.status(500).json({ error: err.message });
+            }
+        });
+
         // Update reminder status
         this.app.put('/api/reminders/:id/status', requireAuth, (req, res) => {
             const { id } = req.params;
