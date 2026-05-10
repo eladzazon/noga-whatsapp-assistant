@@ -206,24 +206,22 @@ class SchedulerManager {
                     }
 
                     if (shouldNudge) {
-                        // We found a reminder that needs a nudge
-                        const prompt = `System Event: Reminder Nudge
-You need to remind the user about this pending task: "${reminder.title}"
-The task was originally due on: ${dueDate.toLocaleString('en-US', { timeZone: 'Asia/Jerusalem' })}
-Keep it short, friendly, and nudging. Use emojis. Respond in Hebrew.
-Ask if they have completed it yet. If not, remind them they can reply "עשיתי" to mark it done, or snooze it.
-DO NOT use the send_whatsapp_message tool. Just return the text.`;
+                        // Use the tool-less broadcast model so we always get plain text back
+                        const eventData = {
+                            event: `Reminder Nudge: "${reminder.title}"`,
+                            data: {
+                                task: reminder.title,
+                                due: dueDate.toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' }),
+                                instruction: 'Send a short, friendly, nudging Hebrew WhatsApp message. Use emojis. Ask if they completed it. Remind them they can reply "עשיתי" to mark it done or ask to snooze it.'
+                            }
+                        };
 
-                        const response = await this.geminiManager.processMessage(
-                            'system_scheduler',
-                            prompt,
-                            { keepHistory: false }
-                        );
+                        const response = await this.geminiManager.generateBroadcastMessage(eventData);
 
                         if (response && response.trim()) {
                             await whatsappManager.sendMessage(config.whatsapp.groupId, response);
                             db.updateReminderLastNudged(reminder.id);
-                            logger.info(`Sent nudge for reminder ${reminder.id}`);
+                            logger.info(`Sent nudge for reminder ${reminder.id}: "${reminder.title}"`);
                         }
                     }
                 }

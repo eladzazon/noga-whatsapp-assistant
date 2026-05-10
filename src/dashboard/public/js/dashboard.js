@@ -1396,135 +1396,132 @@
 
     // ==================== Reminders Management ====================
 
-    const remindersTbody = document.querySelector('#reminders-table tbody');
-    const formReminder = document.getElementById('form-reminder');
+    const remindersTbody = document.getElementById('reminders-tbody');
+    const reminderForm = document.getElementById('reminder-form');
+    const reminderEditId = document.getElementById('reminder-edit-id');
+    const reminderTitle = document.getElementById('reminder-title');
+    const reminderDueDate = document.getElementById('reminder-dueDate');
+    const reminderInterval = document.getElementById('reminder-interval');
+    const reminderSaveBtn = document.getElementById('reminder-save');
+    const reminderCancelBtn = document.getElementById('reminder-cancel');
+    const addReminderBtn = document.getElementById('add-reminder-btn');
 
-    window.loadReminders = async () => {
+    async function loadReminders() {
         try {
             const res = await fetch('/api/reminders');
             const data = await res.json();
-            if (data.success) {
-                renderReminders(data.reminders);
-            }
+            if (data.success) renderReminders(data.reminders);
         } catch (err) {
             console.error('Failed to load reminders:', err);
+            if (remindersTbody) remindersTbody.innerHTML = '<tr class="empty-row"><td colspan="5">\u05e9\u05d2\u05d9\u05d0\u05d4 \u05d1\u05d8\u05e2\u05d9\u05e0\u05ea \u05ea\u05d6\u05db\u05d5\u05e8\u05d5\u05ea</td></tr>';
         }
-    };
+    }
 
     function renderReminders(reminders) {
         if (!remindersTbody) return;
-        remindersTbody.innerHTML = '';
         if (reminders.length === 0) {
-            remindersTbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--gray);">אין תזכורות במערכת</td></tr>';
+            remindersTbody.innerHTML = '<tr class="empty-row"><td colspan="5">\u05d0\u05d9\u05df \u05ea\u05d6\u05db\u05d5\u05e8\u05d5\u05ea. \u05dc\u05d7\u05e6\u05d5 \"\u05d4\u05d5\u05e1\u05e3\" \u05db\u05d3\u05d9 \u05dc\u05d4\u05ea\u05d7\u05d9\u05dc.</td></tr>';
             return;
         }
-
-        reminders.forEach(r => {
-            const tr = document.createElement('tr');
-            
-            // Format dates
-            const dueDateObj = new Date(r.due_date);
-            const dueDateStr = isNaN(dueDateObj) ? r.due_date : dueDateObj.toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' });
-            
+        remindersTbody.innerHTML = reminders.map(r => {
+            const dueDateStr = r.due_date ? new Date(r.due_date).toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' }) : '-';
             const nudgedStr = r.last_nudged ? new Date(r.last_nudged).toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' }) : '-';
 
-            // Status Badge
-            let statusHtml = '';
-            if (r.status === 'pending') statusHtml = '<span class="status-badge loading">בהמתנה</span>';
-            else if (r.status === 'done') statusHtml = '<span class="status-badge success">בוצע</span>';
-            else statusHtml = '<span class="status-badge" style="background:var(--gray)">מבוטל</span>';
+            const isOverdue = r.status === 'pending' && new Date(r.due_date) < new Date();
+            let statusHtml;
+            if (r.status === 'done') statusHtml = '<span class="kw-type ai">\u05d1\u05d5\u05e6\u05e2</span>';
+            else if (r.status === 'cancelled') statusHtml = '<span class="kw-type">\u05de\u05d1\u05d5\u05d8\u05dc</span>';
+            else if (isOverdue) statusHtml = '<span class="kw-type" style="background:var(--danger);color:#fff;">\u05de\u05e2\u05d5\u05db\u05d1!</span>';
+            else statusHtml = '<span class="kw-type" style="background:var(--primary);color:#fff;">\u05d1\u05d4\u05de\u05ea\u05e0\u05d4</span>';
 
-            tr.innerHTML = `
-                <td>${r.id}</td>
-                <td>${escapeHtml(r.title)}</td>
-                <td dir="ltr" style="text-align:right;">${dueDateStr}</td>
-                <td dir="ltr" style="text-align:right;">${nudgedStr}</td>
+            return `
+            <tr data-id="${r.id}">
+                <td class="kw-keyword"><strong>${escapeHtml(r.title)}</strong></td>
+                <td><code dir="ltr" style="background:var(--light-bg);padding:2px 6px;border-radius:4px;">${dueDateStr}</code></td>
+                <td>${nudgedStr}</td>
                 <td>${statusHtml}</td>
-                <td>
-                    <div class="action-buttons">
-                        ${r.status === 'pending' ? `<button class="btn btn-secondary btn-small" onclick="updateReminderStatus(${r.id}, 'done')">✔️ סמן כבוצע</button>` : ''}
-                        <button class="btn btn-danger-small" onclick="deleteReminder(${r.id})">🗑️ מחק</button>
-                    </div>
+                <td class="kw-actions">
+                    ${r.status === 'pending' ? `<button class="btn btn-small btn-action" onclick="window._markReminderDone(${r.id})" title="\u05e1\u05de\u05df \u05db\u05d1\u05d5\u05e6\u05e2">\u2714\ufe0f</button>` : ''}
+                    <button class="btn btn-small btn-action btn-danger-action" onclick="window._deleteReminder(${r.id})" title="\u05de\u05d7\u05e7">\ud83d\uddd1\ufe0f</button>
                 </td>
-            `;
-            remindersTbody.appendChild(tr);
-        });
+            </tr>`;
+        }).join('');
     }
 
-    window.showAddReminderModal = () => {
-        document.getElementById('form-reminder').reset();
-        
-        // Set default due date to 10 minutes from now
-        const now = new Date();
-        now.setMinutes(now.getMinutes() + 10);
-        // Format to YYYY-MM-DDThh:mm for datetime-local input
-        const tzoffset = (now.getTimezoneOffset() * 60000); 
-        const localISOTime = (new Date(now - tzoffset)).toISOString().slice(0, 16);
-        document.getElementById('reminder-dueDate').value = localISOTime;
+    function showReminderForm(id = '', title = '', dueDate = '', interval = 60) {
+        reminderEditId.value = id;
+        reminderTitle.value = title;
+        reminderInterval.value = interval;
 
-        showModal('modal-reminder');
-    };
+        // Default due date to 1hr from now if not editing
+        if (dueDate) {
+            reminderDueDate.value = dueDate;
+        } else {
+            const now = new Date();
+            now.setHours(now.getHours() + 1);
+            reminderDueDate.value = new Date(now - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+        }
 
-    if (formReminder) {
-        formReminder.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const title = document.getElementById('reminder-title').value;
-            const dueDate = document.getElementById('reminder-dueDate').value; // already local ISO
-            const nudgeInterval = document.getElementById('reminder-interval').value;
+        reminderForm.style.display = 'block';
+        reminderTitle.focus();
+    }
 
+    function hideReminderForm() {
+        reminderForm.style.display = 'none';
+        reminderEditId.value = '';
+        reminderTitle.value = '';
+        reminderDueDate.value = '';
+        reminderInterval.value = 60;
+    }
+
+    if (addReminderBtn) addReminderBtn.addEventListener('click', () => showReminderForm());
+    if (reminderCancelBtn) reminderCancelBtn.addEventListener('click', hideReminderForm);
+
+    if (reminderSaveBtn) {
+        reminderSaveBtn.addEventListener('click', async () => {
+            const title = reminderTitle.value.trim();
+            const dueDate = reminderDueDate.value;
+            const interval = parseInt(reminderInterval.value) || 60;
+
+            if (!title || !dueDate) { alert('\u05d9\u05e9 \u05dc\u05de\u05dc\u05d0 \u05ea\u05d9\u05d0\u05d5\u05e8 \u05d5\u05ea\u05d0\u05e8\u05d9\u05da \u05d9\u05e2\u05d3'); return; }
+
+            reminderSaveBtn.disabled = true;
             try {
                 const res = await fetch('/api/reminders', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        title, 
-                        dueDate: new Date(dueDate).toISOString(), 
-                        nudgeIntervalMinutes: parseInt(nudgeInterval) 
-                    })
+                    body: JSON.stringify({ title, dueDate: new Date(dueDate).toISOString(), nudgeIntervalMinutes: interval })
                 });
                 const data = await res.json();
-                if (data.success) {
-                    closeModal('modal-reminder');
-                    loadReminders();
-                } else {
-                    alert('שגיאה בהוספת תזכורת: ' + data.error);
-                }
-            } catch (err) {
-                console.error(err);
-                alert('שגיאת תקשורת');
-            }
+                if (data.success) { hideReminderForm(); loadReminders(); }
+                else alert(data.error || '\u05e9\u05d2\u05d9\u05d0\u05d4 \u05d1\u05e9\u05de\u05d9\u05e8\u05ea \u05ea\u05d6\u05db\u05d5\u05e8\u05ea');
+            } catch { alert('\u05e9\u05d2\u05d9\u05d0\u05ea \u05ea\u05e7\u05e9\u05d5\u05e8\u05ea'); }
+            finally { reminderSaveBtn.disabled = false; }
         });
     }
 
-    window.updateReminderStatus = async (id, status) => {
+    window._markReminderDone = async (id) => {
         try {
-            const res = await fetch(`/api/reminders/${id}/status`, {
+            await fetch(`/api/reminders/${id}/status`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status })
+                body: JSON.stringify({ status: 'done' })
             });
-            if (res.ok) {
-                loadReminders();
-            }
-        } catch (err) {
-            console.error(err);
-        }
+            loadReminders();
+        } catch (err) { console.error(err); }
     };
 
-    window.deleteReminder = async (id) => {
-        if (!confirm('האם למחוק תזכורת זו?')) return;
+    window._deleteReminder = async (id) => {
+        if (!confirm('\u05d4\u05d0\u05dd \u05dc\u05de\u05d7\u05d5\u05e7 \u05ea\u05d6\u05db\u05d5\u05e8\u05ea \u05d6\u05d5?')) return;
         try {
-            const res = await fetch(`/api/reminders/${id}`, { method: 'DELETE' });
-            if (res.ok) {
-                loadReminders();
-            }
-        } catch (err) {
-            console.error(err);
-        }
+            await fetch(`/api/reminders/${id}`, { method: 'DELETE' });
+            loadReminders();
+        } catch (err) { console.error(err); }
     };
 
-    // Load reminders when tab is clicked
+    // Reload when tab is clicked
     document.querySelector('[data-tab="tab-reminders"]')?.addEventListener('click', loadReminders);
+
 
     // ==================== Initialization ====================
 
