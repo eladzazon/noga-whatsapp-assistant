@@ -628,8 +628,9 @@ class DatabaseManager {
      * Update the last_nudged timestamp
      */
     updateReminderLastNudged(id) {
-        const stmt = this.db.prepare("UPDATE reminders SET last_nudged = CURRENT_TIMESTAMP WHERE id = ?");
-        return stmt.run(id).changes > 0;
+        const isoString = new Date().toISOString();
+        const stmt = this.db.prepare("UPDATE reminders SET last_nudged = ? WHERE id = ?");
+        return stmt.run(isoString, id).changes > 0;
     }
 
     /**

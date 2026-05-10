@@ -197,11 +197,18 @@ class SchedulerManager {
                     let shouldNudge = false;
                     if (!reminder.last_nudged) {
                         shouldNudge = true; // Never nudged
+                        logger.debug(`Reminder ${reminder.id} needs first nudge (overdue and never nudged)`);
                     } else {
                         const lastNudgedDate = new Date(reminder.last_nudged);
-                        const minutesSinceLastNudge = (now - lastNudgedDate) / (1000 * 60);
-                        if (minutesSinceLastNudge >= reminder.nudge_interval_minutes) {
+                        // Add a 10-second buffer to handle cron timing jitter
+                        const secondsSinceLastNudge = (now - lastNudgedDate) / 1000;
+                        const requiredSeconds = (reminder.nudge_interval_minutes * 60) - 10;
+                        
+                        if (secondsSinceLastNudge >= requiredSeconds) {
                             shouldNudge = true;
+                        } else {
+                            const remaining = Math.round(requiredSeconds - secondsSinceLastNudge);
+                            logger.debug(`Reminder ${reminder.id} ("${reminder.title}"): Skipping nudge, next one in ~${remaining}s`);
                         }
                     }
 
