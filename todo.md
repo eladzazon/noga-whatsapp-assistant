@@ -49,10 +49,11 @@
 - [ ] **AI Interaction Page**: A dedicated "Chat" tab to interact with Noga directly from the dashboard for testing and debugging.
 - [ ] **Remote Conversation Manager**: A WhatsApp-Web-like interface to view active conversations, message history, and send/receive messages remotely via the admin panel.
 
-## 📅 Calendar Enhancements
+## 📅 Calendar & Reminders
 - [ ] **Multi-Calendar Support**: Extend the calendar skill to handle multiple calendars (not just "primary").
 - [ ] **Birthday & Event Reminders**: Add logic to scan specific calendars for birthdays and anniversaries.
 - [ ] **Reminder Cronjobs**: Implement scheduled jobs to send daily/weekly birthday and event summaries via WhatsApp.
+- [ ] **Nudge Expiration**: Automatically stop nudging or mark as "expired" if a reminder has been nudged more than 10 times without response.
 
 ## ⚡ Performance & Optimization
 - [ ] **Dynamic Model Switching**: Implement logic in the message router to detect request complexity:
