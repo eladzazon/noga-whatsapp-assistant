@@ -292,6 +292,9 @@ class WhatsAppManager {
                 hasMedia = true;
             } else if (type === 'documentMessage') {
                 hasMedia = true;
+            } else if (type === 'reactionMessage') {
+                const reactionEmoji = messageContent.reactionMessage?.text || '';
+                body = `[The user reacted to a previous message with the emoji: ${reactionEmoji}]`;
             }
 
             logger.info('Message received', {
