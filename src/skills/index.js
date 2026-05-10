@@ -68,9 +68,6 @@ export const functionDeclarations = [
         }
     },
 
-            required: ['title', 'date']
-        }
-    },
 
     // ==================== Reminders ====================
     {
