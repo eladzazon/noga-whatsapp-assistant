@@ -138,9 +138,11 @@ body {
     gap: 8px;
     flex-wrap: wrap;
     margin-bottom: 20px;
+    width: 100%;
 }
 
 .tab-btn {
+    flex: 1;
     padding: 8px 14px;
     border: 2px solid var(--gray-light);
     background: var(--white);
@@ -151,6 +153,7 @@ body {
     border-radius: 20px;
     transition: all 0.2s;
     white-space: nowrap;
+    text-align: center;
 }
 
 .tab-btn:hover {

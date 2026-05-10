@@ -370,9 +370,7 @@
 
         socket.on('chat_cleared', () => {
             chatMessages.innerHTML = `
-                <div class="message noga-message">
-                    השיחה נוקתה. איך אני יכולה לעזור מחדש? 😊
-                </div>
+                <div class="message noga-message">השיחה נוקתה. איך אני יכולה לעזור מחדש? 😊</div>
             `;
         });
     }
@@ -391,7 +389,7 @@
         const deleteBtn = type === 'knowledge' ? deleteKnowledgeFileBtn : deleteSkillFileBtn;
         const statusEl = type === 'knowledge' ? knowledgeStatusEl : skillStatusEl;
         const apiPath = type === 'knowledge' ? '/api/knowledge' : '/api/skills';
-        
+
         let currentFile = null;
         let filesData = [];
 
@@ -401,7 +399,7 @@
                 const data = await res.json();
                 filesData = data.files || [];
                 renderFileList();
-                
+
                 // Update the open editor if the file content changed remotely
                 if (currentFile) {
                     const fileObj = filesData.find(f => f.name === currentFile);
@@ -444,7 +442,7 @@
 
         async function saveFile() {
             if (!currentFile) return;
-            
+
             const content = editor.value;
             saveBtn.disabled = true;
             saveBtn.textContent = 'שומר...';
@@ -475,14 +473,14 @@
 
         async function deleteFile() {
             if (!currentFile) return;
-            
+
             const confirmed = await showConfirmModal('מחיקת קובץ', `האם אתה בטוח שברצונך למחוק את הקובץ ${currentFile}?`);
             if (!confirmed) return;
 
             try {
                 const res = await fetch(`${apiPath}/${currentFile}`, { method: 'DELETE' });
                 const data = await res.json();
-                
+
                 if (data.success) {
                     currentFile = null;
                     editor.value = '';
@@ -501,7 +499,7 @@
             let filename = prompt('הכנס שם קובץ חדש (עם סיומת .md):', `new_${type}.md`);
             if (!filename) return;
             if (!filename.endsWith('.md')) filename += '.md';
-            
+
             if (filesData.some(f => f.name === filename)) {
                 alert('קובץ עם שם כזה כבר קיים!');
                 return;
@@ -528,7 +526,7 @@
 
         // Initial load
         loadFiles();
-        
+
         return { loadFiles };
     }
 
@@ -600,7 +598,7 @@
 
     function renderHaEntitiesList(entities) {
         if (!haEntitiesTbody) return;
-        
+
         if (entities.length === 0) {
             haEntitiesTbody.innerHTML = '<tr><td style="text-align: center; padding: 20px;">לא נמצאו מכשירים.</td></tr>';
             return;
@@ -618,8 +616,8 @@
     if (haEntitiesFilter) {
         haEntitiesFilter.addEventListener('input', (e) => {
             const query = e.target.value.toLowerCase();
-            const filtered = allHaEntities.filter(ent => 
-                ent.id.toLowerCase().includes(query) || 
+            const filtered = allHaEntities.filter(ent =>
+                ent.id.toLowerCase().includes(query) ||
                 ent.name.toLowerCase().includes(query)
             );
             renderHaEntitiesList(filtered);
@@ -1384,8 +1382,8 @@
                 </tr></thead>
                 <tbody>
                     ${backups.map(b => {
-                        const date = new Date(b.created_at).toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' });
-                        return `<tr>
+            const date = new Date(b.created_at).toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' });
+            return `<tr>
                             <td><code dir="ltr" style="font-size: 12px;">${escapeHtml(b.filename)}</code></td>
                             <td>${escapeHtml(formatBytes(b.size))}</td>
                             <td style="font-size: 13px; color: var(--gray);">${date}</td>
@@ -1394,13 +1392,13 @@
                                 <button class="btn btn-small btn-action btn-danger-action" onclick="window._deleteBackup('${escapeAttr(b.filename)}')" title="מחק">🗑️</button>
                             </td>
                         </tr>`;
-                    }).join('')}
+        }).join('')}
                 </tbody>
             </table>
         `;
     }
 
-    window._deleteBackup = async function(filename) {
+    window._deleteBackup = async function (filename) {
         const confirmed = await showConfirmModal('מחיקת גיבוי', `האם אתה בטוח שברצונך למחוק את הגיבוי "${filename}"?`);
         if (!confirmed) return;
         try {
@@ -1539,7 +1537,7 @@
                         const nextNudgeDate = new Date(new Date(r.last_nudged).getTime() + (r.nudge_interval_minutes * 60000));
                         nextNudgeStr = nextNudgeDate.toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' });
                         if (nextNudgeDate < now) {
-                             nextNudgeStr = 'מיידי (בדקה הקרובה)';
+                            nextNudgeStr = 'מיידי (בדקה הקרובה)';
                         }
                     }
                 }
@@ -1568,12 +1566,12 @@
         }).join('');
     }
 
-    window._editReminder = function(id, title, dueDate, interval) {
+    window._editReminder = function (id, title, dueDate, interval) {
         // Convert ISO date to local datetime-local format
         const date = new Date(dueDate);
-        const tzoffset = (date.getTimezoneOffset() * 60000); 
+        const tzoffset = (date.getTimezoneOffset() * 60000);
         const localISOTime = (new Date(date - tzoffset)).toISOString().slice(0, 16);
-        
+
         showReminderForm(id, title, localISOTime, interval);
     };
 
@@ -1619,7 +1617,7 @@
             try {
                 const method = id ? 'PUT' : 'POST';
                 const url = id ? `/api/reminders/${id}` : '/api/reminders';
-                
+
                 const res = await fetch(url, {
                     method,
                     headers: { 'Content-Type': 'application/json' },
