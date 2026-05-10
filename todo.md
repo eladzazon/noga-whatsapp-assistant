@@ -40,7 +40,7 @@
 
 
 ## 🧠 AI & Context Improvements
-- [x] **Context Awareness Logic**: Improved context handling — short messages (≤8 words) with existing history now get a continuation hint injected to Gemini. Quoted replies are also passed as explicit context.
+- [x] **Context Awareness Logic**: Improved context handling — short messages (≤8 words) and volatile requests (device/calendar controls) now maintain history to resolve relative pronouns correctly. Quoted replies are also passed as explicit context.
 - [x] **Private-to-Group Delegation**: Admin can send a private message to Noga like "שלחי לקבוצה: ארוחת ערב מוכנה!" and Noga will compose and relay the message to the family group.
 - [x] **🎙️ Voice Note Processing**:
     - Transcription via Gemini multimodal (already working).

@@ -175,15 +175,13 @@ class GeminiManager {
             // Check if this is a volatile request (devices, calendar, etc)
             const isVolatileRequest = this._isVolatileRequestMessage(text);
 
-            // For volatile/status messages (devices, calendar), use minimal history to force fresh API calls
-            // UNLESS keepHistory is explicitly true (e.g. from AI keywords that need context)
+            // Always use history to maintain context, even for volatile requests.
+            // This allows resolving relative pronouns like "it", "them", "that" correctly.
             let history = [];
             if (options.keepHistory === false) {
-                logger.info('keepHistory explicitly false - using empty history to force API calls');
-            } else if (options.keepHistory || !isVolatileRequest) {
-                history = this._buildHistory(userId);
+                logger.info('keepHistory explicitly false - using empty history');
             } else {
-                logger.info('Volatile request detected - using empty history to force API calls');
+                history = this._buildHistory(userId);
             }
 
             // Start chat session
