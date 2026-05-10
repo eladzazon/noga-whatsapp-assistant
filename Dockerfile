@@ -1,5 +1,5 @@
 # Use a specific Node version for stability
-FROM node:20-slim AS builder
+FROM node:24-slim AS builder
 
 WORKDIR /app
 
@@ -15,7 +15,7 @@ COPY package*.json ./
 RUN npm ci --omit=dev
 
 # --- Production stage ---
-FROM node:20-slim
+FROM node:24-slim
 
 WORKDIR /app
 
