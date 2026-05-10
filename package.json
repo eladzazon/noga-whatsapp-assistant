@@ -41,6 +41,7 @@
   "license": "MIT",
   "overrides": {
     "glob": "^13.0.6",
-    "fetch-blob": "^4.0.0"
+    "fetch-blob": "^4.0.0",
+    "protobufjs": "^7.5.7"
   }
 }

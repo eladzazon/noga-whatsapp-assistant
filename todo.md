@@ -16,6 +16,7 @@
     - [x] check full build log from github actions and get warning and errors from there. and fix them, explicit:
         - [ ] `node-domexception@1.0.0`: Use native DOMException instead (Blocked by deep upstream dependencies in googleapis/gaxios).
         - [x] `glob@10.5.0`: Update to a newer version to address security vulnerabilities.
+        - [x] `protobufjs <7.5.5`: Resolved critical vulnerabilities via global override.
 
 ## 🛠️ Debugging & Maintenance
 - [x] **Remote Admin Commands**: Implemented a suite of commands starting with `/` for remote management via WhatsApp:
