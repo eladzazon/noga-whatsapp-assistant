@@ -54,6 +54,7 @@
 - [ ] **Birthday & Event Reminders**: Add logic to scan specific calendars for birthdays and anniversaries.
 - [ ] **Reminder Cronjobs**: Implement scheduled jobs to send daily/weekly birthday and event summaries via WhatsApp.
 - [ ] **Nudge Expiration**: Automatically stop nudging or mark as "expired" if a reminder has been nudged more than 10 times without response.
+- [ ] **Backup & Restore Extension**: Include the `reminders` table in the automated daily backups and restore logic.
 
 ## ⚡ Performance & Optimization
 - [ ] **Dynamic Model Switching**: Implement logic in the message router to detect request complexity:
