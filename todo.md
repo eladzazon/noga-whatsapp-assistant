@@ -13,8 +13,9 @@
 - [ ] **Token Usage accuracy**: Ensure cumulative usage across tool calls is correctly logged to the DB.
 - [ ] **Error Boundaries**: Better UI feedback when a file fails to save or load remotely.
 - [ ] **Dependency Updates**: Fix deprecated build log warnings:
-    - [ ] `node-domexception@1.0.0`: Use native DOMException instead.
-    - [ ] `glob@10.5.0`: Update to a newer version to address security vulnerabilities.
+    - [ ] check full build log from github actions and get warning and errors from there. and fix them, explicit:
+        - [ ] `node-domexception@1.0.0`: Use native DOMException instead.
+        - [ ] `glob@10.5.0`: Update to a newer version to address security vulnerabilities.
 
 ## 🛠️ Debugging & Maintenance
 - [x] **Remote Admin Commands**: Implemented a suite of commands starting with `/` for remote management via WhatsApp:
@@ -54,7 +55,7 @@
 - [ ] **Birthday & Event Reminders**: Add logic to scan specific calendars for birthdays and anniversaries.
 - [ ] **Reminder Cronjobs**: Implement scheduled jobs to send daily/weekly birthday and event summaries via WhatsApp.
 - [ ] **Nudge Expiration**: Automatically stop nudging or mark as "expired" if a reminder has been nudged more than 10 times without response.
-- [ ] **Backup & Restore Extension**: Include the `reminders` table in the automated daily backups and restore logic.
+- [ ] **Backup & Restore Extension**: Include the `reminders` table in the automated daily backups and restore logic and the dashboard backup and restore logic.
 
 ## ⚡ Performance & Optimization
 - [ ] **Dynamic Model Switching**: Implement logic in the message router to detect request complexity:
