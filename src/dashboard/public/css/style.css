@@ -16,7 +16,10 @@
     --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.15);
 }
 
-/* ==================== Base ==================== */
+html {
+    scrollbar-gutter: stable;
+}
+
 * {
     margin: 0;
     padding: 0;
