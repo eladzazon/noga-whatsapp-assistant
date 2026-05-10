@@ -1,5 +1,5 @@
 # Use a specific Node version for stability
-FROM node:24-slim AS builderFROM
+FROM node:24-slim AS builder
 
 WORKDIR /app
 
