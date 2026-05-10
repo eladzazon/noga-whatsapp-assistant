@@ -906,6 +906,7 @@ select.form-input {
     line-height: 1.5;
     position: relative;
     word-wrap: break-word;
+    white-space: pre-wrap;
 }
 
 .user-message {
