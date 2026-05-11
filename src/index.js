@@ -30,7 +30,7 @@ async function main() {
     ║     🏠 נוגה - Noga Home Assistant    ║
     ║                                       ║
     ║     WhatsApp AI Home Assistant        ║
-    ║     Powered by Gemini 2.5 Flash       ║
+    ║     Powered by Gemini 1.5 Flash       ║
     ║                                       ║
     ╚═══════════════════════════════════════╝
     `);
