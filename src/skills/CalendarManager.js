@@ -63,22 +63,24 @@ class CalendarManager {
         }
 
         try {
-            // Parse dates
-            const timeMin = new Date(startDate);
-            timeMin.setHours(0, 0, 0, 0);
+            // Israel is UTC+3. To avoid boundary leaks, we explicitly set the offset.
+            // startDate is YYYY-MM-DD
+            const timeMin = `${startDate}T00:00:00+03:00`;
+            
+            const endD = endDate || startDate;
+            const timeMax = `${endD}T23:59:59+03:00`;
 
-            const timeMax = endDate ? new Date(endDate) : new Date(startDate);
-            timeMax.setHours(23, 59, 59, 999);
-
-            logger.info('Fetching calendar events', {
+            logger.info('Fetching calendar events (Timezone Corrected)', {
                 startDate,
-                endDate: endDate || startDate
+                endDate: endDate || startDate,
+                timeMin,
+                timeMax
             });
 
             const response = await this.calendar.events.list({
                 calendarId: config.google.calendarId,
-                timeMin: timeMin.toISOString(),
-                timeMax: timeMax.toISOString(),
+                timeMin: timeMin,
+                timeMax: timeMax,
                 singleEvents: true,
                 orderBy: 'startTime',
                 maxResults: 20
