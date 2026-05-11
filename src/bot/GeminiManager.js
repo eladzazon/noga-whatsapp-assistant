@@ -194,12 +194,14 @@ class GeminiManager {
             });
 
             // ── Context Awareness: inject a hint for short follow-up messages ──
-            // If message is short (<=8 words) and history exists, it's likely a continuation
+            // If message is short (<=10 words) and history exists, it's likely a continuation
             let textToSend = text;
             if (!isVolatileRequest && history.length > 0) {
                 const wordCount = text.trim().split(/\s+/).length;
-                if (wordCount <= 8 && !text.startsWith('[')) {
-                    textToSend = `[הערה: ייתכן שהודעה זו היא המשך לשיחה הקודמת - קרא את ההקשר נכון אם כן.]\n${text}`;
+                if (wordCount <= 10 && !text.startsWith('[')) {
+                    const lastMsg = history[history.length - 1].parts[0].text;
+                    const truncatedLast = lastMsg.length > 100 ? lastMsg.substring(0, 100) + '...' : lastMsg;
+                    textToSend = `[Context Note: This is a short message following our last exchange: "${truncatedLast}". Please interpret this new message relative to that context.]\n${text}`;
                     logger.info('Context hint injected (short follow-up)', { wordCount });
                 }
             }
@@ -495,7 +497,7 @@ class GeminiManager {
      * Build conversation history from database
      */
     _buildHistory(userId) {
-        const messages = db.getChatHistory(userId, 20);
+        const messages = db.getChatHistory(userId, 40);
 
         // Convert to Gemini format
         let history = messages.map(msg => ({
