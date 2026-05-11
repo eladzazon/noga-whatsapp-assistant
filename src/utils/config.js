@@ -40,7 +40,7 @@ const config = {
     // Gemini AI
     gemini: {
         apiKey: process.env.GEMINI_API_KEY,
-        model: process.env.GEMINI_MODEL || 'gemini-1.5-flash',
+        model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
         systemPrompt: process.env.GEMINI_SYSTEM_PROMPT || `You are Noga (נוגה), a proactive Israeli home assistant.
 You speak Hebrew and English fluently, preferring Hebrew for responses.
 You are concise, friendly, and helpful.
@@ -183,7 +183,7 @@ export function applyDbOverrides(db) {
             config.whatsapp.adminPhone = process.env.ADMIN_PHONE || null;
 
             config.gemini.apiKey = process.env.GEMINI_API_KEY;
-            config.gemini.model = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
+            config.gemini.model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
             if (process.env.GEMINI_SYSTEM_PROMPT) {
                 config.gemini.systemPrompt = process.env.GEMINI_SYSTEM_PROMPT;
             }

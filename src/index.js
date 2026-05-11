@@ -30,7 +30,7 @@ async function main() {
     ║     🏠 נוגה - Noga Home Assistant    ║
     ║                                       ║
     ║     WhatsApp AI Home Assistant        ║
-    ║     Powered by Gemini 1.5 Flash       ║
+    ║     Powered by Gemini 2.5 Flash       ║
     ║                                       ║
     ╚═══════════════════════════════════════╝
     `);
@@ -60,7 +60,7 @@ async function main() {
         // Initialize Gemini AI with function calling
         logger.info('Initializing Gemini AI...');
         geminiManager.init(functionDeclarations, functionHandlers);
-        
+
         // Pass Gemini manager back to skills (for reinit on memory updates)
         setGeminiManager(geminiManager);
 
