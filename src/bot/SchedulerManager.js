@@ -77,9 +77,9 @@ class SchedulerManager {
                 }
 
                 // 1. Process the prompt with Gemini
-                // We pass in a special system user ID for context tracking if needed
+                // Log under the main group ID so Noga remembers what she said
                 const response = await this.geminiManager.processMessage(
-                    'system_scheduler',
+                    config.whatsapp.groupId,
                     promptData.prompt,
                     { keepHistory: false } // Force fresh context for scheduled tasks
                 );
@@ -227,6 +227,10 @@ class SchedulerManager {
 
                         if (response && response.trim()) {
                             await whatsappManager.sendMessage(config.whatsapp.groupId, response);
+                            
+                            // Log to history so Noga remembers the nudge
+                            db.addChatMessage(config.whatsapp.groupId, 'model', response);
+                            
                             db.updateReminderLastNudged(reminder.id);
                             logger.info(`Sent nudge for reminder ${reminder.id}: "${reminder.title}"`);
                         }

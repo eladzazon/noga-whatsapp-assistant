@@ -298,6 +298,11 @@ class DashboardServer {
                                 
                                 await whatsappManager.sendMediaMessage(config.whatsapp.groupId, mediaPath, message);
                                 
+                                // Log to history
+                                if (this.db) {
+                                    this.db.addChatMessage(config.whatsapp.groupId, 'model', `[Image Notification] ${message}`);
+                                }
+
                                 // Clean up
                                 fs.unlinkSync(mediaPath);
                                 messageSent = true;
@@ -310,6 +315,10 @@ class DashboardServer {
                         // Send as text if no image or image failed
                         if (!messageSent) {
                             await whatsappManager.sendMessage(config.whatsapp.groupId, message);
+                            // Log to history
+                            if (this.db) {
+                                this.db.addChatMessage(config.whatsapp.groupId, 'model', message);
+                            }
                         }
                         
                         return res.json({ success: true, message, hasImage: !!req.file });
