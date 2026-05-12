@@ -49,7 +49,6 @@
 
 ## 🖥️ Dashboard Expansion
 - [x] **AI Interaction Page**: A dedicated "Chat" tab to interact with Noga directly from the dashboard for testing and debugging.
-- [ ] **Remote Conversation Manager**: A WhatsApp-Web-like interface to view active conversations, message history, and send/receive messages remotely via the admin panel.
 
 ## 📅 Calendar & Reminders
 - [ ] **Nudge Expiration**: Automatically stop nudging or mark as "expired" if a reminder has been nudged more than 10 times without response.
@@ -91,7 +90,6 @@
     - **Health Log**: Track symptoms, medications, or doctor visits.
     - **Kids' Sizes**: Store shoe/clothing sizes for the children to reference when shopping.
 - [ ] **🔧 Home Maintenance Registry**:
-    - **General Home**: Log last time filters were changed or garden was treated.
     - **🚗 Cars Maintenance**:
         - Track service history, oil changes, and annual inspections (Test).
         - Log fuel consumption and mileage.
@@ -101,8 +99,3 @@
 - [ ] **📰 Knowledge Aggregation**:
     - **Link Saver**: Save and categorize links shared in chat to a `LINKS.md`.
     - **News Summaries**: Integration with news APIs to provide a "Morning Briefing" tailored to user interests.
-- [ ] **🎮 Gamification & Persona**:
-    - Enhance Noga's personality with varied responses based on "mood" or time of day.
-    - Implement a "Karma" or "Efficiency" score for household tasks.
-
-

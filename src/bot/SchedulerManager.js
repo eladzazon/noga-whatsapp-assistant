@@ -142,6 +142,19 @@ class SchedulerManager {
                 backup.keywords = db.getKeywords().map(k => ({ keyword: k.keyword, response: k.response, type: k.type, enabled: k.enabled }));
                 backup.ha_mappings = db.getHaMappings().map(m => ({ entity_id: m.entity_id, nickname: m.nickname, location: m.location, type: m.type }));
                 backup.scheduled_prompts = db.getScheduledPrompts().map(p => ({ name: p.name, prompt: p.prompt, cron_expression: p.cron_expression, enabled: p.enabled }));
+                
+                // Settings: .env baseline + DB overrides
+                const envPath = path.resolve(process.cwd(), '.env');
+                if (fs.existsSync(envPath)) {
+                    const content = fs.readFileSync(envPath, 'utf-8');
+                    content.split('\n').forEach(line => {
+                        const trimmed = line.trim();
+                        if (!trimmed || trimmed.startsWith('#')) return;
+                        const eqIdx = trimmed.indexOf('=');
+                        if (eqIdx === -1) return;
+                        backup.settings[trimmed.substring(0, eqIdx).trim()] = trimmed.substring(eqIdx + 1).trim();
+                    });
+                }
                 const allConfig = db.getAllConfig();
                 const ENV_PREFIX = 'env_';
                 for (const [key, value] of Object.entries(allConfig)) {
