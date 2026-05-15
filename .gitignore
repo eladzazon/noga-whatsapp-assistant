@@ -6,7 +6,6 @@ node_modules/
 
 # Data
 data/*
-!data/skills/
 *.db
 
 # Credentials
