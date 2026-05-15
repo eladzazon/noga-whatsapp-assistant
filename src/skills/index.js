@@ -6,7 +6,7 @@ import { findActionAndEntity } from '../utils/HaRecognition.js';
 import logger from '../utils/logger.js';
 import config from '../utils/config.js';
 import whatsappManager from '../bot/WhatsAppManager.js';
-import { fetchUrl, fetchRss } from '../utils/WebFetcher.js';
+import { fetchUrl, fetchRss, searchWeb } from '../utils/WebFetcher.js';
 
 let globalGeminiManager = null;
 
@@ -238,6 +238,24 @@ export const functionDeclarations = [
                 }
             },
             required: ['url']
+        }
+    },
+    {
+        name: 'web_search',
+        description: 'חפש מידע באינטרנט. Search the web for any information - current events, exchange rates, weather, facts, people, places, products, etc. Use this when you need up-to-date information that you don\'t have in your knowledge. Returns search results with titles, snippets, and links.',
+        parameters: {
+            type: 'object',
+            properties: {
+                query: {
+                    type: 'string',
+                    description: 'שאילתת החיפוש (עברית או אנגלית). The search query in any language.'
+                },
+                max_results: {
+                    type: 'number',
+                    description: 'Maximum number of results to return (default 5, max 10).'
+                }
+            },
+            required: ['query']
         }
     },
 
@@ -488,6 +506,24 @@ export const functionHandlers = {
     fetch_rss: async (args) => {
         logger.info('Executing: fetch_rss', { url: args.url });
         return await fetchRss(args.url, { maxItems: Math.min(args.max_items || 10, 30) });
+    },
+
+    web_search: async (args) => {
+        logger.info('Executing: web_search', { query: args.query });
+        const result = await searchWeb(args.query, { maxResults: Math.min(args.max_results || 5, 10) });
+        // If we got results but no instant answer, auto-fetch the top result for a richer answer
+        if (result.success && !result.instant_answer && result.results?.length > 0) {
+            try {
+                const topUrl = result.results[0].url;
+                const page = await fetchUrl(topUrl, { maxLength: 8000 });
+                if (page.success) {
+                    result.top_result_content = page.content;
+                }
+            } catch (e) {
+                // Non-critical — snippets are still available
+            }
+        }
+        return result;
     },
 
     // ==================== Home Assistant Handlers ====================

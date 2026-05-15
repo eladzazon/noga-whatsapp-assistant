@@ -120,6 +120,117 @@ export async function fetchRss(url, { maxItems = 10 } = {}) {
     }
 }
 
+/**
+ * Searches the web using DuckDuckGo and returns structured results.
+ * Uses the instant-answer API for direct facts, then HTML search for full results.
+ * No API key required.
+ * @param {string} query - The search query.
+ * @param {object} [options]
+ * @param {number} [options.maxResults] - Max number of results to return (default 5).
+ * @returns {Promise<{success: boolean, query: string, instant_answer?: string, results?: Array, error?: string}>}
+ */
+export async function searchWeb(query, { maxResults = 5 } = {}) {
+    try {
+        logger.info('WebFetcher: searchWeb', { query });
+
+        let instantAnswer = null;
+
+        // --- 1. Try DuckDuckGo Instant Answer API for quick facts ---
+        try {
+            const iaResponse = await axios.get('https://api.duckduckgo.com/', {
+                params: { q: query, format: 'json', no_html: 1, skip_disambig: 1 },
+                timeout: 8000,
+                headers: { 'User-Agent': 'Mozilla/5.0 (compatible; NogaBot/1.0)' }
+            });
+
+            const ia = iaResponse.data;
+            if (ia.AbstractText) {
+                instantAnswer = {
+                    text: ia.AbstractText,
+                    source: ia.AbstractSource || 'DuckDuckGo',
+                    url: ia.AbstractURL || null
+                };
+            } else if (ia.Answer) {
+                instantAnswer = {
+                    text: typeof ia.Answer === 'string' ? ia.Answer : ia.Answer.toString(),
+                    source: 'DuckDuckGo Instant Answer',
+                    url: null
+                };
+            }
+        } catch (iaErr) {
+            logger.debug('WebFetcher: instant answer API failed, continuing with HTML search', { error: iaErr.message });
+        }
+
+        // --- 2. DuckDuckGo HTML search for full results ---
+        const results = [];
+        try {
+            const htmlResponse = await axios.get('https://html.duckduckgo.com/html/', {
+                params: { q: query },
+                timeout: DEFAULT_TIMEOUT_MS,
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Accept': 'text/html',
+                    'Accept-Language': 'en-US,en;q=0.9,he;q=0.8'
+                },
+                responseType: 'text'
+            });
+
+            const html = String(htmlResponse.data);
+
+            // Parse result blocks — DuckDuckGo HTML has .result class elements
+            // Each result has: <a class="result__a" href="...">title</a>
+            //                  <a class="result__snippet">snippet text</a>
+            const resultBlockRegex = /<div[^>]*class="[^"]*result[^"]*"[^>]*>([\s\S]*?)<\/div>\s*(?=<div[^>]*class="[^"]*result|$)/gi;
+            const titleRegex = /<a[^>]*class="result__a"[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/i;
+            const snippetRegex = /<a[^>]*class="result__snippet"[^>]*>([\s\S]*?)<\/a>/i;
+
+            let blockMatch;
+            while ((blockMatch = resultBlockRegex.exec(html)) !== null && results.length < maxResults) {
+                const block = blockMatch[1];
+
+                const titleMatch = block.match(titleRegex);
+                const snippetMatch = block.match(snippetRegex);
+
+                if (titleMatch) {
+                    let href = titleMatch[1];
+                    // DuckDuckGo wraps URLs in a redirect — extract the actual URL
+                    const uddgMatch = href.match(/[?&]uddg=([^&]+)/);
+                    if (uddgMatch) {
+                        href = decodeURIComponent(uddgMatch[1]);
+                    }
+
+                    const title = titleMatch[2].replace(/<[^>]+>/g, '').trim();
+                    const snippet = snippetMatch
+                        ? snippetMatch[1].replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').trim()
+                        : '';
+
+                    if (title && href.startsWith('http')) {
+                        results.push({ title, url: href, snippet });
+                    }
+                }
+            }
+        } catch (htmlErr) {
+            logger.warn('WebFetcher: DuckDuckGo HTML search failed', { error: htmlErr.message });
+        }
+
+        // --- 3. Build response ---
+        if (!instantAnswer && results.length === 0) {
+            return { success: false, query, error: 'No results found for this query.' };
+        }
+
+        return {
+            success: true,
+            query,
+            instant_answer: instantAnswer,
+            result_count: results.length,
+            results
+        };
+    } catch (err) {
+        logger.error('WebFetcher: searchWeb failed', { query, error: err.message });
+        return { success: false, query, error: err.message };
+    }
+}
+
 // ---- helpers ----
 
 function extractField(xml, tag) {
@@ -136,4 +247,4 @@ function extractAtomLink(xml) {
     return m ? m[1] : null;
 }
 
-export default { fetchUrl, fetchRss };
+export default { fetchUrl, fetchRss, searchWeb };
