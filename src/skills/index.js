@@ -6,6 +6,7 @@ import { findActionAndEntity } from '../utils/HaRecognition.js';
 import logger from '../utils/logger.js';
 import config from '../utils/config.js';
 import whatsappManager from '../bot/WhatsAppManager.js';
+import { fetchUrl, fetchRss } from '../utils/WebFetcher.js';
 
 let globalGeminiManager = null;
 
@@ -202,6 +203,44 @@ export const functionDeclarations = [
             required: ['filename']
         }
     },
+    // ==================== Web Fetch Functions ====================
+    {
+        name: 'fetch_url',
+        description: 'Fetch and read the text content of any public URL (web page, plain text, etc.). Use this to read articles, documentation, or any website. Returns cleaned text suitable for summarizing.',
+        parameters: {
+            type: 'object',
+            properties: {
+                url: {
+                    type: 'string',
+                    description: 'The full URL to fetch (must start with http:// or https://).'
+                },
+                max_length: {
+                    type: 'number',
+                    description: 'Maximum number of characters to return (default 50000). Lower this for large pages you only need a snippet of.'
+                }
+            },
+            required: ['url']
+        }
+    },
+    {
+        name: 'fetch_rss',
+        description: 'Fetch and parse an RSS or Atom news feed. Returns a clean list of articles with titles, links, publication dates, and summaries. Perfect for news briefings, blog updates, or any RSS-based content.',
+        parameters: {
+            type: 'object',
+            properties: {
+                url: {
+                    type: 'string',
+                    description: 'The full URL of the RSS or Atom feed.'
+                },
+                max_items: {
+                    type: 'number',
+                    description: 'Maximum number of articles to return (default 10, max 30).'
+                }
+            },
+            required: ['url']
+        }
+    },
+
     // ==================== Home Assistant Functions ====================
     {
         name: 'control_device',
@@ -438,6 +477,17 @@ export const functionHandlers = {
             logger.error('Failed to execute send_whatsapp_message', { error: err.message });
             return { error: err.message };
         }
+    },
+
+    // ==================== Web Fetch Handlers ====================
+    fetch_url: async (args) => {
+        logger.info('Executing: fetch_url', { url: args.url });
+        return await fetchUrl(args.url, { maxLength: args.max_length || 50000 });
+    },
+
+    fetch_rss: async (args) => {
+        logger.info('Executing: fetch_rss', { url: args.url });
+        return await fetchRss(args.url, { maxItems: Math.min(args.max_items || 10, 30) });
     },
 
     // ==================== Home Assistant Handlers ====================
