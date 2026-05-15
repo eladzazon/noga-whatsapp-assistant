@@ -161,56 +161,45 @@ export async function searchWeb(query, { maxResults = 5 } = {}) {
             logger.debug('WebFetcher: instant answer API failed, continuing with HTML search', { error: iaErr.message });
         }
 
-        // --- 2. DuckDuckGo HTML search for full results ---
+        // --- 2. DuckDuckGo Lite search for full results ---
         const results = [];
         try {
-            const htmlResponse = await axios.get('https://html.duckduckgo.com/html/', {
-                params: { q: query },
+            const liteResponse = await axios.post('https://lite.duckduckgo.com/lite/', `q=${encodeURIComponent(query)}`, {
                 timeout: DEFAULT_TIMEOUT_MS,
                 headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                    'Accept': 'text/html',
-                    'Accept-Language': 'en-US,en;q=0.9,he;q=0.8'
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                    'Accept-Language': 'en-US,en;q=0.5'
                 },
                 responseType: 'text'
             });
 
-            const html = String(htmlResponse.data);
+            const html = String(liteResponse.data);
 
-            // Parse result blocks — DuckDuckGo HTML has .result class elements
-            // Each result has: <a class="result__a" href="...">title</a>
-            //                  <a class="result__snippet">snippet text</a>
-            const resultBlockRegex = /<div[^>]*class="[^"]*result[^"]*"[^>]*>([\s\S]*?)<\/div>\s*(?=<div[^>]*class="[^"]*result|$)/gi;
-            const titleRegex = /<a[^>]*class="result__a"[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/i;
-            const snippetRegex = /<a[^>]*class="result__snippet"[^>]*>([\s\S]*?)<\/a>/i;
+            // Parse DDG Lite result pairs
+            // Title: <a rel="nofollow" href="...">...</a>
+            // Snippet: <td class='result-snippet'>...</td>
+            const resultRegex = /<a rel="nofollow" href="([^"]+)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?<td[^>]*class='result-snippet'[^>]*>([\s\S]*?)<\/td>/gi;
 
-            let blockMatch;
-            while ((blockMatch = resultBlockRegex.exec(html)) !== null && results.length < maxResults) {
-                const block = blockMatch[1];
+            let match;
+            while ((match = resultRegex.exec(html)) !== null && results.length < maxResults) {
+                let href = match[1];
+                // Resolve DDG tracking redirects just in case
+                const uddgMatch = href.match(/[?&]uddg=([^&]+)/);
+                if (uddgMatch) {
+                    href = decodeURIComponent(uddgMatch[1]);
+                }
 
-                const titleMatch = block.match(titleRegex);
-                const snippetMatch = block.match(snippetRegex);
+                const title = match[2].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+                const snippet = match[3].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
 
-                if (titleMatch) {
-                    let href = titleMatch[1];
-                    // DuckDuckGo wraps URLs in a redirect — extract the actual URL
-                    const uddgMatch = href.match(/[?&]uddg=([^&]+)/);
-                    if (uddgMatch) {
-                        href = decodeURIComponent(uddgMatch[1]);
-                    }
-
-                    const title = titleMatch[2].replace(/<[^>]+>/g, '').trim();
-                    const snippet = snippetMatch
-                        ? snippetMatch[1].replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').trim()
-                        : '';
-
-                    if (title && href.startsWith('http')) {
-                        results.push({ title, url: href, snippet });
-                    }
+                if (title && href.startsWith('http')) {
+                    results.push({ title, url: href, snippet });
                 }
             }
         } catch (htmlErr) {
-            logger.warn('WebFetcher: DuckDuckGo HTML search failed', { error: htmlErr.message });
+            logger.warn('WebFetcher: DuckDuckGo Lite search failed', { error: htmlErr.message });
         }
 
         // --- 3. Build response ---
