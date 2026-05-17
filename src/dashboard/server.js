@@ -1,5 +1,6 @@
 import express from 'express';
 import session from 'express-session';
+import sessionFileStore from 'session-file-store';
 import { createServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import path from 'path';
@@ -9,6 +10,8 @@ import config from '../utils/config.js';
 import logger, { subscribeToLogs, getRecentLogs } from '../utils/logger.js';
 import db from '../database/DatabaseManager.js';
 import multer from 'multer';
+
+const FileStore = sessionFileStore(session);
 
 const uploadDir = path.resolve(process.cwd(), 'data', 'temp');
 if (!fs.existsSync(uploadDir)) {
@@ -63,12 +66,16 @@ class DashboardServer {
 
         // Session management
         this.app.use(session({
+            store: new FileStore({
+                path: path.resolve(process.cwd(), 'data', 'sessions'),
+                retries: 0
+            }),
             secret: config.dashboard.sessionSecret,
             resave: false,
             saveUninitialized: false,
             cookie: {
                 secure: false, // Set to true if using HTTPS
-                maxAge: 24 * 60 * 60 * 1000 // 24 hours
+                maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
             }
         }));
 
