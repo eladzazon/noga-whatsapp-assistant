@@ -241,8 +241,8 @@ class SchedulerManager {
                         if (response && response.trim()) {
                             await whatsappManager.sendMessage(config.whatsapp.groupId, response);
                             
-                            // Log to history so Noga remembers the nudge
-                            db.addChatMessage(config.whatsapp.groupId, 'model', response);
+                            // Log to history with the internal ID appended so Noga remembers exactly which reminder this was
+                            db.addChatMessage(config.whatsapp.groupId, 'model', `${response} [Internal Context: Reminder ID ${reminder.id}]`);
                             
                             db.updateReminderLastNudged(reminder.id);
                             logger.info(`Sent nudge for reminder ${reminder.id}: "${reminder.title}"`);

@@ -127,7 +127,7 @@ class GeminiManager {
         if (db) {
             const reminders = db.getPendingReminders();
             if (reminders && reminders.length > 0) {
-                pendingRemindersInfo = `\nPending Reminders (To-Do): ${reminders.map(r => `[ID: ${r.id}] ${r.title}`).join(', ')}. If the user says "done", "I did it", or reacts with a thumbs up / "like" emoji (👍), they are likely referring to one of these tasks. Use update_reminder_status to mark it done.`;
+                pendingRemindersInfo = `\nPending Reminders (To-Do): ${reminders.map(r => `[ID: ${r.id}] ${r.title}`).join(', ')}. If the user says "done", "I did it", or reacts with a thumbs up / "like" emoji (👍), check the chat history for the "Internal Context: Reminder ID X" tag to know exactly which task they are reacting to, and use update_reminder_status to mark it done.`;
             }
         }
 
@@ -249,7 +249,24 @@ class GeminiManager {
             response = await this._handleFunctionCalls(chat, response, userId);
 
             // Extract final text response
-            const responseText = response.text();
+            let responseText = '';
+            try {
+                responseText = response.text() || '';
+            } catch (e) {
+                logger.debug('Failed to extract text from response, might be empty', { error: e.message });
+            }
+
+            // If the model finished function calls but generated no text, ask it to summarize
+            if (!responseText || responseText.trim() === '') {
+                logger.warn('Gemini returned empty text after processing, prompting for a summary message');
+                try {
+                    const followUp = await chat.sendMessage('הפעולה בוצעה. אנא כתוב הודעה קצרה וידידותית בעברית למשתמש המאשרת שהבקשה שלו טופלה בהצלחה.');
+                    responseText = followUp.response.text();
+                } catch (e) {
+                    logger.error('Failed to get summary response', { error: e.message });
+                    responseText = 'הפעולה בוצעה בהצלחה! 👍';
+                }
+            }
 
             // Store assistant response
             db.addChatMessage(userId, 'model', responseText);
