@@ -445,7 +445,7 @@
 
             const content = editor.value;
             saveBtn.disabled = true;
-            saveBtn.textContent = 'שומר...';
+            saveBtn.textContent = '...שומר';
 
             try {
                 const res = await fetch(`${apiPath}/${currentFile}`, {
@@ -578,7 +578,7 @@
 
     async function fetchHaEntities() {
         if (haDiscoverySection) haDiscoverySection.style.display = 'block';
-        if (haEntitiesTbody) haEntitiesTbody.innerHTML = '<tr><td style="text-align: center; padding: 20px;">טוען מכשירים מ-Home Assistant...</td></tr>';
+        if (haEntitiesTbody) haEntitiesTbody.innerHTML = '<tr><td style="text-align: center; padding: 20px;">...טוען מכשירים מ-Home Assistant</td></tr>';
 
         try {
             const res = await fetch('/api/ha/entities');
@@ -1015,7 +1015,7 @@
             if (!confirmed) return;
 
             btnDisconnectWa.disabled = true;
-            btnDisconnectWa.textContent = 'מתנתק...';
+            btnDisconnectWa.textContent = '...מתנתק';
 
             try {
                 const res = await fetch('/api/whatsapp/disconnect', { method: 'POST' });
@@ -1041,7 +1041,7 @@
     if (btnReconnectWa) {
         btnReconnectWa.addEventListener('click', async () => {
             btnReconnectWa.disabled = true;
-            btnReconnectWa.textContent = 'מתחבר...';
+            btnReconnectWa.textContent = '...מתחבר';
 
             try {
                 const res = await fetch('/api/whatsapp/reconnect', { method: 'POST' });
@@ -1121,7 +1121,7 @@
             if (!confirmed) return;
 
             btnRestart.disabled = true;
-            btnRestart.textContent = 'מפעיל מחדש...';
+            btnRestart.textContent = '...מפעיל מחדש';
 
             try {
                 await fetch('/api/restart', { method: 'POST' });
@@ -1189,7 +1189,7 @@
         if (!serverLogConsole) return;
 
         const lines = serverLogLines ? serverLogLines.value : 500;
-        serverLogConsole.innerHTML = '<div style="text-align: center; color: var(--gray); padding: 40px;">טוען...</div>';
+        serverLogConsole.innerHTML = '<div style="text-align: center; color: var(--gray); padding: 40px;">...טוען</div>';
 
         try {
             const res = await fetch(`/api/logs/file?lines=${lines}`);
@@ -1287,7 +1287,7 @@
         }
 
         saveSettingsBtn.disabled = true;
-        saveSettingsBtn.textContent = 'שומר...';
+        saveSettingsBtn.textContent = '...שומר';
 
         try {
             const res = await fetch('/api/settings', {
