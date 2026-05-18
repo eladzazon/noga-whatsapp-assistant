@@ -24,14 +24,14 @@ export const functionDeclarations = [
         name: 'list_calendar_events',
         description: 'רשימת אירועים מהיומן לטווח תאריכים. Get calendar events for a date range.',
         parameters: {
-            type: 'object',
+            type: 'OBJECT',
             properties: {
                 start_date: {
-                    type: 'string',
+                    type: 'STRING',
                     description: 'תאריך התחלה בפורמט YYYY-MM-DD. Start date in YYYY-MM-DD format.'
                 },
                 end_date: {
-                    type: 'string',
+                    type: 'STRING',
                     description: 'תאריך סיום בפורמט YYYY-MM-DD (אופציונלי). End date in YYYY-MM-DD format (optional).'
                 }
             },
@@ -42,26 +42,26 @@ export const functionDeclarations = [
         name: 'add_calendar_event',
         description: 'הוסף אירוע חדש ליומן. Add a new event to the calendar.',
         parameters: {
-            type: 'object',
+            type: 'OBJECT',
             properties: {
                 title: {
-                    type: 'string',
+                    type: 'STRING',
                     description: 'כותרת האירוע. Event title.'
                 },
                 date: {
-                    type: 'string',
+                    type: 'STRING',
                     description: 'תאריך האירוע בפורמט YYYY-MM-DD. Event date in YYYY-MM-DD format.'
                 },
                 time: {
-                    type: 'string',
+                    type: 'STRING',
                     description: 'שעת האירוע בפורמט HH:MM (אופציונלי). Event time in HH:MM format (optional).'
                 },
                 duration_minutes: {
-                    type: 'number',
+                    type: 'NUMBER',
                     description: 'משך האירוע בדקות, ברירת מחדל 60. Duration in minutes, default 60.'
                 },
                 description: {
-                    type: 'string',
+                    type: 'STRING',
                     description: 'תיאור האירוע (אופציונלי). Event description (optional).'
                 }
             },
@@ -75,11 +75,11 @@ export const functionDeclarations = [
         name: 'add_reminder',
         description: 'הוסף תזכורת או משימה שיש לבצע (To-Do). Noga will nudge the user until it is done. Add a new reminder.',
         parameters: {
-            type: 'object',
+            type: 'OBJECT',
             properties: {
-                title: { type: 'string', description: 'תיאור התזכורת. Task description.' },
-                due_date_iso: { type: 'string', description: 'מתי להזכיר לראשונה. חובה להשתמש בפורמט UTC ISO (למשל סיומת Z). Use UTC ISO format (ending with Z).' },
-                nudge_interval_minutes: { type: 'number', description: 'תדירות תזכורות חוזרות בדקות. ברירת מחדל 60.' }
+                title: { type: 'STRING', description: 'תיאור התזכורת. Task description.' },
+                due_date_iso: { type: 'STRING', description: 'מתי להזכיר לראשונה. חובה להשתמש בפורמט UTC ISO (למשל סיומת Z). Use UTC ISO format (ending with Z).' },
+                nudge_interval_minutes: { type: 'NUMBER', description: 'תדירות תזכורות חוזרות בדקות. ברירת מחדל 60.' }
             },
             required: ['title', 'due_date_iso']
         }
@@ -87,16 +87,16 @@ export const functionDeclarations = [
     {
         name: 'get_pending_reminders',
         description: 'הצג את כל התזכורות והמשימות שממתינות לביצוע. Get all pending reminders.',
-        parameters: { type: 'object', properties: {} }
+        parameters: { type: 'OBJECT', properties: { dummy: { type: 'STRING', description: 'Ignore' } } }
     },
     {
         name: 'update_reminder_status',
         description: 'עדכן סטטוס של תזכורת (לסמן כבוצע או מבוטל). Mark reminder as done or cancelled.',
         parameters: {
-            type: 'object',
+            type: 'OBJECT',
             properties: {
-                id: { type: 'number', description: 'מזהה התזכורת. Reminder ID.' },
-                status: { type: 'string', description: 'סטטוס חדש: "done" או "cancelled".' }
+                id: { type: 'NUMBER', description: 'מזהה התזכורת. Reminder ID.' },
+                status: { type: 'STRING', description: 'סטטוס חדש: "done" או "cancelled".' }
             },
             required: ['id', 'status']
         }
@@ -105,10 +105,10 @@ export const functionDeclarations = [
         name: 'snooze_reminder',
         description: 'דחה תזכורת קיימת לזמן מאוחר יותר. Snooze a reminder.',
         parameters: {
-            type: 'object',
+            type: 'OBJECT',
             properties: {
-                id: { type: 'number', description: 'מזהה התזכורת. Reminder ID.' },
-                new_due_date_iso: { type: 'string', description: 'תאריך ושעה חדשים לתזכורת. חובה להשתמש בפורמט UTC ISO (למשל סיומת Z).' }
+                id: { type: 'NUMBER', description: 'מזהה התזכורת. Reminder ID.' },
+                new_due_date_iso: { type: 'STRING', description: 'תאריך ושעה חדשים לתזכורת. חובה להשתמש בפורמט UTC ISO (למשל סיומת Z).' }
             },
             required: ['id', 'new_due_date_iso']
         }
@@ -121,10 +121,10 @@ export const functionDeclarations = [
         name: 'read_knowledge_file',
         description: 'Read the contents of a knowledge file (e.g., USER, HOME, MEMORY).',
         parameters: {
-            type: 'object',
+            type: 'OBJECT',
             properties: {
                 filename: {
-                    type: 'string',
+                    type: 'STRING',
                     description: 'The name of the file to read (e.g., "MEMORY.md").'
                 }
             },
@@ -135,14 +135,14 @@ export const functionDeclarations = [
         name: 'update_memory',
         description: 'Update the MEMORY.md file or any other knowledge file with new information.',
         parameters: {
-            type: 'object',
+            type: 'OBJECT',
             properties: {
                 filename: {
-                    type: 'string',
+                    type: 'STRING',
                     description: 'The name of the file to update (usually "MEMORY.md").'
                 },
                 content: {
-                    type: 'string',
+                    type: 'STRING',
                     description: 'The full new content to write to the file. You must include all previous important information and the new information.'
                 }
             },
@@ -153,14 +153,14 @@ export const functionDeclarations = [
         name: 'send_whatsapp_message',
         description: 'שלח הודעת וואטסאפ לאדם אחר או לקבוצה. השתמש בזה כשהמשתמש מבקש ממך למסור הודעה או לשלוח משהו לקבוצה המשפחתית. Send a WhatsApp message to the family group or admin.',
         parameters: {
-            type: 'object',
+            type: 'OBJECT',
             properties: {
                 recipient: {
-                    type: 'string',
+                    type: 'STRING',
                     description: 'הנמען. השתמש בערך "group" עבור הקבוצה המשפחתית, "admin" עבור המנהל, או מספר טלפון ספציפי.'
                 },
                 message: {
-                    type: 'string',
+                    type: 'STRING',
                     description: 'ההודעה שברצונך לשלוח (נסח בצורה טבעית וחברית בעברית).'
                 }
             },
@@ -171,14 +171,14 @@ export const functionDeclarations = [
         name: 'create_skill',
         description: 'Create a new skill (procedure) that teaches you how to perform a multi-step task.',
         parameters: {
-            type: 'object',
+            type: 'OBJECT',
             properties: {
                 skill_name: {
-                    type: 'string',
+                    type: 'STRING',
                     description: 'The name of the skill file (e.g., "guest_wifi_procedure.md").'
                 },
                 instructions: {
-                    type: 'string',
+                    type: 'STRING',
                     description: 'הוראות צעד אחר צעד בפורמט Markdown. אם המשתמש לא סיפק הוראות מדויקות, עלייך לייצר אותן בעצמך על סמך מטרת המיומנות. Step-by-step instructions in Markdown. Generate them yourself if not provided.'
                 }
             },
@@ -187,16 +187,17 @@ export const functionDeclarations = [
     },
     {
         name: 'list_memory',
-        description: 'List all available knowledge and memory files.'
+        description: 'List all available knowledge and memory files.',
+        parameters: { type: 'OBJECT', properties: { dummy: { type: 'STRING', description: 'Ignore' } } }
     },
     {
         name: 'delete_memory',
         description: 'Delete a knowledge or memory file.',
         parameters: {
-            type: 'object',
+            type: 'OBJECT',
             properties: {
                 filename: {
-                    type: 'string',
+                    type: 'STRING',
                     description: 'The name of the file to delete (e.g., "OLD_NOTES.md").'
                 }
             },
@@ -208,14 +209,14 @@ export const functionDeclarations = [
         name: 'fetch_url',
         description: 'Fetch and read the text content of any public URL (web page, plain text, etc.). Use this to read articles, documentation, or any website. Returns cleaned text suitable for summarizing.',
         parameters: {
-            type: 'object',
+            type: 'OBJECT',
             properties: {
                 url: {
-                    type: 'string',
+                    type: 'STRING',
                     description: 'The full URL to fetch (must start with http:// or https://).'
                 },
                 max_length: {
-                    type: 'number',
+                    type: 'NUMBER',
                     description: 'Maximum number of characters to return (default 50000). Lower this for large pages you only need a snippet of.'
                 }
             },
@@ -226,14 +227,14 @@ export const functionDeclarations = [
         name: 'fetch_rss',
         description: 'Fetch and parse an RSS or Atom news feed. Returns a clean list of articles with titles, links, publication dates, and summaries. Perfect for news briefings, blog updates, or any RSS-based content.',
         parameters: {
-            type: 'object',
+            type: 'OBJECT',
             properties: {
                 url: {
-                    type: 'string',
+                    type: 'STRING',
                     description: 'The full URL of the RSS or Atom feed.'
                 },
                 max_items: {
-                    type: 'number',
+                    type: 'NUMBER',
                     description: 'Maximum number of articles to return (default 10, max 30).'
                 }
             },
@@ -244,14 +245,14 @@ export const functionDeclarations = [
         name: 'web_search',
         description: 'חפש מידע באינטרנט. Search the web for any information - current events, exchange rates, weather, facts, people, places, products, etc. Use this when you need up-to-date information that you don\'t have in your knowledge. Returns search results with titles, snippets, and links.',
         parameters: {
-            type: 'object',
+            type: 'OBJECT',
             properties: {
                 query: {
-                    type: 'string',
+                    type: 'STRING',
                     description: 'שאילתת החיפוש (עברית או אנגלית). The search query in any language.'
                 },
                 max_results: {
-                    type: 'number',
+                    type: 'NUMBER',
                     description: 'Maximum number of results to return (default 5, max 10).'
                 }
             },
@@ -264,14 +265,14 @@ export const functionDeclarations = [
         name: 'control_device',
         description: 'שלוט במכשיר בבית חכם - הדלק, כבה או החלף מצב. Control a smart home device - turn on, off, or toggle.',
         parameters: {
-            type: 'object',
+            type: 'OBJECT',
             properties: {
                 entity_id: {
-                    type: 'string',
+                    type: 'STRING',
                     description: 'מזהה המכשיר (למשל light.living_room) או שם המכשיר. Entity ID or device name.'
                 },
                 action: {
-                    type: 'string',
+                    type: 'STRING',
                     enum: ['turn_on', 'turn_off', 'toggle', 'press'],
                     description: 'הפעולה לביצוע. Action to perform.'
                 }
@@ -283,10 +284,10 @@ export const functionDeclarations = [
         name: 'get_device_state',
         description: 'קבל את מצב מכשיר בבית חכם (מודלק/כבוי, טמפרטורה וכו׳). Get smart home device state.',
         parameters: {
-            type: 'object',
+            type: 'OBJECT',
             properties: {
                 entity_id: {
-                    type: 'string',
+                    type: 'STRING',
                     description: 'מזהה המכשיר או החיישן. Entity ID or sensor.'
                 }
             },
@@ -297,10 +298,10 @@ export const functionDeclarations = [
         name: 'list_devices',
         description: 'הצג רשימת מכשירים בבית החכם. List smart home devices.',
         parameters: {
-            type: 'object',
+            type: 'OBJECT',
             properties: {
-                type: {
-                    type: 'string',
+                device_type: {
+                    type: 'STRING',
                     description: 'סוג המכשירים (light, switch, sensor, climate). Device type filter.'
                 }
             }
@@ -310,14 +311,14 @@ export const functionDeclarations = [
         name: 'find_device',
         description: 'מצא מכשיר לפי שם. Find a device by name.',
         parameters: {
-            type: 'object',
+            type: 'OBJECT',
             properties: {
                 name: {
-                    type: 'string',
+                    type: 'STRING',
                     description: 'שם המכשיר לחיפוש. Device name to search.'
                 },
-                type: {
-                    type: 'string',
+                device_type: {
+                    type: 'STRING',
                     description: 'סוג המכשיר (אופציונלי). Device type (optional).'
                 }
             },
@@ -328,14 +329,14 @@ export const functionDeclarations = [
         name: 'set_light_brightness',
         description: 'קבע עוצמת תאורה. Set light brightness.',
         parameters: {
-            type: 'object',
+            type: 'OBJECT',
             properties: {
                 entity_id: {
-                    type: 'string',
+                    type: 'STRING',
                     description: 'מזהה התאורה. Light entity ID.'
                 },
                 brightness: {
-                    type: 'number',
+                    type: 'NUMBER',
                     description: 'עוצמה באחוזים (0-100). Brightness percentage (0-100).'
                 }
             },
@@ -590,8 +591,8 @@ export const functionHandlers = {
 
     list_devices: async (args) => {
         logger.info('Executing: list_devices', args);
-        if (args.type) {
-            return await homeAssistantManager.getEntitiesByDomain(args.type);
+        if (args.device_type) {
+            return await homeAssistantManager.getEntitiesByDomain(args.device_type);
         }
         return await homeAssistantManager.getEntities();
     },
@@ -600,10 +601,10 @@ export const functionHandlers = {
         logger.info('Executing: find_device', args);
 
         // 1. Check custom mappings
-        const mappings = db.findHaMappingsByName(args.name, args.type);
+        const mappings = db.findHaMappingsByName(args.name, args.device_type);
 
         // 2. Check native HA entities
-        const nativeResult = await homeAssistantManager.findEntityByName(args.name, args.type);
+        const nativeResult = await homeAssistantManager.findEntityByName(args.name, args.device_type);
 
         if (mappings.length > 0) {
             const mappedEntities = mappings.map(m => ({
