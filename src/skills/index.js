@@ -491,6 +491,10 @@ export const functionHandlers = {
             }
 
             await whatsappManager.sendMessage(targetJid, args.message);
+
+            // Log outbound message to chat history so Noga remembers what she sent
+            db.addChatMessage(targetJid, 'model', args.message);
+
             return { success: true, status: `Message sent successfully to ${args.recipient}` };
         } catch (err) {
             logger.error('Failed to execute send_whatsapp_message', { error: err.message });

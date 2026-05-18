@@ -6,6 +6,7 @@ import fs from 'fs';
 import path from 'path';
 import config from '../utils/config.js';
 import logger from '../utils/logger.js';
+import db from '../database/DatabaseManager.js';
 
 class WhatsAppManager {
     constructor() {
@@ -124,7 +125,12 @@ class WhatsAppManager {
                 if (config.whatsapp.adminPhone) {
                     const adminJid = `${config.whatsapp.adminPhone}@s.whatsapp.net`;
                     const bootTime = new Date().toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' });
-                    this.sendMessage(adminJid, `🚀 *נוגה התחברה בהצלחה!*\nהסיסטם מוכן לפעולה.\nזמן חיבור: ${bootTime}`);
+                    const bootMsg = `🚀 *נוגה התחברה בהצלחה!*\nהסיסטם מוכן לפעולה.\nזמן חיבור: ${bootTime}`;
+                    this.sendMessage(adminJid, bootMsg);
+                    // Log boot notification to chat history
+                    if (db && db.db) {
+                        db.addChatMessage(adminJid, 'model', bootMsg);
+                    }
                 }
             }
         });

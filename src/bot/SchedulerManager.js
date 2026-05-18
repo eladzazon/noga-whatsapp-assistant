@@ -80,8 +80,7 @@ class SchedulerManager {
                 // Log under the main group ID so Noga remembers what she said
                 const response = await this.geminiManager.processMessage(
                     config.whatsapp.groupId,
-                    promptData.prompt,
-                    { keepHistory: false } // Force fresh context for scheduled tasks
+                    promptData.prompt
                 );
 
                 // 2. Send the response to the WhatsApp group

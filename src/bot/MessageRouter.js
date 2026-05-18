@@ -76,7 +76,10 @@ class MessageRouter {
                 await whatsappManager.sendMessage(chat, response);
             } else {
                 logger.warn('Empty response generated', { from });
-                await whatsappManager.sendMessage(chat, 'סליחה, המערכת סיימה לעבד את הבקשה אבל לא ייצרה שום טקסט כתשובה. ייתכן שיש תקלה פנימית או שהפעולה בוצעה בשקט. 😅');
+                const fallbackMsg = 'סליחה, המערכת סיימה לעבד את הבקשה אבל לא ייצרה שום טקסט כתשובה. ייתכן שיש תקלה פנימית או שהפעולה בוצעה בשקט. 😅';
+                await whatsappManager.sendMessage(chat, fallbackMsg);
+                // Log fallback message to chat history
+                db.addChatMessage(from, 'model', fallbackMsg);
             }
         } catch (err) {
             logger.error('Error processing message', { error: err.message, from });
@@ -91,6 +94,8 @@ class MessageRouter {
                     : `סליחה, נתקלתי בתקלה ולכן לא יכולתי לענות לבקשתך 😅\n\n*פרטי התקלה להבנת הבעיה:*\n${err.message}`;
 
                 await whatsappManager.sendMessage(chat, errorMessage);
+                // Log error message to chat history
+                db.addChatMessage(from, 'model', errorMessage);
             } catch (sendErr) {
                 logger.error('Failed to send error message', { error: sendErr.message });
             }
