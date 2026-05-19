@@ -17,6 +17,7 @@ class WhatsAppManager {
         this.onMessageCallback = null;
         this.onReadyCallback = null;
         this.onDisconnectedCallback = null;
+        this.hasBooted = false;
     }
 
     /**
@@ -121,8 +122,9 @@ class WhatsAppManager {
                     this.onReadyCallback();
                 }
 
-                // Send boot notification to admin if configured
-                if (config.whatsapp.adminPhone) {
+                // Send boot notification to admin if configured - only on full start
+                if (!this.hasBooted && config.whatsapp.adminPhone) {
+                    this.hasBooted = true;
                     const adminJid = `${config.whatsapp.adminPhone}@s.whatsapp.net`;
                     const bootTime = new Date().toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' });
                     const bootMsg = `🚀 *נוגה התחברה בהצלחה!*\nהסיסטם מוכן לפעולה.\nזמן חיבור: ${bootTime}`;
