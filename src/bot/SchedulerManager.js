@@ -225,6 +225,18 @@ class SchedulerManager {
                     }
 
                     if (shouldNudge) {
+                        // Quiet hours check for subsequent nudges (allow first send always)
+                        if (reminder.last_nudged) {
+                            const tzNow = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Jerusalem' }));
+                            const timeMinutes = tzNow.getHours() * 60 + tzNow.getMinutes();
+                            const isQuietHours = timeMinutes >= (23 * 60 + 30) || timeMinutes < (5 * 60 + 30);
+                            
+                            if (isQuietHours) {
+                                logger.debug(`Reminder ${reminder.id} skipped due to quiet hours (23:30 - 05:30)`);
+                                continue;
+                            }
+                        }
+
                         // Use the tool-less broadcast model so we always get plain text back
                         const eventData = {
                             event: `Reminder Nudge: "${reminder.title}"`,
