@@ -32,14 +32,11 @@ class MessageRouter {
     async routeMessage(message) {
         const { from, chat, body, type, hasMedia, media } = message;
 
-        // Auto-clear context after 10 minutes of inactivity
-        const now = Date.now();
-        const lastTime = this.lastMessageTime.get(from);
-        if (lastTime && (now - lastTime) > this.CONTEXT_TIMEOUT_MS) {
-            logger.info('Auto-clearing chat context (10 min inactivity)', { from });
-            geminiManager.clearHistory(from);
-        }
-        this.lastMessageTime.set(from, now);
+        // We removed the 10-minute context auto-clear.
+        // Noga will naturally rely on the sliding window (last 40 messages) 
+        // to maintain context, allowing her to remember reminders she sent 
+        // even if the user replies hours later.
+        this.lastMessageTime.set(from, Date.now());
 
         // Skip if already processing a message from this user
         if (this.processingQueue.has(from)) {
