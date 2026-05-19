@@ -30,22 +30,24 @@ class MessageRouter {
      * Route incoming message to appropriate handler
      */
     async routeMessage(message) {
-        const { from, chat, body, type, hasMedia, media } = message;
+        const { from, chat, body, type, hasMedia, media, isGroup } = message;
+
+        const contextId = isGroup ? chat : from;
 
         // We removed the 10-minute context auto-clear.
         // Noga will naturally rely on the sliding window (last 40 messages) 
         // to maintain context, allowing her to remember reminders she sent 
         // even if the user replies hours later.
-        this.lastMessageTime.set(from, Date.now());
+        this.lastMessageTime.set(contextId, Date.now());
 
         // Skip if already processing a message from this user
-        if (this.processingQueue.has(from)) {
-            logger.debug('User already has message in queue', { from });
+        if (this.processingQueue.has(contextId)) {
+            logger.debug('Context already has message in queue', { contextId });
             return;
         }
 
         // Add to processing queue
-        this.processingQueue.set(from, Date.now());
+        this.processingQueue.set(contextId, Date.now());
 
         try {
             let response;
@@ -76,7 +78,7 @@ class MessageRouter {
                 const fallbackMsg = 'סליחה, המערכת סיימה לעבד את הבקשה אבל לא ייצרה שום טקסט כתשובה. ייתכן שיש תקלה פנימית או שהפעולה בוצעה בשקט. 😅';
                 await whatsappManager.sendMessage(chat, fallbackMsg);
                 // Log fallback message to chat history
-                db.addChatMessage(from, 'model', fallbackMsg);
+                db.addChatMessage(contextId, 'model', fallbackMsg);
             }
         } catch (err) {
             logger.error('Error processing message', { error: err.message, from });
@@ -92,13 +94,13 @@ class MessageRouter {
 
                 await whatsappManager.sendMessage(chat, errorMessage);
                 // Log error message to chat history
-                db.addChatMessage(from, 'model', errorMessage);
+                db.addChatMessage(contextId, 'model', errorMessage);
             } catch (sendErr) {
                 logger.error('Failed to send error message', { error: sendErr.message });
             }
         } finally {
             // Remove from processing queue
-            this.processingQueue.delete(from);
+            this.processingQueue.delete(contextId);
         }
     }
 
@@ -106,11 +108,14 @@ class MessageRouter {
      * Handle text messages
      */
     async handleTextMessage(message) {
-        const { from, body } = message;
+        const { from, body, chat, isGroup } = message;
 
         logger.info('Processing text message', { from, preview: body.substring(0, 50) });
 
-        return await this.processText(from, body, message);
+        const contextId = isGroup ? chat : from;
+        const textToProcess = isGroup ? `[Sender: ${from}]\n${body}` : body;
+
+        return await this.processText(contextId, textToProcess, message);
     }
 
     /**
@@ -153,7 +158,7 @@ class MessageRouter {
      * Handle voice messages
      */
     async handleVoiceMessage(message) {
-        const { from, chat, media } = message;
+        const { from, chat, media, isGroup } = message;
 
         logger.info('Processing voice message', { from });
 
@@ -164,11 +169,14 @@ class MessageRouter {
             // Ignore reaction errors
         }
 
+        const contextId = isGroup ? chat : from;
+
         // Process with Gemini multimodal
         const response = await geminiManager.processVoiceMessage(
-            from,
+            contextId,
             media.data,
-            media.mimetype
+            media.mimetype,
+            isGroup ? from : null
         );
 
         return response;
@@ -178,7 +186,7 @@ class MessageRouter {
      * Handle special commands
      */
     async handleCommand(message) {
-        const { from, body } = message;
+        const { from, body, chat, isGroup } = message;
         const command = body.toLowerCase().trim();
 
         logger.info('Processing command', { from, command });
@@ -186,6 +194,8 @@ class MessageRouter {
         // Admin-only commands require ADMIN_PHONE to be configured and match the sender
         const adminPhone = config.whatsapp.adminPhone;
         const isAdmin = adminPhone && from === adminPhone;
+
+        const contextId = isGroup ? chat : from;
 
         switch (command) {
             case '/help':
@@ -198,7 +208,7 @@ class MessageRouter {
 
             case '/clear':
             case '/נקה':
-                geminiManager.clearHistory(from);
+                geminiManager.clearHistory(contextId);
                 return 'היסטוריית השיחה נמחקה 🗑️';
 
             case '/log':
@@ -246,7 +256,8 @@ class MessageRouter {
 
             default:
                 // Unknown command - pass to Gemini
-                return geminiManager.processMessage(from, body);
+                const textToProcess = isGroup ? `[Sender: ${from}]\n${body}` : body;
+                return geminiManager.processMessage(contextId, textToProcess);
         }
     }
 

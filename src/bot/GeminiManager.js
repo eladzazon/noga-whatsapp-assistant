@@ -341,7 +341,7 @@ class GeminiManager {
      * @param {string} audioBase64 - Base64 encoded audio data
      * @param {string} mimeType - Audio MIME type
      */
-    async processVoiceMessage(userId, audioBase64, mimeType) {
+    async processVoiceMessage(userId, audioBase64, mimeType, senderId = null) {
         logger.info('Processing voice message with Gemini', { userId, mimeType });
 
         try {
@@ -366,14 +366,17 @@ class GeminiManager {
             };
 
             // Store reference to voice message
-            db.addChatMessage(userId, 'user', '[Voice Message]');
+            const logMsg = senderId ? `[Voice Message from Sender: ${senderId}]` : '[Voice Message]';
+            db.addChatMessage(userId, 'user', logMsg);
+
+            let senderHint = senderId ? `הודעה קולית זו נשלחה מקבוצה על ידי משתמש ${senderId}. ` : '';
 
             // Send audio for Hebrew transcription + response
             let result;
             try {
                 result = await chat.sendMessage([
                     audioPart,
-                    { text: `אתה מקבל הודעה קולית.
+                    { text: `${senderHint}אתה מקבל הודעה קולית.
 1. תמלל את ההודעה במדויק.
 2. אם יש בה בקשה או שאלה - טפל בה (כולל שימוש בכלים אם צריך).
 3. אם ההקלטה ארוכה מ-30 שניות, הוסף סיכום קצר בראשית.
