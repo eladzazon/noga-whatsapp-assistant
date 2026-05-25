@@ -886,6 +886,11 @@ select.form-input {
         flex-wrap: wrap;
         gap: 5px;
     }
+
+    .prompt-textarea {
+        min-height: 200px;
+        padding-bottom: 40px; /* Give some extra space at the bottom for mobile scrolling */
+    }
 }
 /* ==================== Chat Tab ==================== */
 .chat-messages {

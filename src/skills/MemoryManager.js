@@ -16,6 +16,31 @@ class MemoryManager {
         if (!fs.existsSync(this.skillsDir)) {
             fs.mkdirSync(this.skillsDir, { recursive: true });
         }
+        
+        // Copy defaults if directories are empty
+        const defaultsBase = path.resolve(process.cwd(), 'data_defaults');
+        const dirsToCheck = [
+            { path: this.knowledgeDir, defaultPath: path.join(defaultsBase, 'knowledge') },
+            { path: this.skillsDir, defaultPath: path.join(defaultsBase, 'skills') }
+        ];
+
+        for (const dirInfo of dirsToCheck) {
+            if (fs.existsSync(dirInfo.defaultPath)) {
+                const existingFiles = fs.readdirSync(dirInfo.path);
+                if (existingFiles.length === 0) {
+                    logger.info('Populating directory with defaults', { path: dirInfo.path });
+                    const defaultFiles = fs.readdirSync(dirInfo.defaultPath);
+                    for (const file of defaultFiles) {
+                        const srcFile = path.join(dirInfo.defaultPath, file);
+                        const destFile = path.join(dirInfo.path, file);
+                        if (fs.statSync(srcFile).isFile()) {
+                            fs.copyFileSync(srcFile, destFile);
+                        }
+                    }
+                }
+            }
+        }
+
         logger.info('MemoryManager initialized');
         return this;
     }

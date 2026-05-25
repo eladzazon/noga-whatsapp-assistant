@@ -18,13 +18,36 @@ class KnowledgeManager {
     }
 
     /**
-     * Ensure knowledge and skills directories exist
+     * Ensure knowledge and skills directories exist and populate with defaults if empty
      */
     _ensureDirectories() {
-        for (const dir of [this.knowledgePath, this.skillsPath]) {
-            if (!fs.existsSync(dir)) {
-                fs.mkdirSync(dir, { recursive: true });
-                logger.info('Created directory', { path: dir });
+        const defaultsBase = path.resolve(process.cwd(), 'data_defaults');
+        
+        const dirs = [
+            { path: this.knowledgePath, defaultPath: path.join(defaultsBase, 'knowledge') },
+            { path: this.skillsPath, defaultPath: path.join(defaultsBase, 'skills') }
+        ];
+
+        for (const dirInfo of dirs) {
+            if (!fs.existsSync(dirInfo.path)) {
+                fs.mkdirSync(dirInfo.path, { recursive: true });
+                logger.info('Created directory', { path: dirInfo.path });
+            }
+            
+            // Copy defaults if the target directory is empty
+            if (fs.existsSync(dirInfo.defaultPath)) {
+                const existingFiles = fs.readdirSync(dirInfo.path);
+                if (existingFiles.length === 0) {
+                    logger.info('Populating directory with defaults', { path: dirInfo.path });
+                    const defaultFiles = fs.readdirSync(dirInfo.defaultPath);
+                    for (const file of defaultFiles) {
+                        const srcFile = path.join(dirInfo.defaultPath, file);
+                        const destFile = path.join(dirInfo.path, file);
+                        if (fs.statSync(srcFile).isFile()) {
+                            fs.copyFileSync(srcFile, destFile);
+                        }
+                    }
+                }
             }
         }
     }
