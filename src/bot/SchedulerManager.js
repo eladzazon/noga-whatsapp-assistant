@@ -123,6 +123,7 @@ class SchedulerManager {
                     keywords: [],
                     ha_mappings: [],
                     scheduled_prompts: [],
+                    reminders: [],
                     settings: {}
                 };
 
@@ -141,6 +142,7 @@ class SchedulerManager {
                 backup.keywords = db.getKeywords().map(k => ({ keyword: k.keyword, response: k.response, type: k.type, enabled: k.enabled }));
                 backup.ha_mappings = db.getHaMappings().map(m => ({ entity_id: m.entity_id, nickname: m.nickname, location: m.location, type: m.type }));
                 backup.scheduled_prompts = db.getScheduledPrompts().map(p => ({ name: p.name, prompt: p.prompt, cron_expression: p.cron_expression, enabled: p.enabled }));
+                backup.reminders = db.getAllReminders();
                 
                 // Settings: .env baseline + DB overrides
                 const envPath = path.resolve(process.cwd(), '.env');
@@ -207,6 +209,14 @@ class SchedulerManager {
                     if (now < dueDate) continue; // Not due yet
 
                     let shouldNudge = false;
+                    if (reminder.nudge_count >= 10) {
+                        db.updateReminderStatus(reminder.id, 'cancelled');
+                        logger.info(`Reminder ${reminder.id} cancelled due to reaching nudge limit (10)`);
+                        const msg = `אני מפסיקה לנדנד על המשימה "${reminder.title}". סימנתי אותה כמבוטלת.`;
+                        await whatsappManager.sendMessage(config.whatsapp.groupId, msg);
+                        continue;
+                    }
+
                     if (!reminder.last_nudged) {
                         shouldNudge = true; // Never nudged
                         logger.debug(`Reminder ${reminder.id} needs first nudge (overdue and never nudged)`);

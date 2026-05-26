@@ -78,12 +78,22 @@ class DatabaseManager {
                 title TEXT NOT NULL,
                 due_date DATETIME NOT NULL,
                 last_nudged DATETIME,
+                nudge_count INTEGER DEFAULT 0,
                 nudge_interval_minutes INTEGER DEFAULT 60,
                 status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'done', 'cancelled')),
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
             );
         `);
+
+        // Migration: Add nudge_count column to reminders if missing
+        try {
+            const cols = this.db.pragma('table_info(reminders)');
+            if (cols.length > 0 && !cols.find(c => c.name === 'nudge_count')) {
+                this.db.exec("ALTER TABLE reminders ADD COLUMN nudge_count INTEGER DEFAULT 0");
+                console.log('[Database] Migrated reminders table: added nudge_count column');
+            }
+        } catch { /* table may not exist yet */ }
 
         console.log('[Database] Initialized successfully');
         return this;
@@ -625,11 +635,11 @@ class DatabaseManager {
     }
 
     /**
-     * Update the last_nudged timestamp
+     * Update the last_nudged timestamp and increment nudge_count
      */
     updateReminderLastNudged(id) {
         const isoString = new Date().toISOString();
-        const stmt = this.db.prepare("UPDATE reminders SET last_nudged = ? WHERE id = ?");
+        const stmt = this.db.prepare("UPDATE reminders SET last_nudged = ?, nudge_count = nudge_count + 1 WHERE id = ?");
         return stmt.run(isoString, id).changes > 0;
     }
 

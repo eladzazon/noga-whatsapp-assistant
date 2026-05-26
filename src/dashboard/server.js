@@ -810,6 +810,7 @@ class DashboardServer {
                     keywords: [],
                     ha_mappings: [],
                     scheduled_prompts: [],
+                    reminders: [],
                     settings: {}
                 };
 
@@ -839,6 +840,7 @@ class DashboardServer {
                 backup.scheduled_prompts = db.getScheduledPrompts().map(p => ({
                     name: p.name, prompt: p.prompt, cron_expression: p.cron_expression, enabled: p.enabled
                 }));
+                backup.reminders = db.getAllReminders();
 
                 // Settings: .env baseline + DB overrides (same as GET /api/settings)
                 const envPath = path.resolve(process.cwd(), '.env');
@@ -871,8 +873,8 @@ class DashboardServer {
 
         this.app.post('/api/restore', requireAuth, express.json({limit: '10mb'}), (req, res) => {
             try {
-                const { knowledge, skills, keywords, ha_mappings, scheduled_prompts, settings } = req.body;
-                if (!knowledge && !skills && !keywords && !ha_mappings && !scheduled_prompts && !settings) {
+                const { knowledge, skills, keywords, ha_mappings, scheduled_prompts, reminders, settings } = req.body;
+                if (!knowledge && !skills && !keywords && !ha_mappings && !scheduled_prompts && !reminders && !settings) {
                     return res.status(400).json({ error: 'Invalid backup format' });
                 }
 
@@ -922,6 +924,19 @@ class DashboardServer {
                             try { db.addScheduledPrompt(p.name, p.prompt, p.cron_expression, p.enabled); } catch { /* skip */ }
                         }
                         logger.info('Restored scheduled prompts', { count: scheduled_prompts.length });
+                    }
+
+                    if (reminders && Array.isArray(reminders)) {
+                        db.db.exec('DELETE FROM reminders');
+                        const stmt = db.db.prepare("UPDATE reminders SET last_nudged = ?, nudge_count = ?, created_at = ?, updated_at = ? WHERE id = ?");
+                        for (const r of reminders) {
+                            try { 
+                                const id = db.addReminder(r.title, r.due_date, r.nudge_interval_minutes);
+                                db.updateReminderStatus(id, r.status);
+                                stmt.run(r.last_nudged, r.nudge_count || 0, r.created_at, r.updated_at, id);
+                            } catch { /* skip */ }
+                        }
+                        logger.info('Restored reminders', { count: reminders.length });
                     }
 
                     if (settings && typeof settings === 'object') {
@@ -988,7 +1003,7 @@ class DashboardServer {
                     version: 2,
                     generated_at: new Date().toISOString(),
                     knowledge: {}, skills: {}, keywords: [],
-                    ha_mappings: [], scheduled_prompts: [], settings: {}
+                    ha_mappings: [], scheduled_prompts: [], reminders: [], settings: {}
                 };
 
                 if (fs.existsSync(knowledgeDir)) {
@@ -1004,6 +1019,7 @@ class DashboardServer {
                 backup.keywords = db.getKeywords().map(k => ({ keyword: k.keyword, response: k.response, type: k.type, enabled: k.enabled }));
                 backup.ha_mappings = db.getHaMappings().map(m => ({ entity_id: m.entity_id, nickname: m.nickname, location: m.location, type: m.type }));
                 backup.scheduled_prompts = db.getScheduledPrompts().map(p => ({ name: p.name, prompt: p.prompt, cron_expression: p.cron_expression, enabled: p.enabled }));
+                backup.reminders = db.getAllReminders();
 
                 // Settings: .env baseline + DB overrides
                 const envPath2 = path.resolve(process.cwd(), '.env');

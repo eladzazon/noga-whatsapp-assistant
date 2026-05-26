@@ -39,6 +39,18 @@ CREATE TABLE IF NOT EXISTS audit_log (
 );
 
 -- Keyword-based custom responses
+CREATE TABLE IF NOT EXISTS reminders (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    due_date DATETIME NOT NULL,
+    last_nudged DATETIME,
+    nudge_count INTEGER DEFAULT 0,
+    nudge_interval_minutes INTEGER DEFAULT 60,
+    status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'done', 'cancelled')),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS keywords (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     keyword TEXT NOT NULL UNIQUE COLLATE NOCASE,
