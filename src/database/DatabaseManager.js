@@ -664,6 +664,20 @@ class DatabaseManager {
         const stmt = this.db.prepare("DELETE FROM reminders WHERE id = ?");
         return stmt.run(id).changes > 0;
     }
+
+    /**
+     * Delete reminders with status 'done' or 'cancelled' that were updated more than N days ago
+     * @param {number} days - Number of days after which to prune (default 7)
+     * @returns {number} Number of deleted reminders
+     */
+    pruneExpiredReminders(days = 7) {
+        const stmt = this.db.prepare(`
+            DELETE FROM reminders
+            WHERE status IN ('done', 'cancelled')
+            AND updated_at < datetime('now', '-' || ? || ' days')
+        `);
+        return stmt.run(days).changes;
+    }
 }
 
 // Export singleton instance
