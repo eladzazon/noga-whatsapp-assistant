@@ -5,6 +5,34 @@ import db from '../database/DatabaseManager.js';
 import fs from 'fs';
 import path from 'path';
 
+// Pricing per 1M tokens (USD) – update when Google changes rates
+const MODEL_PRICING = {
+    'gemini-3.5-flash':      { input: 1.50, output: 9.00 },
+    'gemini-2.5-pro':        { input: 1.25, output: 10.00 },
+    'gemini-2.5-flash':      { input: 0.30, output: 2.50 },
+    'gemini-2.5-flash-lite': { input: 0.10, output: 0.40 },
+    'gemini-2.0-flash':      { input: 0.10, output: 0.40 },
+    'gemini-1.5-flash':      { input: 0.35, output: 1.05 },
+    'gemini-1.5-pro':        { input: 1.25, output: 5.00 },
+};
+
+/**
+ * Get pricing for a model name, using prefix matching for versioned names
+ * e.g. "gemini-2.5-flash-preview-05-20" matches "gemini-2.5-flash"
+ */
+function getModelPricing(modelName) {
+    if (!modelName) return MODEL_PRICING['gemini-2.5-flash'];
+    // Exact match first
+    if (MODEL_PRICING[modelName]) return MODEL_PRICING[modelName];
+    // Prefix match (longest first)
+    const keys = Object.keys(MODEL_PRICING).sort((a, b) => b.length - a.length);
+    for (const key of keys) {
+        if (modelName.startsWith(key)) return MODEL_PRICING[key];
+    }
+    // Fallback
+    return MODEL_PRICING['gemini-2.5-flash'];
+}
+
 class GeminiManager {
     constructor() {
         this.genAI = null;
@@ -281,11 +309,10 @@ class GeminiManager {
                 const outputTokens = usage.candidatesTokenCount || 0;
                 const totalTokens = usage.totalTokenCount || 0;
 
-                // Pricing (Gemini 2.5 Flash)
-                // Input: $0.30 / 1M tokens
-                // Output: $2.50 / 1M tokens
-                const inputCost = (inputTokens / 1000000) * 0.30;
-                const outputCost = (outputTokens / 1000000) * 2.50;
+                // Pricing based on active model
+                const pricing = getModelPricing(config.gemini.model);
+                const inputCost = (inputTokens / 1000000) * pricing.input;
+                const outputCost = (outputTokens / 1000000) * pricing.output;
                 const totalCost = inputCost + outputCost;
 
                 try {
