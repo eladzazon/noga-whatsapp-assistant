@@ -1,10 +1,13 @@
 import axios from 'axios';
 import config from '../utils/config.js';
 import logger from '../utils/logger.js';
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 
 class HomeAssistantManager {
     constructor() {
-        this.client = null;
+        this.client = null; // Axios client (for fallback/finding entities)
+        this.mcpClient = null; // New MCP client
         this.baseUrl = null;
     }
 
@@ -21,6 +24,7 @@ class HomeAssistantManager {
 
         this.baseUrl = url.replace(/\/$/, ''); // Remove trailing slash
 
+        // Keep Axios for legacy fuzzy search
         this.client = axios.create({
             baseURL: `${this.baseUrl}/api`,
             headers: {
@@ -30,23 +34,51 @@ class HomeAssistantManager {
             timeout: 10000
         });
 
-        // Test connection
+        // Initialize MCP Client
         try {
-            const response = await this.client.get('/');
-            logger.info('Home Assistant connected', { message: response.data.message });
+            logger.info('Initializing Home Assistant MCP client...');
+            
+            const transport = new StreamableHTTPClientTransport(new URL(`${this.baseUrl}/api/mcp`), {
+                requestInit: {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                }
+            });
+
+            this.mcpClient = new Client({
+                name: "noga-whatsapp-assistant",
+                version: "1.0.0"
+            }, {
+                capabilities: {
+                    prompts: {},
+                    resources: {},
+                    tools: {}
+                }
+            });
+
+            await this.mcpClient.connect(transport);
+            logger.info('Home Assistant MCP client connected successfully');
         } catch (err) {
-            logger.error('Failed to connect to Home Assistant', { error: err.message });
-            this.client = null;
+            logger.error('Failed to connect to Home Assistant MCP server', { error: err.message });
+            this.mcpClient = null;
         }
 
         return this;
     }
 
     /**
-     * Check if Home Assistant is available
+     * Check if Home Assistant MCP is available
      */
     isAvailable() {
-        return !!this.client;
+        return !!this.mcpClient;
+    }
+
+    /**
+     * Get the MCP Client instance
+     */
+    getMcpClient() {
+        return this.mcpClient;
     }
 
     /**
@@ -95,177 +127,6 @@ class HomeAssistantManager {
             success: true,
             count: filtered.length,
             entities: filtered
-        };
-    }
-
-    /**
-     * Get state of a specific entity
-     * @param {string} entityId - Entity ID
-     */
-    async getState(entityId) {
-        if (!this.isAvailable()) {
-            return { error: 'Home Assistant not available' };
-        }
-
-        try {
-            const response = await this.client.get(`/states/${entityId}`);
-
-            return {
-                success: true,
-                entity: {
-                    id: response.data.entity_id,
-                    state: response.data.state,
-                    name: response.data.attributes.friendly_name || entityId,
-                    attributes: response.data.attributes,
-                    lastChanged: response.data.last_changed
-                }
-            };
-        } catch (err) {
-            logger.error('Failed to get entity state', { error: err.message, entityId });
-            return { error: err.message };
-        }
-    }
-
-    /**
-     * Turn on an entity
-     * @param {string} entityId - Entity ID
-     */
-    async turnOn(entityId) {
-        return this._callService(entityId, 'turn_on');
-    }
-
-    /**
-     * Turn off an entity
-     * @param {string} entityId - Entity ID
-     */
-    async turnOff(entityId) {
-        return this._callService(entityId, 'turn_off');
-    }
-
-    /**
-     * Toggle an entity
-     * @param {string} entityId - Entity ID
-     */
-    async toggle(entityId) {
-        return this._callService(entityId, 'toggle');
-    }
-
-    /**
-     * Press an entity (for buttons)
-     * @param {string} entityId - Entity ID
-     */
-    async press(entityId) {
-        return this._callService(entityId, 'press');
-    }
-
-    /**
-     * Call a service on an entity
-     * @param {string} entityId - Entity ID
-     * @param {string} action - Service action
-     * @param {Object} data - Additional service data
-     */
-    async _callService(entityId, action, data = {}) {
-        if (!this.isAvailable()) {
-            return { error: 'Home Assistant not available' };
-        }
-
-        try {
-            const domain = entityId.split('.')[0];
-            
-            // Map actions for specific domains (e.g. buttons cannot be "turned on", they are pressed)
-            if ((domain === 'button' || domain === 'input_button') && (action === 'turn_on' || action === 'toggle')) {
-                action = 'press';
-            }
-            
-            const endpoint = `/services/${domain}/${action}`;
-            const payload = {
-                entity_id: entityId,
-                ...data
-            };
-
-            logger.info('Calling HA service', {
-                endpoint,
-                entityId,
-                action,
-                domain,
-                payload: JSON.stringify(payload)
-            });
-
-            const response = await this.client.post(endpoint, payload);
-
-            logger.info('HA service response', {
-                entityId,
-                action,
-                status: response.status,
-                dataLength: response.data ? response.data.length : 0,
-                data: JSON.stringify(response.data).substring(0, 200)
-            });
-
-            // Verify the state changed by getting the new state
-            const newState = await this.getState(entityId);
-
-            return {
-                success: true,
-                entityId,
-                action,
-                newState: newState.entity ? newState.entity.state : 'unknown',
-                result: response.data
-            };
-        } catch (err) {
-            logger.error('Failed to call HA service', {
-                error: err.message,
-                entityId,
-                action,
-                responseData: err.response?.data,
-                responseStatus: err.response?.status
-            });
-            return {
-                success: false,
-                error: err.message,
-                details: err.response?.data
-            };
-        }
-    }
-
-    /**
-     * Set light brightness
-     * @param {string} entityId - Light entity ID
-     * @param {number} brightness - Brightness (0-255) or percentage (0-100)
-     */
-    async setBrightness(entityId, brightness) {
-        // Convert percentage to 0-255 if needed
-        const brightnessValue = brightness <= 100 ? Math.round(brightness * 2.55) : brightness;
-
-        return this._callService(entityId, 'turn_on', { brightness: brightnessValue });
-    }
-
-    /**
-     * Set light color
-     * @param {string} entityId - Light entity ID
-     * @param {number[]} rgbColor - RGB color array [r, g, b]
-     */
-    async setColor(entityId, rgbColor) {
-        return this._callService(entityId, 'turn_on', { rgb_color: rgbColor });
-    }
-
-    /**
-     * Get sensor reading with friendly formatting
-     * @param {string} entityId - Sensor entity ID
-     */
-    async getSensorReading(entityId) {
-        const result = await this.getState(entityId);
-
-        if (result.error) return result;
-
-        const { state, attributes, name } = result.entity;
-        const unit = attributes.unit_of_measurement || '';
-
-        return {
-            success: true,
-            name,
-            value: state,
-            unit,
-            formatted: `${state}${unit}`
         };
     }
 

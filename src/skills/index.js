@@ -262,54 +262,8 @@ export const functionDeclarations = [
 
     // ==================== Home Assistant Functions ====================
     {
-        name: 'control_device',
-        description: 'שלוט במכשיר בבית חכם - הדלק, כבה או החלף מצב. Control a smart home device - turn on, off, or toggle.',
-        parameters: {
-            type: 'OBJECT',
-            properties: {
-                entity_id: {
-                    type: 'STRING',
-                    description: 'מזהה המכשיר (למשל light.living_room) או שם המכשיר. Entity ID or device name.'
-                },
-                action: {
-                    type: 'STRING',
-                    enum: ['turn_on', 'turn_off', 'toggle', 'press'],
-                    description: 'הפעולה לביצוע. Action to perform.'
-                }
-            },
-            required: ['entity_id', 'action']
-        }
-    },
-    {
-        name: 'get_device_state',
-        description: 'קבל את מצב מכשיר בבית חכם (מודלק/כבוי, טמפרטורה וכו׳). Get smart home device state.',
-        parameters: {
-            type: 'OBJECT',
-            properties: {
-                entity_id: {
-                    type: 'STRING',
-                    description: 'מזהה המכשיר או החיישן. Entity ID or sensor.'
-                }
-            },
-            required: ['entity_id']
-        }
-    },
-    {
-        name: 'list_devices',
-        description: 'הצג רשימת מכשירים בבית החכם. List smart home devices.',
-        parameters: {
-            type: 'OBJECT',
-            properties: {
-                device_type: {
-                    type: 'STRING',
-                    description: 'סוג המכשירים (light, switch, sensor, climate). Device type filter.'
-                }
-            }
-        }
-    },
-    {
         name: 'find_device',
-        description: 'מצא מכשיר לפי שם. Find a device by name.',
+        description: 'מצא מכשיר לפי שם. Find a device by name. Use this tool BEFORE calling Home Assistant MCP tools if you are unsure of the exact entity_id, as it supports custom nicknames.',
         parameters: {
             type: 'OBJECT',
             properties: {
@@ -324,67 +278,8 @@ export const functionDeclarations = [
             },
             required: ['name']
         }
-    },
-    {
-        name: 'set_light_brightness',
-        description: 'קבע עוצמת תאורה. Set light brightness.',
-        parameters: {
-            type: 'OBJECT',
-            properties: {
-                entity_id: {
-                    type: 'STRING',
-                    description: 'מזהה התאורה. Light entity ID.'
-                },
-                brightness: {
-                    type: 'NUMBER',
-                    description: 'עוצמה באחוזים (0-100). Brightness percentage (0-100).'
-                }
-            },
-            required: ['entity_id', 'brightness']
-        }
     }
 ];
-
-/**
- * Helper to resolve an entity identifier (ID or friendly name) to a valid HA entity ID.
- * Prioritizes custom mappings from the database.
- * @param {string} identifier - The ID or name to resolve
- * @returns {Promise<string|Object>} - Resolved entity ID or error object
- */
-async function resolveEntityId(identifier) {
-    if (!identifier) return { error: 'No entity identifier provided' };
-
-    // 1. Check if it's already a valid entity ID that exists in mappings
-    // (This handles cases where Gemini uses the real ID)
-    const exactMapping = db.getHaMappings().find(m => m.entity_id === identifier);
-    if (exactMapping) return exactMapping.entity_id;
-
-    // 2. Identify if it looks like a friendly name
-    const looksLikeFriendlyName = !identifier.includes('.') ||
-        /[A-Z]/.test(identifier) ||
-        /\s/.test(identifier) ||
-        /[\u0590-\u05FF]/.test(identifier);
-
-    // 3. Check custom mappings by nickname/location
-    const mappings = db.findHaMappingsByName(identifier);
-    if (mappings.length > 0) {
-        logger.info('Resolved entity via custom mappings', { original: identifier, resolved: mappings[0].entity_id });
-        return mappings[0].entity_id;
-    }
-
-    // 4. If it looks like a friendly name, try native HA search
-    if (looksLikeFriendlyName) {
-        const result = await homeAssistantManager.findEntityByName(identifier);
-        if (result.success && result.entities.length > 0) {
-            logger.info('Resolved entity via HA native search', { original: identifier, resolved: result.entities[0].id });
-            return result.entities[0].id;
-        }
-        return result; // Return the search failure result
-    }
-
-    // 5. Default: return as-is (assume it's a real entity ID)
-    return identifier;
-}
 
 /**
  * Map function names to their handlers
@@ -532,75 +427,6 @@ export const functionHandlers = {
     },
 
     // ==================== Home Assistant Handlers ====================
-    control_device: async (args) => {
-        logger.info('Executing: control_device', args);
-
-        const resolved = await resolveEntityId(args.entity_id);
-        if (typeof resolved === 'object' && resolved.success === false) return resolved;
-        if (typeof resolved === 'object' && resolved.error) return resolved;
-
-        const entityId = resolved;
-
-        switch (args.action) {
-            case 'turn_on':
-                return await homeAssistantManager.turnOn(entityId);
-            case 'turn_off':
-                return await homeAssistantManager.turnOff(entityId);
-            case 'toggle':
-                return await homeAssistantManager.toggle(entityId);
-            case 'press':
-                return await homeAssistantManager.press(entityId);
-            default:
-                return { error: `Unknown action: ${args.action}` };
-        }
-    },
-
-    get_device_state: async (args) => {
-        logger.info('Executing: get_device_state', args);
-
-        const resolved = await resolveEntityId(args.entity_id);
-        if (typeof resolved === 'object' && resolved.success === false) return resolved;
-        if (typeof resolved === 'object' && resolved.error) return resolved;
-
-        const entityId = resolved;
-
-        // Check if it's a sensor
-        if (entityId.startsWith('sensor.')) {
-            const sensorResult = await homeAssistantManager.getSensorReading(entityId);
-            logger.info('get_device_state RESULT (sensor)', { entityId, result: sensorResult });
-            return sensorResult;
-        }
-
-        let stateResult = await homeAssistantManager.getState(entityId);
-
-        // Final fallback: if state failed (e.g. 404) and we haven't tried searching yet,
-        // it's possible Gemini used an incorrect entity ID format.
-        if (!stateResult.success && entityId.includes('.')) {
-            logger.info('Native state check failed, trying fuzzy search fallback...', { entityId });
-            const domain = entityId.split('.')[0];
-            const name = entityId.split('.')[1] || entityId;
-            const searchResult = await homeAssistantManager.findEntityByName(name, domain);
-            if (searchResult.success && searchResult.entities.length > 0) {
-                stateResult = await homeAssistantManager.getState(searchResult.entities[0].id);
-            }
-        }
-
-        logger.info('get_device_state RESULT', {
-            entityId,
-            state: stateResult.entity?.state,
-            success: stateResult.success
-        });
-        return stateResult;
-    },
-
-    list_devices: async (args) => {
-        logger.info('Executing: list_devices', args);
-        if (args.device_type) {
-            return await homeAssistantManager.getEntitiesByDomain(args.device_type);
-        }
-        return await homeAssistantManager.getEntities();
-    },
-
     find_device: async (args) => {
         logger.info('Executing: find_device', args);
 
@@ -627,11 +453,6 @@ export const functionHandlers = {
         }
 
         return nativeResult;
-    },
-
-    set_light_brightness: async (args) => {
-        logger.info('Executing: set_light_brightness', args);
-        return await homeAssistantManager.setBrightness(args.entity_id, args.brightness);
     }
 };
 
@@ -644,6 +465,50 @@ export async function initializeSkills() {
     await calendarManager.init();
     await homeAssistantManager.init();
     await memoryManager.init();
+
+    // Register MCP tools dynamically
+    if (homeAssistantManager.isAvailable()) {
+        try {
+            const mcpClient = homeAssistantManager.getMcpClient();
+            const { tools } = await mcpClient.listTools();
+            logger.info(`Fetched ${tools.length} MCP tools from Home Assistant`);
+
+            for (const tool of tools) {
+                // Add to declarations
+                functionDeclarations.push({
+                    name: tool.name,
+                    description: tool.description || `Home Assistant MCP Tool: ${tool.name}`,
+                    parameters: {
+                        type: 'OBJECT',
+                        properties: tool.inputSchema?.properties || {},
+                        required: tool.inputSchema?.required || []
+                    }
+                });
+
+                // Add to handlers
+                functionHandlers[tool.name] = async (args) => {
+                    logger.info(`Executing MCP tool: ${tool.name}`, args);
+                    try {
+                        const result = await mcpClient.callTool({
+                            name: tool.name,
+                            arguments: args
+                        });
+                        
+                        if (result && result.content && result.content.length > 0) {
+                            const text = result.content[0].text;
+                            try { return JSON.parse(text); } catch (e) { return { result: text }; }
+                        }
+                        return { success: true };
+                    } catch (err) {
+                        logger.error(`Error executing MCP tool ${tool.name}`, { error: err.message });
+                        return { error: err.message };
+                    }
+                };
+            }
+        } catch (err) {
+            logger.error('Failed to register MCP tools', { error: err.message });
+        }
+    }
 
     logger.info('All skills initialized');
 

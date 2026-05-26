@@ -2,11 +2,21 @@
 
 This guide explains how to connect your Home Assistant to Noga, so she can announce smart home events to your family WhatsApp group using AI.
 
-## 1. Setup in Noga
+## 1. Prerequisites
 
-First, ensure your `.env` file has a secure webhook secret:
+Before connecting Noga to Home Assistant, you must install the official **Home Assistant MCP Server Add-on**:
+1. In Home Assistant, go to **Settings** > **Add-ons**.
+2. Search for **MCP Server** and install the official integration.
+3. Configure it to expose `/api/mcp`.
+4. Generate a Long-Lived Access Token in your Home Assistant user profile.
+
+## 2. Setup in Noga
+
+First, ensure your `.env` file has a secure webhook secret and your Home Assistant credentials:
 ```ini
 WEBHOOK_SECRET=my_super_secret_webhook_key_123
+HOME_ASSISTANT_URL=https://ha.example.com
+HOME_ASSISTANT_TOKEN=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ```
 
 ## 2. Configure Home Assistant
@@ -156,9 +166,11 @@ action:
 **Noga will send:** The image of the front door with the exact text provided in the `event` field as the caption: "Motion detected at the front door". 
 *(Note: To ensure fast delivery, Noga bypasses AI text generation when an image is attached and simply uses your exact event text).*
 
-## 5. Control from WhatsApp (Entity Mapping)
+## 5. Control from WhatsApp (Entity Mapping & MCP)
 
-You can now control your Home Assistant devices directly from WhatsApp using friendly Hebrew nicknames.
+Noga uses the **Model Context Protocol (MCP)** to automatically pull all available services directly from your Home Assistant instance. This means Noga immediately knows how to control your lights, switches, media players, and more, without needing custom code.
+
+To make things even easier, you can assign friendly Hebrew nicknames to your devices so Noga knows exactly what you mean when you speak naturally.
 
 ### Setup Mappings
 1. Open the Noga Dashboard.
@@ -174,7 +186,7 @@ Once mapped, you can send these commands to Noga:
 - "כבי את המזגן בסלון" (Turn off the living room AC)
 - "מה המצב של התאורה בכניסה?" (What's the status of the entrance lighting?)
 
-Noga uses your custom nicknames and locations to precisely identify which device you want to control.
+Noga uses your custom nicknames to find the exact Home Assistant `entity_id` and then uses the official MCP tools (like `HassTurnOn`, `HassTurnOff`, or `GetLiveContext`) to perform the action!
 
 ## 6. AI Quota Handling
 
