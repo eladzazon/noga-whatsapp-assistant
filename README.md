@@ -1,14 +1,15 @@
 # 🏠 נוגה (Noga) - WhatsApp AI Home Assistant
 
-A modular, Dockerized home assistant accessible via WhatsApp, powered by Google Gemini 2.0 Flash with Hebrew/English support.
+A modular, Dockerized home assistant accessible via WhatsApp, powered by Google Gemini with Hebrew/English support.
 
-<img width="1224" height="738" alt="{07E0F28E-38E2-4D07-9054-15B015BEEF79}" src="https://github.com/user-attachments/assets/d8152253-b7b3-423a-925b-295da876cbff" />
+<img width="1248" height="665" alt="image" src="https://github.com/user-attachments/assets/8471b966-f68f-4b06-982a-e2bd0d2ed57e" />
+
 
 
 ## ✨ Features
 
 - **WhatsApp Integration** - Chat with your home assistant via WhatsApp (text & voice)
-- **Gemini AI** - Powered by Google's Gemini 2.0 Flash with function calling
+- **Gemini AI** - Powered by Google's Gemini with function calling
 - **Google Calendar** - View, add, and manage calendar events
 - **Shopping List** - Manage a shared shopping list via Google Tasks
 - **Home Assistant** - Control smart home devices and check sensors with custom Hebrew nicknames and location mapping
