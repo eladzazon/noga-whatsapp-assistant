@@ -279,6 +279,11 @@
             if (data.gemini) {
                 const label = data.gemini.quotaExceeded ? 'מכסה נגמרה' : (data.gemini.isInitialized ? 'פעיל' : 'לא פעיל');
                 updateStatusItem('gemini', data.gemini.isInitialized && !data.gemini.quotaExceeded, label);
+                
+                const modelEl = document.getElementById('status-gemini-model');
+                if (modelEl && data.gemini.model) {
+                    modelEl.textContent = data.gemini.model;
+                }
             }
 
             if (data.skills) {
