@@ -127,7 +127,7 @@ class GeminiManager {
         if (db) {
             const reminders = db.getPendingReminders();
             if (reminders && reminders.length > 0) {
-                pendingRemindersInfo = `\nPending Reminders (To-Do): ${reminders.map(r => `[ID: ${r.id}] ${r.title}`).join(', ')}. If the user says "done", "I did it", or reacts with a thumbs up / "like" emoji (👍), check the chat history for the "Internal Context: Reminder ID X" tag to know exactly which task they are reacting to, and use update_reminder_status to mark it done.`;
+                pendingRemindersInfo = `\nPending Reminders (To-Do): ${reminders.map(r => `[ID: ${r.id}] ${r.title}`).join(', ')}. If the user says "done", "I did it", or reacts with a thumbs up / "like" emoji (👍), check the chat history for the "[Internal Context: Reminder ID X]" tag to know exactly which task they are reacting to, and use update_reminder_status to mark it done. IMPORTANT: Never include "[Internal Context: ...]" tags in your responses to the user. These are internal system metadata only.`;
             }
         }
 
@@ -267,6 +267,9 @@ class GeminiManager {
                     responseText = 'הפעולה בוצעה בהצלחה! 👍';
                 }
             }
+
+            // Strip any internal context tags that Gemini may have echoed
+            responseText = responseText.replace(/\s*\[Internal Context:[^\]]*\]/gi, '').trim();
 
             // Store assistant response
             db.addChatMessage(userId, 'model', responseText);
