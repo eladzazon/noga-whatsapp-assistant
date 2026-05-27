@@ -4,6 +4,9 @@
   "description": "WhatsApp AI Home Assistant powered by Gemini",
   "main": "src/index.js",
   "type": "module",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js"

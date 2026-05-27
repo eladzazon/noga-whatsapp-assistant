@@ -138,7 +138,7 @@ class HomeAssistantManager {
     async findEntityByName(name, domain = null) {
         logger.info('Finding entity by name', { name, domain });
 
-        const result = domain
+        let result = domain
             ? await this.getEntitiesByDomain(domain)
             : await this.getEntities();
 
@@ -164,6 +164,32 @@ class HomeAssistantManager {
                     nameLower.includes(word) || idLower.includes(word)
                 );
             });
+        }
+
+        // Fallback: If domain was provided but no matches found, try searching ALL entities
+        if (matches.length === 0 && domain) {
+            logger.info(`No matches found in domain ${domain}, falling back to all entities`);
+            const allEntitiesResult = await this.getEntities();
+            if (!allEntitiesResult.error) {
+                result = allEntitiesResult;
+                
+                // Retry exact match on all entities
+                matches = result.entities.filter(entity =>
+                    entity.name.toLowerCase().includes(searchLower) ||
+                    entity.id.toLowerCase().includes(searchLower)
+                );
+
+                // Retry all words match on all entities
+                if (matches.length === 0 && searchWords.length > 1) {
+                    matches = result.entities.filter(entity => {
+                        const nameLower = entity.name.toLowerCase();
+                        const idLower = entity.id.toLowerCase();
+                        return searchWords.every(word =>
+                            nameLower.includes(word) || idLower.includes(word)
+                        );
+                    });
+                }
+            }
         }
 
         // Log what we found

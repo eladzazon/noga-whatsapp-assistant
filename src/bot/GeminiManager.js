@@ -199,139 +199,165 @@ class GeminiManager {
     async processMessage(userId, text, options = {}) {
         logger.info('Processing message with Gemini', { userId, textLength: text.length });
 
-        try {
-            // Check if this is a volatile request (devices, calendar, etc)
-            const isVolatileRequest = this._isVolatileRequestMessage(text);
+        // Check if this is a volatile request (devices, calendar, etc)
+        const isVolatileRequest = this._isVolatileRequestMessage(text);
 
-            // Always use history to maintain context, even for volatile requests.
-            // This allows resolving relative pronouns like "it", "them", "that" correctly.
-            let history = [];
-            if (options.keepHistory === false) {
-                logger.info('keepHistory explicitly false - using empty history');
-            } else {
-                history = this._buildHistory(userId);
+        // Always use history to maintain context, even for volatile requests.
+        let history = [];
+        if (options.keepHistory === false) {
+            logger.info('keepHistory explicitly false - using empty history');
+        } else {
+            history = this._buildHistory(userId);
+        }
+
+        // ── Context Awareness: inject a hint for short follow-up messages ──
+        let textToSend = text;
+        if (!isVolatileRequest && history.length > 0) {
+            const wordCount = text.trim().split(/\s+/).length;
+            if (wordCount <= 10 && !text.startsWith('[')) {
+                const lastMsg = history[history.length - 1].parts[0].text;
+                const truncatedLast = lastMsg.length > 100 ? lastMsg.substring(0, 100) + '...' : lastMsg;
+                textToSend = `[Context Note: This is a short message following our last exchange: "${truncatedLast}". Please interpret this new message relative to that context.]\n${text}`;
+                logger.info('Context hint injected (short follow-up)', { wordCount });
             }
+        }
 
-            // Start chat session
-            const chat = this._getModel().startChat({
-                history,
-                generationConfig: {
-                    maxOutputTokens: 1024,
-                    temperature: 0.1  // Very low temperature for deterministic function calls
-                }
-            });
+        // Store user message once
+        db.addChatMessage(userId, 'user', text);
 
-            // ── Context Awareness: inject a hint for short follow-up messages ──
-            // If message is short (<=10 words) and history exists, it's likely a continuation
-            let textToSend = text;
-            if (!isVolatileRequest && history.length > 0) {
-                const wordCount = text.trim().split(/\s+/).length;
-                if (wordCount <= 10 && !text.startsWith('[')) {
-                    const lastMsg = history[history.length - 1].parts[0].text;
-                    const truncatedLast = lastMsg.length > 100 ? lastMsg.substring(0, 100) + '...' : lastMsg;
-                    textToSend = `[Context Note: This is a short message following our last exchange: "${truncatedLast}". Please interpret this new message relative to that context.]\n${text}`;
-                    logger.info('Context hint injected (short follow-up)', { wordCount });
-                }
-            }
+        const maxAttempts = 2;
+        let lastError = null;
 
-            // Store user message
-            db.addChatMessage(userId, 'user', text);
-
-            // Send message and get response
-            let result;
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
             try {
-                result = await chat.sendMessage(textToSend);
-                this.quotaExceeded = false; // Reset on success
-            } catch (err) {
-                if (err.message && (err.message.includes('429') || err.message.toLowerCase().includes('quota'))) {
-                    this.quotaExceeded = true;
-                }
-                throw err;
-            }
-            let response = result.response;
+                // Start chat session
+                const chat = this._getModel().startChat({
+                    history: [...history],
+                    generationConfig: {
+                        maxOutputTokens: 1024,
+                        temperature: 0.1  // Very low temperature for deterministic function calls
+                    }
+                });
 
-            // Debug: Log what Gemini returned
-            const candidates = response.candidates || [];
-            const firstCandidate = candidates[0];
-            const finishReason = firstCandidate ? firstCandidate.finishReason : 'NONE';
-            const safetyRatings = firstCandidate ? firstCandidate.safetyRatings : [];
-            
-            const functionCalls = response.functionCalls ? response.functionCalls() : null;
-            const textPreview = response.text ? response.text().substring(0, 100) : '';
-            
-            logger.info('Gemini raw response', {
-                historyLength: history.length,
-                isVolatileRequest,
-                hasFunctionCalls: !!(functionCalls && functionCalls.length > 0),
-                functionCallsCount: functionCalls ? functionCalls.length : 0,
-                candidatesCount: candidates.length,
-                finishReason,
-                textPreview: textPreview
-            });
-
-            if (finishReason !== 'STOP' && finishReason !== 'NONE') {
-                logger.warn('Gemini response finished with unusual reason', { finishReason, safetyRatings });
-            }
-
-            // Handle function calls
-            response = await this._handleFunctionCalls(chat, response, userId);
-
-            // Extract final text response
-            let responseText = '';
-            try {
-                responseText = response.text() || '';
-            } catch (e) {
-                logger.debug('Failed to extract text from response, might be empty', { error: e.message });
-            }
-
-            // If the model finished function calls but generated no text, ask it to summarize
-            if (!responseText || responseText.trim() === '') {
-                logger.warn('Gemini returned empty text after processing, prompting for a summary message');
+                // Send message and get response
+                let result;
                 try {
-                    const followUp = await chat.sendMessage('הפעולה בוצעה. אנא כתוב הודעה קצרה וידידותית בעברית למשתמש המאשרת שהבקשה שלו טופלה בהצלחה.');
-                    responseText = followUp.response.text();
-                } catch (e) {
-                    logger.error('Failed to get summary response', { error: e.message });
-                    responseText = 'הפעולה בוצעה בהצלחה! 👍';
-                }
-            }
-
-            // Strip any internal context tags that Gemini may have echoed
-            responseText = responseText.replace(/\s*\[Internal Context:[^\]]*\]/gi, '').trim();
-
-            // Store assistant response
-            db.addChatMessage(userId, 'model', responseText);
-
-            // Log usage and cost
-            if (response.usageMetadata) {
-                const usage = response.usageMetadata;
-                const inputTokens = usage.promptTokenCount || 0;
-                const outputTokens = usage.candidatesTokenCount || 0;
-                const totalTokens = usage.totalTokenCount || 0;
-
-                // Pricing based on active model
-                const pricing = getModelPricing(config.gemini.model);
-                const inputCost = (inputTokens / 1000000) * pricing.input;
-                const outputCost = (outputTokens / 1000000) * pricing.output;
-                const totalCost = inputCost + outputCost;
-
-                try {
-                    db.logUsage(config.gemini.model, inputTokens, outputTokens, totalTokens, totalCost);
-                    logger.info('Usage logged', { inputTokens, outputTokens, totalCost: totalCost.toFixed(6) });
+                    result = await chat.sendMessage(textToSend);
+                    this.quotaExceeded = false; // Reset on success
                 } catch (err) {
-                    logger.error('Failed to log usage', { error: err.message });
+                    if (err.message && (err.message.includes('429') || err.message.toLowerCase().includes('quota'))) {
+                        this.quotaExceeded = true;
+                    }
+                    throw err;
+                }
+                let response = result.response;
+
+                // Debug: Log what Gemini returned
+                const candidates = response.candidates || [];
+                const firstCandidate = candidates[0];
+                const finishReason = firstCandidate ? firstCandidate.finishReason : 'NONE';
+                const safetyRatings = firstCandidate ? firstCandidate.safetyRatings : [];
+                
+                const functionCalls = response.functionCalls ? response.functionCalls() : null;
+                const textPreview = response.text ? response.text().substring(0, 100) : '';
+                
+                logger.info('Gemini raw response', {
+                    attempt,
+                    historyLength: history.length,
+                    isVolatileRequest,
+                    hasFunctionCalls: !!(functionCalls && functionCalls.length > 0),
+                    functionCallsCount: functionCalls ? functionCalls.length : 0,
+                    candidatesCount: candidates.length,
+                    finishReason,
+                    textPreview: textPreview
+                });
+
+                if (finishReason !== 'STOP' && finishReason !== 'NONE') {
+                    logger.warn('Gemini response finished with unusual reason', { finishReason, safetyRatings });
+                }
+
+                // Handle function calls
+                const functionCallResult = await this._handleFunctionCalls(chat, response, userId);
+                response = functionCallResult.response;
+
+                if (functionCallResult.hasUnknownFunction && attempt < maxAttempts) {
+                    logger.warn(`Unknown function called on attempt ${attempt}. Retrying...`);
+                    continue; // Retry
+                }
+
+                // Extract final text response
+                let responseText = '';
+                try {
+                    responseText = response.text() || '';
+                } catch (e) {
+                    logger.debug('Failed to extract text from response, might be empty', { error: e.message });
+                }
+
+                // If the model finished function calls but generated no text, ask it to summarize
+                if (!responseText || responseText.trim() === '') {
+                    if (attempt < maxAttempts) {
+                        logger.warn(`Gemini returned empty text on attempt ${attempt}. Retrying...`);
+                        continue; // Retry
+                    }
+
+                    logger.warn('Gemini returned empty text after processing and all retries failed');
+                    try {
+                        const followUpPrompt = functionCallResult.hasErrors ? 
+                            'הפעולה הסתיימה עם שגיאות ולא החזרת טקסט. אנא הודע למשתמש שהייתה שגיאה בביצוע הבקשה.' :
+                            'הפעולה בוצעה אך לא החזרת טקסט. אנא כתוב הודעה קצרה וידידותית בעברית למשתמש המאשרת שהבקשה שלו טופלה.';
+                        const followUp = await chat.sendMessage(followUpPrompt);
+                        responseText = followUp.response.text();
+                    } catch (e) {
+                        logger.error('Failed to get summary response', { error: e.message });
+                        if (functionCallResult.hasErrors) {
+                            responseText = 'הייתה שגיאה בביצוע הבקשה. אנא נסה שוב. ⚠️';
+                        } else {
+                            responseText = 'הפעולה בוצעה. 👍';
+                        }
+                    }
+                }
+
+                // Strip any internal context tags that Gemini may have echoed
+                responseText = responseText.replace(/\s*\[Internal Context:[^\]]*\]/gi, '').trim();
+
+                // Store assistant response
+                db.addChatMessage(userId, 'model', responseText);
+
+                // Log usage and cost
+                if (response.usageMetadata) {
+                    const usage = response.usageMetadata;
+                    const inputTokens = usage.promptTokenCount || 0;
+                    const outputTokens = usage.candidatesTokenCount || 0;
+                    const totalTokens = usage.totalTokenCount || 0;
+
+                    // Pricing based on active model
+                    const pricing = getModelPricing(config.gemini.model);
+                    const inputCost = (inputTokens / 1000000) * pricing.input;
+                    const outputCost = (outputTokens / 1000000) * pricing.output;
+                    const totalCost = inputCost + outputCost;
+
+                    try {
+                        db.logUsage(config.gemini.model, inputTokens, outputTokens, totalTokens, totalCost);
+                        logger.info('Usage logged', { inputTokens, outputTokens, totalCost: totalCost.toFixed(6) });
+                    } catch (err) {
+                        logger.error('Failed to log usage', { error: err.message });
+                    }
+                }
+
+                logger.info('Gemini response generated', {
+                    userId,
+                    responseLength: responseText.length,
+                    attempt
+                });
+
+                return responseText;
+            } catch (err) {
+                logger.error(`Gemini processing error on attempt ${attempt}`, { error: err.message, userId });
+                lastError = err;
+                if (attempt >= maxAttempts) {
+                    throw err;
                 }
             }
-
-            logger.info('Gemini response generated', {
-                userId,
-                responseLength: responseText.length
-            });
-
-            return responseText;
-        } catch (err) {
-            logger.error('Gemini processing error', { error: err.message, userId });
-            throw err;
         }
     }
 
@@ -374,68 +400,100 @@ class GeminiManager {
     async processVoiceMessage(userId, audioBase64, mimeType, senderId = null) {
         logger.info('Processing voice message with Gemini', { userId, mimeType });
 
-        try {
-            // Get conversation history
-            const history = this._buildHistory(userId);
+        // Get conversation history
+        const history = this._buildHistory(userId);
 
-            // Start chat session
-            const chat = this._getModel().startChat({
-                history,
-                generationConfig: {
-                    maxOutputTokens: 1024,
-                    temperature: 0.7
-                }
-            });
+        // Store reference to voice message once
+        const logMsg = senderId ? `[Voice Message from Sender: ${senderId}]` : '[Voice Message]';
+        db.addChatMessage(userId, 'user', logMsg);
 
-            // Create multimodal content
-            const audioPart = {
-                inlineData: {
-                    mimeType: mimeType,
-                    data: audioBase64
-                }
-            };
+        const maxAttempts = 2;
+        let lastError = null;
 
-            // Store reference to voice message
-            const logMsg = senderId ? `[Voice Message from Sender: ${senderId}]` : '[Voice Message]';
-            db.addChatMessage(userId, 'user', logMsg);
-
-            let senderHint = senderId ? `הודעה קולית זו נשלחה מקבוצה על ידי משתמש ${senderId}. ` : '';
-
-            // Send audio for Hebrew transcription + response
-            let result;
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
             try {
-                result = await chat.sendMessage([
-                    audioPart,
-                    { text: `${senderHint}אתה מקבל הודעה קולית.
+                // Start chat session
+                const chat = this._getModel().startChat({
+                    history: [...history],
+                    generationConfig: {
+                        maxOutputTokens: 1024,
+                        temperature: 0.7
+                    }
+                });
+
+                // Create multimodal content
+                const audioPart = {
+                    inlineData: {
+                        mimeType: mimeType,
+                        data: audioBase64
+                    }
+                };
+
+                let senderHint = senderId ? `הודעה קולית זו נשלחה מקבוצה על ידי משתמש ${senderId}. ` : '';
+
+                // Send audio for Hebrew transcription + response
+                let result;
+                try {
+                    result = await chat.sendMessage([
+                        audioPart,
+                        { text: `${senderHint}אתה מקבל הודעה קולית.
 1. תמלל את ההודעה במדויק.
 2. אם יש בה בקשה או שאלה - טפל בה (כולל שימוש בכלים אם צריך).
 3. אם ההקלטה ארוכה מ-30 שניות, הוסף סיכום קצר בראשית.
 ענה בעברית.` }
-                ]);
-                this.quotaExceeded = false;
-            } catch (err) {
-                if (err.message && (err.message.includes('429') || err.message.toLowerCase().includes('quota'))) {
-                    this.quotaExceeded = true;
+                    ]);
+                    this.quotaExceeded = false;
+                } catch (err) {
+                    if (err.message && (err.message.includes('429') || err.message.toLowerCase().includes('quota'))) {
+                        this.quotaExceeded = true;
+                    }
+                    throw err;
                 }
-                throw err;
+                let response = result.response;
+
+                // Handle function calls
+                const functionCallResult = await this._handleFunctionCalls(chat, response, userId);
+                response = functionCallResult.response;
+
+                if (functionCallResult.hasUnknownFunction && attempt < maxAttempts) {
+                    logger.warn(`Unknown function called on attempt ${attempt}. Retrying...`);
+                    continue; // Retry
+                }
+
+                // Extract final text response
+                let responseText = '';
+                try {
+                    responseText = response.text() || '';
+                } catch (e) {
+                    logger.debug('Failed to extract text from voice response', { error: e.message });
+                }
+
+                if (!responseText || responseText.trim() === '') {
+                    if (attempt < maxAttempts) {
+                        logger.warn(`Gemini returned empty text for voice message on attempt ${attempt}. Retrying...`);
+                        continue; // Retry
+                    }
+                    logger.warn('Gemini returned empty text for voice message after all retries');
+                    if (functionCallResult.hasErrors) {
+                        responseText = 'הייתה שגיאה בביצוע הבקשה. אנא נסה שוב. ⚠️';
+                    } else {
+                        responseText = 'הפעולה בוצעה. 👍';
+                    }
+                }
+
+                // Store assistant response
+                db.addChatMessage(userId, 'model', responseText);
+
+                logger.info('Voice message processed', { userId, responseLength: responseText.length, attempt });
+
+                return responseText;
+            } catch (err) {
+                logger.error(`Voice message processing error on attempt ${attempt}`, { error: err.message, userId });
+                lastError = err;
+                if (attempt >= maxAttempts) {
+                    throw err;
+                }
             }
-            let response = result.response;
-
-            // Handle function calls
-            response = await this._handleFunctionCalls(chat, response, userId);
-
-            // Extract final text response
-            const responseText = response.text();
-
-            // Store assistant response
-            db.addChatMessage(userId, 'model', responseText);
-
-            logger.info('Voice message processed', { userId, responseLength: responseText.length });
-
-            return responseText;
-        } catch (err) {
-            logger.error('Voice message processing error', { error: err.message, userId });
-            throw err;
         }
     }
 
@@ -492,6 +550,8 @@ class GeminiManager {
         let currentResponse = response;
         let iterations = 0;
         const maxIterations = 5; // Prevent infinite loops
+        let hasUnknownFunction = false;
+        let hasErrors = false;
 
         while (iterations < maxIterations) {
             const functionCalls = currentResponse.functionCalls();
@@ -517,13 +577,19 @@ class GeminiManager {
                     if (this.toolHandlers[name]) {
                         result = await this.toolHandlers[name](args);
                         logger.info('Function executed', { name, result: typeof result });
+                        if (result && typeof result === 'object' && result.error) {
+                            hasErrors = true;
+                        }
                     } else {
                         result = { error: `Unknown function: ${name}` };
                         logger.warn('Unknown function called', { name });
+                        hasUnknownFunction = true;
+                        hasErrors = true;
                     }
                 } catch (err) {
                     result = { error: err.message };
                     logger.error('Function execution error', { name, error: err.message });
+                    hasErrors = true;
                 }
 
                 functionResponses.push({
@@ -540,7 +606,11 @@ class GeminiManager {
             iterations++;
         }
 
-        return currentResponse;
+        return {
+            response: currentResponse,
+            hasUnknownFunction,
+            hasErrors
+        };
     }
 
     /**
