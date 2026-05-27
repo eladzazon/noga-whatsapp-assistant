@@ -241,8 +241,13 @@ class GeminiManager {
 
                 // Send message and get response
                 let result;
+                let actualTextToSend = textToSend;
+                if (attempt > 1) {
+                    actualTextToSend = `${textToSend}\n\n[System Note: Your previous attempt resulted in an empty response. Please rethink your approach. If you need information, use your tools (e.g. web_search). You must provide a valid response.]`;
+                }
+
                 try {
-                    result = await chat.sendMessage(textToSend);
+                    result = await chat.sendMessage(actualTextToSend);
                     this.quotaExceeded = false; // Reset on success
                 } catch (err) {
                     if (err.message && (err.message.includes('429') || err.message.toLowerCase().includes('quota'))) {
@@ -302,17 +307,24 @@ class GeminiManager {
 
                     logger.warn('Gemini returned empty text after processing and all retries failed');
                     try {
-                        const followUpPrompt = functionCallResult.hasErrors ? 
-                            'הפעולה הסתיימה עם שגיאות ולא החזרת טקסט. אנא הודע למשתמש שהייתה שגיאה בביצוע הבקשה.' :
-                            'הפעולה בוצעה אך לא החזרת טקסט. אנא כתוב הודעה קצרה וידידותית בעברית למשתמש המאשרת שהבקשה שלו טופלה.';
+                        let followUpPrompt;
+                        if (functionCallResult.hasErrors) {
+                            followUpPrompt = 'הפעולה הסתיימה עם שגיאות ולא החזרת טקסט. אנא הודע למשתמש שהייתה שגיאה בביצוע הבקשה.';
+                        } else if (functionCallResult.totalFunctionsCalled > 0) {
+                            followUpPrompt = 'הפעולה בוצעה אך לא החזרת טקסט. אנא כתוב הודעה קצרה וידידותית בעברית למשתמש המאשרת שהבקשה שלו טופלה.';
+                        } else {
+                            followUpPrompt = 'קיבלת הודעה אך החזרת טקסט ריק בלי לבצע אף פעולה ובלי לקרוא לאף פונקציה. אנא התנצל בפני המשתמש והסבר שלא הצלחת להשלים את הבקשה. אל תגיד שהבקשה טופלה בהצלחה.';
+                        }
                         const followUp = await chat.sendMessage(followUpPrompt);
                         responseText = followUp.response.text();
                     } catch (e) {
                         logger.error('Failed to get summary response', { error: e.message });
                         if (functionCallResult.hasErrors) {
                             responseText = 'הייתה שגיאה בביצוע הבקשה. אנא נסה שוב. ⚠️';
-                        } else {
+                        } else if (functionCallResult.totalFunctionsCalled > 0) {
                             responseText = 'הפעולה בוצעה. 👍';
+                        } else {
+                            responseText = 'מצטער, לא הצלחתי להבין או לבצע את הבקשה. נסה לנסח מחדש. 😕';
                         }
                     }
                 }
@@ -434,13 +446,15 @@ class GeminiManager {
                 // Send audio for Hebrew transcription + response
                 let result;
                 try {
+                    let textInstruction = `${senderHint}אתה מקבל הודעה קולית.\n1. תמלל את ההודעה במדויק.\n2. אם יש בה בקשה או שאלה - טפל בה (כולל שימוש בכלים אם צריך).\n3. אם ההקלטה ארוכה מ-30 שניות, הוסף סיכום קצר בראשית.\nענה בעברית.`;
+                    
+                    if (attempt > 1) {
+                        textInstruction += `\n\n[System Note: Your previous attempt resulted in an empty response. Please rethink your approach. If you need information, use your tools (e.g. web_search). You must provide a valid response.]`;
+                    }
+
                     result = await chat.sendMessage([
                         audioPart,
-                        { text: `${senderHint}אתה מקבל הודעה קולית.
-1. תמלל את ההודעה במדויק.
-2. אם יש בה בקשה או שאלה - טפל בה (כולל שימוש בכלים אם צריך).
-3. אם ההקלטה ארוכה מ-30 שניות, הוסף סיכום קצר בראשית.
-ענה בעברית.` }
+                        { text: textInstruction }
                     ]);
                     this.quotaExceeded = false;
                 } catch (err) {
@@ -476,8 +490,10 @@ class GeminiManager {
                     logger.warn('Gemini returned empty text for voice message after all retries');
                     if (functionCallResult.hasErrors) {
                         responseText = 'הייתה שגיאה בביצוע הבקשה. אנא נסה שוב. ⚠️';
-                    } else {
+                    } else if (functionCallResult.totalFunctionsCalled > 0) {
                         responseText = 'הפעולה בוצעה. 👍';
+                    } else {
+                        responseText = 'מצטער, לא הצלחתי להבין או לבצע את הבקשה. נסה לנסח מחדש. 😕';
                     }
                 }
 
@@ -552,6 +568,7 @@ class GeminiManager {
         const maxIterations = 5; // Prevent infinite loops
         let hasUnknownFunction = false;
         let hasErrors = false;
+        let totalFunctionsCalled = 0;
 
         while (iterations < maxIterations) {
             const functionCalls = currentResponse.functionCalls();
@@ -559,6 +576,8 @@ class GeminiManager {
             if (!functionCalls || functionCalls.length === 0) {
                 break;
             }
+
+            totalFunctionsCalled += functionCalls.length;
 
             logger.info('Function call requested', {
                 functions: functionCalls.map(fc => fc.name)
@@ -609,7 +628,8 @@ class GeminiManager {
         return {
             response: currentResponse,
             hasUnknownFunction,
-            hasErrors
+            hasErrors,
+            totalFunctionsCalled
         };
     }
 
