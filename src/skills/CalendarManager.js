@@ -63,12 +63,20 @@ class CalendarManager {
         }
 
         try {
-            // Israel is UTC+3. To avoid boundary leaks, we explicitly set the offset.
-            // startDate is YYYY-MM-DD
-            const timeMin = `${startDate}T00:00:00+03:00`;
-            
+            // Use Intl to get the correct Israel timezone offset dynamically (+02:00 or +03:00)
+            const getOffset = (dateStr) => {
+                const date = new Date(dateStr);
+                const tzString = new Intl.DateTimeFormat('en-US', { 
+                    timeZone: 'Asia/Jerusalem', 
+                    timeZoneName: 'longOffset' 
+                }).format(date);
+                const match = tzString.match(/[+-]\d{2}:\d{2}/);
+                return match ? match[0] : '+02:00';
+            };
+
+            const timeMin = `${startDate}T00:00:00${getOffset(startDate)}`;
             const endD = endDate || startDate;
-            const timeMax = `${endD}T23:59:59+03:00`;
+            const timeMax = `${endD}T23:59:59${getOffset(endD)}`;
 
             logger.info('Fetching calendar events (Timezone Corrected)', {
                 startDate,
@@ -117,12 +125,9 @@ class CalendarManager {
      */
     async addEvent(title, date, time = null, durationMinutes = 60, description = '') {
         if (!this.isAvailable()) {
-            // Cache the event for later
-            db.addToCache('pending_event', { title, date, time, durationMinutes, description });
             return {
                 error: 'Calendar not available',
-                cached: true,
-                message: 'הוספתי לזיכרון המקומי. אעדכן כשהחיבור יחזור.'
+                message: 'היומן לא מחובר כרגע. לא ניתן להוסיף פגישה.'
             };
         }
 
@@ -157,11 +162,15 @@ class CalendarManager {
                 };
             } else {
                 // All-day event
+                const nextDay = new Date(date);
+                nextDay.setDate(nextDay.getDate() + 1);
+                const nextDayStr = nextDay.toISOString().split('T')[0];
+
                 event = {
                     summary: title,
                     description,
                     start: { date },
-                    end: { date }
+                    end: { date: nextDayStr }
                 };
             }
 
@@ -183,12 +192,8 @@ class CalendarManager {
         } catch (err) {
             logger.error('Failed to add calendar event', { error: err.message });
 
-            // Cache for retry
-            db.addToCache('pending_event', { title, date, time, durationMinutes, description });
-
             return {
-                error: err.message,
-                cached: true
+                error: err.message
             };
         }
     }

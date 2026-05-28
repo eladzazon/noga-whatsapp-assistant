@@ -53,7 +53,7 @@ class MessageRouter {
             let response;
 
             // Check for special commands
-            if (body.startsWith('/')) {
+            if (body && body.startsWith('/')) {
                 response = await this.handleCommand(message);
             }
             // Handle voice messages

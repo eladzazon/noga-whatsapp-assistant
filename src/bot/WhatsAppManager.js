@@ -26,6 +26,17 @@ class WhatsAppManager {
     async init() {
         logger.info('Initializing WhatsApp client with Baileys...');
 
+        // Clean up previous client instance to prevent duplicate event listeners and memory leaks
+        if (this.client) {
+            try {
+                this.client.ev.removeAllListeners();
+                this.client.ws.close();
+                this.client.end(new Error('Reinitializing client'));
+            } catch (err) {
+                // Ignore
+            }
+        }
+
         // Ensure session directory exists for Baileys
         const sessionDir = config.whatsapp.sessionPath;
         if (!fs.existsSync(sessionDir)) {
@@ -353,7 +364,7 @@ class WhatsAppManager {
 
                     if (buffer) {
                         messageData.media = {
-                            mimetype: messageContent.audioMessage.mimetype,
+                            mimetype: messageContent[type]?.mimetype || 'audio/ogg',
                             data: buffer.toString('base64'), // Base64 encoded
                             filename: 'audio.ogg' // Default for WA voice notes
                         };

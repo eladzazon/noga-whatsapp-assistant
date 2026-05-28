@@ -264,7 +264,12 @@ class GeminiManager {
                 const safetyRatings = firstCandidate ? firstCandidate.safetyRatings : [];
                 
                 const functionCalls = response.functionCalls ? response.functionCalls() : null;
-                const textPreview = response.text ? response.text().substring(0, 100) : '';
+                let textPreview = '';
+                try {
+                    textPreview = response.text ? response.text().substring(0, 100) : '';
+                } catch (e) {
+                    // Ignore, no text part
+                }
                 
                 logger.info('Gemini raw response', {
                     attempt,
@@ -365,7 +370,6 @@ class GeminiManager {
                 return responseText;
             } catch (err) {
                 logger.error(`Gemini processing error on attempt ${attempt}`, { error: err.message, userId });
-                lastError = err;
                 if (attempt >= maxAttempts) {
                     throw err;
                 }
@@ -505,7 +509,6 @@ class GeminiManager {
                 return responseText;
             } catch (err) {
                 logger.error(`Voice message processing error on attempt ${attempt}`, { error: err.message, userId });
-                lastError = err;
                 if (attempt >= maxAttempts) {
                     throw err;
                 }
