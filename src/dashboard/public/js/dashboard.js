@@ -1705,10 +1705,10 @@
     tabLoaders['tab-knowledge'] = () => knowledgeController.loadFiles();
     tabLoaders['tab-skills'] = () => skillsController.loadFiles();
     tabLoaders['tab-keywords'] = () => loadKeywords();
-    tabLoaders['tab-schedules'] = () => loadSchedules();
+    tabLoaders['tab-scheduled-prompts'] = () => loadSchedules();
     tabLoaders['tab-reminders'] = () => loadReminders();
     tabLoaders['tab-settings'] = () => loadSettings();
-    tabLoaders['tab-ha'] = () => loadHaMappings();
+    tabLoaders['tab-homeassistant'] = () => loadHaMappings();
     tabLoaders['tab-backup'] = () => { loadBackups(); loadBackupSettings(); };
 
     // Load only the immediately-needed data on page load:
