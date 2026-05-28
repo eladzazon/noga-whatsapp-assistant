@@ -81,6 +81,14 @@ class DashboardServer {
 
         // Serve static files
         this.app.use('/public', express.static(path.join(__dirname, 'public')));
+        
+        // Serve PWA assets at root to ensure proper Service Worker scope
+        this.app.get('/sw.js', (req, res) => {
+            res.sendFile(path.join(__dirname, 'public', 'sw.js'));
+        });
+        this.app.get('/manifest.json', (req, res) => {
+            res.sendFile(path.join(__dirname, 'public', 'manifest.json'));
+        });
 
         // Set view engine
         this.app.set('view engine', 'ejs');

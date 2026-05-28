@@ -1,0 +1,21 @@
+{
+    "name": "נוגה - Noga",
+    "short_name": "Noga",
+    "description": "Noga WhatsApp Smart Home Assistant Admin Interface",
+    "start_url": "/dashboard",
+    "display": "standalone",
+    "background_color": "#ffffff",
+    "theme_color": "#667eea",
+    "icons": [
+        {
+            "src": "/public/images/icon-192x192.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "/public/images/icon-512x512.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        }
+    ]
+}
