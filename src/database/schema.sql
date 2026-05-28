@@ -64,11 +64,16 @@ CREATE TABLE IF NOT EXISTS keywords (
 -- Create indexes for performance
 CREATE INDEX IF NOT EXISTS idx_chat_user ON chat_context(user_id);
 CREATE INDEX IF NOT EXISTS idx_chat_created ON chat_context(created_at);
+-- Composite index for the common query: WHERE user_id = ? ORDER BY created_at DESC LIMIT ?
+CREATE INDEX IF NOT EXISTS idx_chat_user_created ON chat_context(user_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_cache_status ON cache(status);
 CREATE INDEX IF NOT EXISTS idx_cache_type ON cache(type);
 CREATE INDEX IF NOT EXISTS idx_audit_user ON audit_log(user_id);
 CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_log(created_at);
 CREATE INDEX IF NOT EXISTS idx_keywords_keyword ON keywords(keyword);
+CREATE INDEX IF NOT EXISTS idx_keywords_enabled ON keywords(enabled);
+-- Index for getPendingReminders() which queries WHERE status = 'pending'
+CREATE INDEX IF NOT EXISTS idx_reminders_status ON reminders(status);
 
 -- Usage tracking for Gemini API tokens and costs
 CREATE TABLE IF NOT EXISTS usage_logs (

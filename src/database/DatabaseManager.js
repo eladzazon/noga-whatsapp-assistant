@@ -10,6 +10,8 @@ class DatabaseManager {
     constructor(dbPath = './data/noga.db') {
         this.dbPath = dbPath;
         this.db = null;
+        // In-memory keyword cache (invalidated on any write to keywords table)
+        this._keywordCache = null;
     }
 
     /**
@@ -352,17 +354,20 @@ class DatabaseManager {
     /**
      * Find a keyword by its text (case-insensitive exact match)
      * Supports comma-separated keywords like "עזרה,היי"
+     * Uses an in-memory cache to avoid a full table scan on every message.
      * @param {string} text - The keyword text to search for
      */
     getKeywordByText(text) {
         const trimmedText = text.trim();
 
-        // Get all enabled keywords
-        const stmt = this.db.prepare('SELECT * FROM keywords WHERE enabled = 1');
-        const keywords = stmt.all();
+        // Populate cache if empty
+        if (!this._keywordCache) {
+            const keywords = this.db.prepare('SELECT * FROM keywords WHERE enabled = 1').all();
+            this._keywordCache = keywords;
+        }
 
         // Check each keyword (which may contain comma-separated values)
-        for (const kw of keywords) {
+        for (const kw of this._keywordCache) {
             const variants = kw.keyword.split(',').map(v => v.trim());
             if (variants.some(variant => variant === trimmedText)) {
                 return kw;
@@ -384,6 +389,7 @@ class DatabaseManager {
             VALUES (?, ?, ?)
         `);
         const result = stmt.run(keyword.trim(), response, type);
+        this._keywordCache = null; // Invalidate cache
         return result.lastInsertRowid;
     }
 
@@ -402,6 +408,7 @@ class DatabaseManager {
             WHERE id = ?
         `);
         stmt.run(keyword.trim(), response, enabled ? 1 : 0, type, id);
+        this._keywordCache = null; // Invalidate cache
     }
 
     /**
@@ -411,6 +418,7 @@ class DatabaseManager {
     deleteKeyword(id) {
         const stmt = this.db.prepare('DELETE FROM keywords WHERE id = ?');
         stmt.run(id);
+        this._keywordCache = null; // Invalidate cache
     }
 
     // ==================== Scheduled Prompt Operations ====================

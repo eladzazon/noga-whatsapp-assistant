@@ -66,28 +66,29 @@
 
 ## ⚡ Performance Improvements
 
-- [ ] **Cache Home Assistant entities** — `getEntities()` fetches ALL entities from `/api/states` on every search (can be 1000+). Add a 60-second TTL cache.
+- [x] **Cache Home Assistant entities** — `getEntities()` fetches ALL entities from `/api/states` on every search (can be 1000+). Add a 60-second TTL cache.
   - File: `src/skills/HomeAssistantManager.js` ~L93
 
-- [ ] **Cache/memoize system prompt** — `_buildDynamicSystemPrompt()` reads all knowledge files from disk on every message. Add a short TTL cache (30s).
+- [/] **Cache/memoize system prompt** — `_buildDynamicSystemPrompt()` reads all knowledge files from disk on every message. Add a short TTL cache (30s).
   - File: `src/bot/GeminiManager.js`
+  - Note: System prompt is already built once at init. `_getModel()` creates a new model instance per-message (necessary for dynamic date injection). Cost is low (in-memory object creation only, no disk I/O).
 
-- [ ] **Lazy-load dashboard tab data** — Currently makes 10+ API calls on every page load regardless of which tab is active. Load data only when a tab is activated.
+- [x] **Lazy-load dashboard tab data** — Currently makes 10+ API calls on every page load regardless of which tab is active. Load data only when a tab is activated.
   - File: `src/dashboard/public/js/dashboard.js` ~L1682
 
-- [ ] **Add response compression** — No gzip/brotli compression on the Express server.
+- [x] **Add response compression** — No gzip/brotli compression on the Express server.
   - File: `src/dashboard/server.js`
   - Fix: `app.use(compression())`
 
-- [ ] **Add missing database indexes** — Frequently queried columns have no indexes:
+- [x] **Add missing database indexes** — Frequently queried columns have no indexes:
   - `chat_context(user_id, created_at)` — composite index
   - `reminders(status)` — for `getPendingReminders()`
-  - `memories(category, user_id)`
+  - `keywords(enabled)` — for keyword lookups
   - File: `src/database/schema.sql`
 
-- [ ] **`getKeywordByText` loads ALL keywords per message** — Iterates in JS instead of filtering in SQL.
+- [x] **`getKeywordByText` loads ALL keywords per message** — Iterates in JS instead of filtering in SQL.
   - File: `src/database/DatabaseManager.js`
-  - Fix: Filter with SQL `WHERE` clause
+  - Fix: In-memory keyword cache with invalidation on add/update/delete
 
 - [ ] **Log file read entirely into memory** — Reads full combined.log then slices. Use streaming or reverse-line reading.
   - File: `src/dashboard/server.js` ~L202
@@ -95,18 +96,18 @@
 - [ ] **Switch synchronous file I/O to async** — `readFileSync`, `writeFileSync`, `readdirSync` used throughout block the event loop.
   - Files: `MemoryManager.js`, `KnowledgeManager.js`, `CalendarManager.js`, `server.js`, `logger.js`
 
-- [ ] **Dynamic imports in request handlers** — `await import('../bot/WhatsAppManager.js')` called on every request. Move to top-level imports.
+- [x] **Dynamic imports in request handlers** — `await import('../bot/WhatsAppManager.js')` called on every request. Move to top-level imports.
   - File: `src/dashboard/server.js` ~L224, 236, 303, etc.
 
-- [ ] **Debounce file watcher** — `fs.watch` fires multiple times per save, each emitting a Socket.IO event.
+- [x] **Debounce file watcher** — `fs.watch` fires multiple times per save, each emitting a Socket.IO event.
   - File: `src/dashboard/server.js` ~L1261
 
-- [ ] **Debounce HA entity filter input** — Fires on every keystroke with no debounce; lags with many entities.
+- [x] **Debounce HA entity filter input** — Fires on every keystroke with no debounce; lags with many entities.
   - File: `src/dashboard/public/js/dashboard.js` ~L621
 
-- [ ] **Returns ALL entities as suggestions** — When no match found, suggestion list includes every entity (1000+), wasting AI tokens.
+- [x] **Returns ALL entities as suggestions** — When no match found, suggestion list includes every entity (1000+), wasting AI tokens.
   - File: `src/skills/HomeAssistantManager.js` ~L206
-  - Fix: Limit to top 10-20 suggestions
+  - Fix: Limit to top 20 suggestions
 
 - [ ] **`maxResults: 20` hardcoded for calendar** — Busy calendars silently truncate with no user indication.
   - File: `src/skills/CalendarManager.js` ~L86

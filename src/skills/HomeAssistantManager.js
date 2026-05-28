@@ -4,11 +4,17 @@ import logger from '../utils/logger.js';
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 
+// Cache TTL: 30 seconds
+const ENTITY_CACHE_TTL_MS = 30_000;
+
 class HomeAssistantManager {
     constructor() {
         this.client = null; // Axios client (for fallback/finding entities)
         this.mcpClient = null; // New MCP client
         this.baseUrl = null;
+        // In-memory entity cache
+        this._entityCache = null;
+        this._entityCacheTs = 0;
     }
 
     /**
@@ -37,7 +43,7 @@ class HomeAssistantManager {
         // Initialize MCP Client
         try {
             logger.info('Initializing Home Assistant MCP client...');
-            
+
             const transport = new StreamableHTTPClientTransport(new URL(`${this.baseUrl}/api/mcp`), {
                 requestInit: {
                     headers: {
@@ -82,11 +88,17 @@ class HomeAssistantManager {
     }
 
     /**
-     * Get all entities
+     * Get all entities — results are cached for ENTITY_CACHE_TTL_MS milliseconds
      */
     async getEntities() {
         if (!this.isAvailable()) {
             return { error: 'Home Assistant not available' };
+        }
+
+        // Return cached result if still fresh
+        const now = Date.now();
+        if (this._entityCache && (now - this._entityCacheTs) < ENTITY_CACHE_TTL_MS) {
+            return this._entityCache;
         }
 
         try {
@@ -102,11 +114,17 @@ class HomeAssistantManager {
 
             logger.info('Entities retrieved', { count: entities.length });
 
-            return {
+            const result = {
                 success: true,
                 count: entities.length,
                 entities
             };
+
+            // Store in cache
+            this._entityCache = result;
+            this._entityCacheTs = now;
+
+            return result;
         } catch (err) {
             logger.error('Failed to get entities', { error: err.message });
             return { error: err.message };
@@ -172,7 +190,7 @@ class HomeAssistantManager {
             const allEntitiesResult = await this.getEntities();
             if (!allEntitiesResult.error) {
                 result = allEntitiesResult;
-                
+
                 // Retry exact match on all entities
                 matches = result.entities.filter(entity =>
                     entity.name.toLowerCase().includes(searchLower) ||
@@ -200,10 +218,12 @@ class HomeAssistantManager {
         });
 
         if (matches.length === 0) {
+            // Limit suggestions to top 20 to avoid sending 1000+ entities to AI
+            const suggestions = result.entities.slice(0, 20).map(e => ({ id: e.id, name: e.name }));
             return {
                 success: false,
                 message: `לא מצאתי התאמה מדויקת למכשיר בשם "${name}". הנה רשימה של המכשירים הקיימים, אנא בחר את המתאים ביותר לפי הבנתך הסמנטית ונסה שוב:`,
-                suggestions: result.entities.map(e => ({ id: e.id, name: e.name }))
+                suggestions
             };
         }
 

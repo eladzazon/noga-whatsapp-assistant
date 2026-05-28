@@ -122,18 +122,31 @@
     const tabBtns = document.querySelectorAll('.tab-btn');
     const tabPanes = document.querySelectorAll('.tab-pane');
 
+    // Track which tabs have been loaded at least once (lazy loading)
+    const loadedTabs = new Set();
+
+    // Map tab IDs to their loader functions (populated after each section is set up)
+    const tabLoaders = {};
+
+    function activateTab(targetTab, btn) {
+        // Update buttons
+        tabBtns.forEach(b => b.classList.remove('active'));
+        if (btn) btn.classList.add('active');
+
+        // Update panes
+        tabPanes.forEach(p => p.classList.remove('active'));
+        const pane = document.getElementById(targetTab);
+        if (pane) pane.classList.add('active');
+
+        // Lazy-load tab data on first visit
+        if (!loadedTabs.has(targetTab) && tabLoaders[targetTab]) {
+            loadedTabs.add(targetTab);
+            tabLoaders[targetTab]();
+        }
+    }
+
     tabBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            const targetTab = btn.dataset.tab;
-
-            // Update buttons
-            tabBtns.forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-
-            // Update panes
-            tabPanes.forEach(p => p.classList.remove('active'));
-            document.getElementById(targetTab).classList.add('active');
-        });
+        btn.addEventListener('click', () => activateTab(btn.dataset.tab, btn));
     });
 
     // ==================== Socket.IO Events ====================
@@ -618,14 +631,19 @@
         `).join('');
     }
 
+    // Debounced HA entity filter (200ms delay prevents re-render on every keystroke)
+    let _haFilterTimer = null;
     if (haEntitiesFilter) {
         haEntitiesFilter.addEventListener('input', (e) => {
-            const query = e.target.value.toLowerCase();
-            const filtered = allHaEntities.filter(ent =>
-                ent.id.toLowerCase().includes(query) ||
-                ent.name.toLowerCase().includes(query)
-            );
-            renderHaEntitiesList(filtered);
+            clearTimeout(_haFilterTimer);
+            _haFilterTimer = setTimeout(() => {
+                const query = e.target.value.toLowerCase();
+                const filtered = allHaEntities.filter(ent =>
+                    ent.id.toLowerCase().includes(query) ||
+                    ent.name.toLowerCase().includes(query)
+                );
+                renderHaEntitiesList(filtered);
+            }, 200);
         });
     }
 
@@ -1683,13 +1701,18 @@
     fetchStatus();
     setInterval(fetchStatus, 30000);
 
-    knowledgeController.loadFiles();
-    skillsController.loadFiles();
-    loadKeywords();
-    loadSchedules();
+    // Register lazy loaders — data only fetched on first tab visit
+    tabLoaders['tab-knowledge'] = () => knowledgeController.loadFiles();
+    tabLoaders['tab-skills'] = () => skillsController.loadFiles();
+    tabLoaders['tab-keywords'] = () => loadKeywords();
+    tabLoaders['tab-schedules'] = () => loadSchedules();
+    tabLoaders['tab-reminders'] = () => loadReminders();
+    tabLoaders['tab-settings'] = () => loadSettings();
+    tabLoaders['tab-ha'] = () => loadHaMappings();
+    tabLoaders['tab-backup'] = () => { loadBackups(); loadBackupSettings(); };
+
+    // Load only the immediately-needed data on page load:
+    // Reminders context is injected into every Gemini request, so load it eagerly.
     loadReminders();
-    loadSettings();
-    loadHaMappings();
-    loadBackups();
-    loadBackupSettings();
+    loadSettings(); // Settings are often needed right away
 })();

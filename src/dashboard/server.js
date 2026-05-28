@@ -6,10 +6,16 @@ import { Server as SocketIOServer } from 'socket.io';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
+import compression from 'compression';
 import config from '../utils/config.js';
 import logger, { subscribeToLogs, getRecentLogs } from '../utils/logger.js';
 import db from '../database/DatabaseManager.js';
 import multer from 'multer';
+
+// Pre-load singletons once at module level to avoid dynamic import overhead
+const whatsappManagerPromise = import('../bot/WhatsAppManager.js').then(m => m.default);
+const schedulerManagerPromise = import('../bot/SchedulerManager.js').then(m => m.default);
+const skillsIndexPromise = import('../skills/index.js');
 
 const FileStore = sessionFileStore(session);
 
@@ -63,6 +69,9 @@ class DashboardServer {
         // Parse JSON and URL-encoded bodies
         this.app.use(express.json());
         this.app.use(express.urlencoded({ extended: true }));
+
+        // Gzip/Brotli compression for all responses
+        this.app.use(compression());
 
         // Session management
         this.app.use(session({
@@ -221,7 +230,7 @@ class DashboardServer {
         // WhatsApp Disconnect
         this.app.post('/api/whatsapp/disconnect', requireAuth, async (req, res) => {
             try {
-                const { default: whatsappManager } = await import('../bot/WhatsAppManager.js');
+                const whatsappManager = await whatsappManagerPromise;
                 await whatsappManager.logout();
                 res.json({ success: true, message: 'WhatsApp disconnected successfully. Scan new QR code.' });
             } catch (err) {
@@ -233,7 +242,7 @@ class DashboardServer {
         // WhatsApp Reconnect (manual - used after 405 errors)
         this.app.post('/api/whatsapp/reconnect', requireAuth, async (req, res) => {
             try {
-                const { default: whatsappManager } = await import('../bot/WhatsAppManager.js');
+                const whatsappManager = await whatsappManagerPromise;
                 await whatsappManager.reconnect();
                 res.json({ success: true, message: 'Reconnecting WhatsApp. Please wait for QR code...' });
             } catch (err) {
@@ -300,7 +309,7 @@ class DashboardServer {
                     const whatsappStatus = this.getWhatsAppStatus ? this.getWhatsAppStatus() : { isReady: false };
 
                     if (whatsappStatus.isReady) {
-                        const { default: whatsappManager } = await import('../bot/WhatsAppManager.js');
+                        const whatsappManager = await whatsappManagerPromise;
                         
                         let messageSent = false;
                         
@@ -581,7 +590,7 @@ class DashboardServer {
                 logger.info('Scheduled prompt added via dashboard', { name });
 
                 // Reload scheduling engine
-                const { default: schedulerManager } = await import('../bot/SchedulerManager.js');
+                const schedulerManager = await schedulerManagerPromise;
                 schedulerManager.reload();
 
                 res.json({ success: true, id });
@@ -604,7 +613,7 @@ class DashboardServer {
                 logger.info('Scheduled prompt updated via dashboard', { id, name });
 
                 // Reload scheduling engine
-                const { default: schedulerManager } = await import('../bot/SchedulerManager.js');
+                const schedulerManager = await schedulerManagerPromise;
                 schedulerManager.reload();
 
                 res.json({ success: true });
@@ -623,7 +632,7 @@ class DashboardServer {
                 logger.info('Scheduled prompt deleted via dashboard', { id });
 
                 // Reload scheduling engine
-                const { default: schedulerManager } = await import('../bot/SchedulerManager.js');
+                const schedulerManager = await schedulerManagerPromise;
                 schedulerManager.reload();
 
                 res.json({ success: true });
@@ -1192,7 +1201,7 @@ class DashboardServer {
         // Proxy: Get entities from Home Assistant
         this.app.get('/api/ha/entities', requireAuth, async (req, res) => {
             try {
-                const { homeAssistantManager } = await import('../skills/index.js');
+                const { homeAssistantManager } = await skillsIndexPromise;
                 const result = await homeAssistantManager.getEntities();
                 res.json(result);
             } catch (err) {
@@ -1257,14 +1266,23 @@ class DashboardServer {
             this.io.emit('log', logEntry);
         });
 
-        // Setup file watching for live updates
+        // Setup file watching for live updates (debounced to avoid duplicate events)
+        const debounce = (fn, delay) => {
+            const timers = {};
+            return (eventType, filename) => {
+                const key = `${eventType}:${filename}`;
+                clearTimeout(timers[key]);
+                timers[key] = setTimeout(() => fn(eventType, filename), delay);
+            };
+        };
+
         const watchDir = (dirPath, fileType) => {
             if (!fs.existsSync(dirPath)) return;
-            fs.watch(dirPath, (eventType, filename) => {
+            fs.watch(dirPath, debounce((eventType, filename) => {
                 if (filename && filename.endsWith('.md')) {
                     this.io.emit('file_changed', { type: fileType, filename, eventType });
                 }
-            });
+            }, 300));
         };
 
         const knowledgeDir = path.resolve(process.cwd(), 'data', 'knowledge');
