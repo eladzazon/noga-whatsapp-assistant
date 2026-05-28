@@ -1,4 +1,4 @@
-const CACHE_NAME = 'noga-pwa-cache-v1';
+const CACHE_NAME = 'noga-pwa-cache-v2';
 
 // We don't pre-cache everything since we want the network-first strategy to fetch the latest.
 // We just cache basic offline fallback pages if necessary.

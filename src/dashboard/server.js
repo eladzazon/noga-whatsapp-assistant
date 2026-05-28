@@ -84,9 +84,11 @@ class DashboardServer {
         
         // Serve PWA assets at root to ensure proper Service Worker scope
         this.app.get('/sw.js', (req, res) => {
+            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
             res.sendFile(path.join(__dirname, 'public', 'sw.js'));
         });
         this.app.get('/manifest.json', (req, res) => {
+            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
             res.sendFile(path.join(__dirname, 'public', 'manifest.json'));
         });
 
