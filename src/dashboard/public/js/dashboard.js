@@ -1378,28 +1378,30 @@
         }
 
         backupsListContainer.innerHTML = `
-            <table class="keywords-table" style="width: 100%;">
-                <thead><tr>
-                    <th>שם קובץ</th>
-                    <th>גודל</th>
-                    <th>תאריך</th>
-                    <th>פעולות</th>
-                </tr></thead>
-                <tbody>
-                    ${backups.map(b => {
-            const date = new Date(b.created_at).toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' });
-            return `<tr>
-                            <td><code dir="ltr" style="font-size: 12px;">${escapeHtml(b.filename)}</code></td>
-                            <td>${escapeHtml(formatBytes(b.size))}</td>
-                            <td style="font-size: 13px; color: var(--gray);">${date}</td>
-                            <td class="kw-actions">
-                                <a href="/api/backups/${encodeURIComponent(b.filename)}/download" class="btn btn-small btn-action" title="הורד">⬇️</a>
-                                <button class="btn btn-small btn-action btn-danger-action" onclick="window._deleteBackup('${escapeAttr(b.filename)}')" title="מחק">🗑️</button>
-                            </td>
-                        </tr>`;
-        }).join('')}
-                </tbody>
-            </table>
+            <div class="keywords-table-container">
+                <table class="keywords-table" style="width: 100%;">
+                    <thead><tr>
+                        <th>שם קובץ</th>
+                        <th>גודל</th>
+                        <th>תאריך</th>
+                        <th>פעולות</th>
+                    </tr></thead>
+                    <tbody>
+                        ${backups.map(b => {
+                const date = new Date(b.created_at).toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' });
+                return `<tr>
+                                <td><code dir="ltr" style="font-size: 12px;">${escapeHtml(b.filename)}</code></td>
+                                <td>${escapeHtml(formatBytes(b.size))}</td>
+                                <td style="font-size: 13px; color: var(--gray);">${date}</td>
+                                <td class="kw-actions">
+                                    <a href="/api/backups/${encodeURIComponent(b.filename)}/download" class="btn btn-small btn-action" title="הורד">⬇️</a>
+                                    <button class="btn btn-small btn-action btn-danger-action" onclick="window._deleteBackup('${escapeAttr(b.filename)}')" title="מחק">🗑️</button>
+                                </td>
+                            </tr>`;
+            }).join('')}
+                    </tbody>
+                </table>
+            </div>
         `;
     }
 
