@@ -10,7 +10,6 @@ class MessageRouter {
     constructor() {
         this.processingQueue = new Map();
         this.lastMessageTime = new Map(); // Track last message time per user
-        this.CONTEXT_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
     }
 
     /**
@@ -90,7 +89,7 @@ class MessageRouter {
             try {
                 const errorMessage = isQuotaError
                     ? 'המכסה היומית של הבינה המלאכותית נגמרה 😅 אשתף פעולה שוב בקרוב!'
-                    : `סליחה, נתקלתי בתקלה ולכן לא יכולתי לענות לבקשתך 😅\n\n*פרטי התקלה להבנת הבעיה:*\n${err.message}`;
+                    : `סליחה, נתקלתי בתקלה ולכן לא יכולתי לענות לבקשתך 😅`;
 
                 await whatsappManager.sendMessage(chat, errorMessage);
                 // Log error message to chat history

@@ -640,7 +640,7 @@ class GeminiManager {
      * Build conversation history from database
      */
     _buildHistory(userId) {
-        const messages = db.getChatHistory(userId, 5);
+        const messages = db.getChatHistory(userId, 40);
 
         // Convert to Gemini format
         let history = messages.map(msg => ({

@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import logger from '../utils/logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -39,9 +40,11 @@ class DatabaseManager {
             const cols = this.db.pragma('table_info(keywords)');
             if (cols.length > 0 && !cols.find(c => c.name === 'type')) {
                 this.db.exec("ALTER TABLE keywords ADD COLUMN type TEXT DEFAULT 'static' CHECK(type IN ('static', 'ai'))");
-                console.log('[Database] Migrated keywords table: added type column');
+                logger.info('[Database] Migrated keywords table: added type column');
             }
-        } catch { /* table may not exist yet */ }
+        } catch (err) { 
+            if (err.message && !err.message.includes('no such table')) throw err;
+        }
 
         // Migration: Create ha_mappings table if missing
         this.db.exec(`
@@ -93,11 +96,13 @@ class DatabaseManager {
             const cols = this.db.pragma('table_info(reminders)');
             if (cols.length > 0 && !cols.find(c => c.name === 'nudge_count')) {
                 this.db.exec("ALTER TABLE reminders ADD COLUMN nudge_count INTEGER DEFAULT 0");
-                console.log('[Database] Migrated reminders table: added nudge_count column');
+                logger.info('[Database] Migrated reminders table: added nudge_count column');
             }
-        } catch { /* table may not exist yet */ }
+        } catch (err) {
+            if (err.message && !err.message.includes('no such table')) throw err;
+        }
 
-        console.log('[Database] Initialized successfully');
+        logger.info('[Database] Initialized successfully');
         return this;
     }
 

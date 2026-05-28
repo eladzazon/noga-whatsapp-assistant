@@ -817,78 +817,7 @@ class DashboardServer {
 
         // ==================== Backup & Restore API ====================
 
-        this.app.get('/api/backup', requireAuth, (req, res) => {
-            try {
-                const knowledgeDir = path.resolve(process.cwd(), 'data', 'knowledge');
-                const skillsDir = path.resolve(process.cwd(), 'data', 'skills');
-                const backup = {
-                    version: 2,
-                    generated_at: new Date().toISOString(),
-                    knowledge: {},
-                    skills: {},
-                    keywords: [],
-                    ha_mappings: [],
-                    scheduled_prompts: [],
-                    reminders: [],
-                    settings: {}
-                };
 
-                // MD files
-                if (fs.existsSync(knowledgeDir)) {
-                    fs.readdirSync(knowledgeDir).forEach(file => {
-                        if (file.endsWith('.md')) {
-                            backup.knowledge[file] = fs.readFileSync(path.join(knowledgeDir, file), 'utf8');
-                        }
-                    });
-                }
-                if (fs.existsSync(skillsDir)) {
-                    fs.readdirSync(skillsDir).forEach(file => {
-                        if (file.endsWith('.md')) {
-                            backup.skills[file] = fs.readFileSync(path.join(skillsDir, file), 'utf8');
-                        }
-                    });
-                }
-
-                // DB-backed data
-                backup.keywords = db.getKeywords().map(k => ({
-                    keyword: k.keyword, response: k.response, type: k.type, enabled: k.enabled
-                }));
-                backup.ha_mappings = db.getHaMappings().map(m => ({
-                    entity_id: m.entity_id, nickname: m.nickname, location: m.location, type: m.type
-                }));
-                backup.scheduled_prompts = db.getScheduledPrompts().map(p => ({
-                    name: p.name, prompt: p.prompt, cron_expression: p.cron_expression, enabled: p.enabled
-                }));
-                backup.reminders = db.getAllReminders();
-
-                // Settings: .env baseline + DB overrides (same as GET /api/settings)
-                const envPath = path.resolve(process.cwd(), '.env');
-                if (fs.existsSync(envPath)) {
-                    const content = fs.readFileSync(envPath, 'utf-8');
-                    content.split('\n').forEach(line => {
-                        const trimmed = line.trim();
-                        if (!trimmed || trimmed.startsWith('#')) return;
-                        const eqIdx = trimmed.indexOf('=');
-                        if (eqIdx === -1) return;
-                        backup.settings[trimmed.substring(0, eqIdx).trim()] = trimmed.substring(eqIdx + 1).trim();
-                    });
-                }
-                const ENV_PREFIX = 'env_';
-                const dbOverrides = db.getAllConfig();
-                for (const [key, value] of Object.entries(dbOverrides)) {
-                    if (key.startsWith(ENV_PREFIX)) {
-                        backup.settings[key.substring(ENV_PREFIX.length)] = value;
-                    }
-                }
-
-                res.setHeader('Content-disposition', `attachment; filename=noga_full_backup_${Date.now()}.json`);
-                res.setHeader('Content-type', 'application/json');
-                res.send(JSON.stringify(backup, null, 2));
-            } catch (err) {
-                logger.error('Failed to generate backup', { error: err.message });
-                res.status(500).json({ error: 'Failed to generate backup' });
-            }
-        });
 
         this.app.post('/api/restore', requireAuth, express.json({limit: '10mb'}), (req, res) => {
             try {

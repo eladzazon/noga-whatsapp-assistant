@@ -17,9 +17,6 @@ services:
       - NODE_ENV=production
     networks:
       - proxy-network
-    # Required for Chromium in Alpine
-    security_opt:
-      - seccomp:unconfined
     # Limit resources
     deploy:
       resources:

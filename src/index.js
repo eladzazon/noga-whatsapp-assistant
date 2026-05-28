@@ -110,27 +110,7 @@ async function main() {
         // Initialize message router
         messageRouter.init();
 
-        // Set up birthday check cron job (runs daily at 8 AM Israel time)
-        cron.schedule('0 8 * * *', async () => {
-            logger.info('Running daily birthday check...');
-            try {
-                const birthdays = await calendarManager.checkBirthdays();
-                if (birthdays.length > 0) {
-                    // Log birthdays found
-                    logger.info('Birthdays found today', {
-                        count: birthdays.length,
-                        names: birthdays.map(b => b.title)
-                    });
 
-                    // You could extend this to send a WhatsApp notification
-                    // to remind about birthdays
-                }
-            } catch (err) {
-                logger.error('Birthday check failed', { error: err.message });
-            }
-        }, {
-            timezone: 'Asia/Jerusalem'
-        });
 
         // Set up database cleanup cron (runs daily at 3 AM)
         cron.schedule('0 3 * * *', () => {
@@ -186,6 +166,7 @@ process.on('uncaughtException', (err) => {
 
 process.on('unhandledRejection', (reason, promise) => {
     logger.error('Unhandled rejection', { reason: String(reason) });
+    process.exit(1);
 });
 
 // Start the application

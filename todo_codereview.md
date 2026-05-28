@@ -161,10 +161,10 @@
 
 - [ ] **Add centralized error middleware for Express** — Replace 30+ identical try/catch blocks.
 
-- [ ] **`unhandledRejection` should exit the process** — Currently logs but keeps running in a broken state.
+- [x] **`unhandledRejection` should exit the process** — Currently logs but keeps running in a broken state.
   - File: `src/index.js` ~L187
 
-- [ ] **Empty catch blocks in DB migrations** — `catch { /* table may not exist */ }` swallows ALL errors including disk full, corruption.
+- [x] **Empty catch blocks in DB migrations** — `catch { /* table may not exist */ }` swallows ALL errors including disk full, corruption.
   - File: `src/database/DatabaseManager.js` ~L42, 96
   - Fix: Check for specific SQLite error codes
 
@@ -172,42 +172,42 @@
   - File: `src/utils/config.js`
   - Fix: Throw on critical missing config, or log and exit
 
-- [ ] **Internal error details leak to WhatsApp users** — `err.message` sent directly to users could expose internal paths.
+- [x] **Internal error details leak to WhatsApp users** — `err.message` sent directly to users could expose internal paths.
   - File: `src/bot/MessageRouter.js` ~L93
   - Fix: Send generic error message, log full error internally
 
 ### Dead Code & Cleanup
 
-- [ ] **Remove `KnowledgeManager.buildSystemPrompt()`** — Never called; `GeminiManager._buildDynamicSystemPrompt()` is used instead.
+- [x] **Remove `KnowledgeManager.buildSystemPrompt()`** — Never called; `GeminiManager._buildDynamicSystemPrompt()` is used instead.
   - File: `src/bot/KnowledgeManager.js`
 
-- [ ] **Remove or implement birthday feature** — Birthdays are found and logged but never sent.
+- [x] **Remove or implement birthday feature** — Birthdays are found and logged but never sent.
   - File: `src/index.js` ~L114-133
 
-- [ ] **Remove `CONTEXT_TIMEOUT_MS`** — Defined but never used.
+- [x] **Remove `CONTEXT_TIMEOUT_MS`** — Defined but never used.
   - File: `src/bot/MessageRouter.js` ~L13
 
-- [ ] **Fix history window discrepancy** — Comment says "last 40 messages" but code fetches 5.
+- [x] **Fix history window discrepancy** — Comment says "last 40 messages" but code fetches 5.
   - File: `src/bot/MessageRouter.js` vs `src/bot/GeminiManager.js`
 
-- [ ] **Remove stale `.wwebjs_auth/.wwebjs_cache` from .gitignore** — App uses Baileys, not whatsapp-web.js. Also delete the `.wwebjs_cache` directory from the repo root.
+- [x] **Remove stale `.wwebjs_auth/.wwebjs_cache` from .gitignore** — App uses Baileys, not whatsapp-web.js. Also delete the `.wwebjs_cache` directory from the repo root.
   - File: `.gitignore`
 
-- [ ] **Remove `HaRecognition.js` or make it configurable** — Duplicates Gemini's `find_device` tool. If kept, load mappings from DB instead of hardcoding.
+- [x] **Remove `HaRecognition.js` or make it configurable** — Duplicates Gemini's `find_device` tool. If kept, load mappings from DB instead of hardcoding.
   - File: `src/utils/HaRecognition.js`
 
-- [ ] **Remove stale Chromium/Alpine comments** — Dockerfile references Chromium but app uses Baileys.
+- [x] **Remove stale Chromium/Alpine comments** — Dockerfile references Chromium but app uses Baileys.
   - File: `Dockerfile`
 
-- [ ] **Remove duplicate backup creation logic** — Exists in both `GET /api/backup` and `POST /api/backups/create`.
+- [x] **Remove duplicate backup creation logic** — Exists in both `GET /api/backup` and `POST /api/backups/create`.
   - File: `src/dashboard/server.js`
 
-- [ ] **Fix `console.log` mixed with `logger`** — Some messages use `console.log` while the rest uses Winston.
+- [x] **Fix `console.log` mixed with `logger`** — Some messages use `console.log` while the rest uses Winston.
   - File: `src/database/DatabaseManager.js` ~L40, 94, 98
 
 ### Infrastructure & Config
 
-- [ ] **Pin dependency versions** — Most use `"*"` (latest). Any `npm install` can pull breaking changes.
+- [x] **Pin dependency versions** — Most use `"*"` (latest). Any `npm install` can pull breaking changes.
   - File: `package.json`
   - Fix: Run `npm ls` and pin current working versions
 
@@ -221,7 +221,7 @@
 - [ ] **Fix duplicate schema definitions** — Tables like `ha_mappings`, `scheduled_prompts`, `reminders` are defined in both `schema.sql` AND `DatabaseManager.init()`.
   - Files: `src/database/schema.sql`, `src/database/DatabaseManager.js`
 
-- [ ] **Remove `seccomp:unconfined`** from docker-compose — Not needed since Baileys doesn't use Chromium.
+- [x] **Remove `seccomp:unconfined`** from docker-compose — Not needed since Baileys doesn't use Chromium.
   - File: `docker-compose.yml`
 
 - [ ] **Fix PWA icons** — `icon-192x192.png` and `icon-512x512.png` are both 424KB (identical files). Generate properly sized icons.

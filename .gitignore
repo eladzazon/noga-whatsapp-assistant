@@ -12,8 +12,7 @@ data/*
 credentials/
 
 # WhatsApp session
-.wwebjs_auth/
-.wwebjs_cache/
+data/auth_info_baileys/
 
 # Logs
 logs/

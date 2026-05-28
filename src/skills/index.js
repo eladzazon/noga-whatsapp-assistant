@@ -2,7 +2,6 @@ import calendarManager from './CalendarManager.js';
 import homeAssistantManager from './HomeAssistantManager.js';
 import memoryManager from './MemoryManager.js';
 import db from '../database/DatabaseManager.js';
-import { findActionAndEntity } from '../utils/HaRecognition.js';
 import logger from '../utils/logger.js';
 import config from '../utils/config.js';
 import whatsappManager from '../bot/WhatsAppManager.js';
