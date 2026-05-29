@@ -331,38 +331,38 @@ export const functionHandlers = {
     // ==================== Memory Handlers ====================
     read_knowledge_file: async (args) => {
         logger.info('Executing: read_knowledge_file', args);
-        return memoryManager.readKnowledgeFile(args.filename);
+        return await memoryManager.readKnowledgeFile(args.filename);
     },
 
     update_memory: async (args) => {
         logger.info('Executing: update_memory', args);
-        const result = memoryManager.writeKnowledgeFile(args.filename, args.content);
+        const result = await memoryManager.writeKnowledgeFile(args.filename, args.content);
         if (result.success && globalGeminiManager) {
-            globalGeminiManager.reinit();
+            await globalGeminiManager.reinit();
         }
         return result;
     },
 
     create_skill: async (args) => {
         logger.info('Executing: create_skill', args);
-        const result = memoryManager.createSkill(args.skill_name, args.instructions);
+        const result = await memoryManager.createSkill(args.skill_name, args.instructions);
         if (result.success && globalGeminiManager) {
-            globalGeminiManager.reinit();
+            await globalGeminiManager.reinit();
         }
         return result;
     },
 
     list_memory: async () => {
         logger.info('Executing: list_memory');
-        const files = memoryManager.getKnowledgeFiles();
+        const files = await memoryManager.getKnowledgeFiles();
         return { success: true, files: files.map(f => f.name) };
     },
 
     delete_memory: async (args) => {
         logger.info('Executing: delete_memory', args);
-        const result = memoryManager.deleteKnowledgeFile(args.filename);
+        const result = await memoryManager.deleteKnowledgeFile(args.filename);
         if (result.success && globalGeminiManager) {
-            globalGeminiManager.reinit();
+            await globalGeminiManager.reinit();
         }
         return result;
     },
@@ -521,11 +521,11 @@ export async function initializeSkills() {
 /**
  * Get status of all skills
  */
-export function getSkillsStatus() {
+export async function getSkillsStatus() {
     return {
         calendar: calendarManager.getStatus(),
         homeAssistant: homeAssistantManager.getStatus(),
-        memory: memoryManager.getStatus()
+        memory: await memoryManager.getStatus()
     };
 }
 

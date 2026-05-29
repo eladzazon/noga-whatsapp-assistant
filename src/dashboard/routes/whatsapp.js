@@ -1,39 +1,30 @@
 import { Router } from 'express';
 import fs from 'fs';
 import path from 'path';
+import { asyncHandler } from '../middleware/error.js';
 
 export default function createWhatsappRoutes(deps) {
     const router = Router();
     const { requireAuth, config, logger, whatsappManagerPromise, upload, server, db } = deps;
 
     // WhatsApp Disconnect
-    router.post('/api/whatsapp/disconnect', requireAuth, async (req, res) => {
-        try {
-            const whatsappManager = await whatsappManagerPromise;
-            await whatsappManager.logout();
-            res.json({ success: true, message: 'WhatsApp disconnected successfully. Scan new QR code.' });
-        } catch (err) {
-            logger.error('Failed to disconnect WhatsApp', { error: err.message });
-            res.status(500).json({ error: 'Failed to disconnect WhatsApp' });
-        }
-    });
+    router.post('/api/whatsapp/disconnect', requireAuth, asyncHandler(async (req, res) => {
+        const whatsappManager = await whatsappManagerPromise;
+        await whatsappManager.logout();
+        res.json({ success: true, message: 'WhatsApp disconnected successfully. Scan new QR code.' });
+    }));
 
     // WhatsApp Reconnect (manual - used after 405 errors)
-    router.post('/api/whatsapp/reconnect', requireAuth, async (req, res) => {
-        try {
-            const whatsappManager = await whatsappManagerPromise;
-            await whatsappManager.reconnect();
-            res.json({ success: true, message: 'Reconnecting WhatsApp. Please wait for QR code...' });
-        } catch (err) {
-            logger.error('Failed to reconnect WhatsApp', { error: err.message });
-            res.status(500).json({ error: 'Failed to reconnect WhatsApp' });
-        }
-    });
+    router.post('/api/whatsapp/reconnect', requireAuth, asyncHandler(async (req, res) => {
+        const whatsappManager = await whatsappManagerPromise;
+        await whatsappManager.reconnect();
+        res.json({ success: true, message: 'Reconnecting WhatsApp. Please wait for QR code...' });
+    }));
 
     // ==================== Webhook API ====================
 
     // Status webhook (for Home Assistant)
-    router.get('/api/webhook/status', (req, res) => {
+    router.get('/api/webhook/status', asyncHandler(async (req, res) => {
         const secret = req.headers['x-webhook-secret'] || req.query.secret;
 
         // Verify Secret
@@ -45,14 +36,14 @@ export default function createWhatsappRoutes(deps) {
         res.json({
             whatsapp: server.getWhatsAppStatus ? server.getWhatsAppStatus() : { isReady: false },
             gemini: server.getGeminiStatus ? server.getGeminiStatus() : { isInitialized: false },
-            skills: server.getSkillsStatus ? server.getSkillsStatus() : {},
+            skills: server.getSkillsStatus ? await server.getSkillsStatus() : {},
             usage: db ? db.getUsageStats() : { today: {}, month: {} }
         });
-    });
+    }));
 
     // Notification webhook (for Home Assistant)
     // Accepts application/json OR multipart/form-data (for image uploads)
-    router.post('/api/notify', upload.single('image'), async (req, res) => {
+    router.post('/api/notify', upload.single('image'), asyncHandler(async (req, res) => {
         const event = req.body.event;
         let data = {};
         if (req.body.data) {
@@ -99,7 +90,7 @@ export default function createWhatsappRoutes(deps) {
                             const fileExt = path.extname(req.file.originalname) || '.jpg';
                             const tempPath = req.file.path;
                             const mediaPath = tempPath + fileExt;
-                            fs.renameSync(tempPath, mediaPath);
+                            await fs.promises.rename(tempPath, mediaPath);
                             
                             await whatsappManager.sendMediaMessage(config.whatsapp.groupId, mediaPath, message);
                             
@@ -109,7 +100,7 @@ export default function createWhatsappRoutes(deps) {
                             }
 
                             // Clean up
-                            fs.unlinkSync(mediaPath);
+                            await fs.promises.unlink(mediaPath);
                             messageSent = true;
                         } catch (uploadErr) {
                             logger.error('Failed to send media message', { error: uploadErr.message });
@@ -129,22 +120,25 @@ export default function createWhatsappRoutes(deps) {
                     return res.json({ success: true, message, hasImage: !!req.file });
                 } else {
                     // Clean up file if WA not ready
-                    if (req.file) fs.unlinkSync(req.file.path);
+                    if (req.file) {
+                        try { await fs.promises.unlink(req.file.path); } catch (e) {}
+                    }
                     return res.status(503).json({ error: 'WhatsApp client not ready' });
                 }
             } else {
-                if (req.file) fs.unlinkSync(req.file.path);
+                if (req.file) {
+                    try { await fs.promises.unlink(req.file.path); } catch (e) {}
+                }
                 return res.status(400).json({ error: 'WHATSAPP_GROUP_ID not configured' });
             }
 
         } catch (err) {
             if (req.file) {
-                try { fs.unlinkSync(req.file.path); } catch(e){}
+                try { await fs.promises.unlink(req.file.path); } catch (e) {}
             }
-            logger.error('Webhook processing error', { error: err.message, stack: err.stack });
-            return res.status(500).json({ error: 'Internal server error', details: err.message });
+            throw err; // Let centralized errorHandler handle it
         }
-    });
+    }));
 
     return router;
 }

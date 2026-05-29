@@ -111,7 +111,16 @@ class SchedulerManager {
             logger.info('Running automated daily backup...');
             try {
                 const backupsDir = path.resolve(process.cwd(), 'data', 'backups');
-                if (!fs.existsSync(backupsDir)) fs.mkdirSync(backupsDir, { recursive: true });
+                
+                let exists = false;
+                try {
+                    await fs.promises.access(backupsDir);
+                    exists = true;
+                } catch {}
+
+                if (!exists) {
+                    await fs.promises.mkdir(backupsDir, { recursive: true });
+                }
 
                 const knowledgeDir = path.resolve(process.cwd(), 'data', 'knowledge');
                 const skillsDir = path.resolve(process.cwd(), 'data', 'skills');
@@ -127,15 +136,38 @@ class SchedulerManager {
                     settings: {}
                 };
 
-                if (fs.existsSync(knowledgeDir)) {
-                    fs.readdirSync(knowledgeDir).forEach(file => {
-                        if (file.endsWith('.md')) backup.knowledge[file] = fs.readFileSync(path.join(knowledgeDir, file), 'utf8');
-                    });
+                let knowledgeExists = false;
+                try {
+                    await fs.promises.access(knowledgeDir);
+                    knowledgeExists = true;
+                } catch {}
+
+                if (knowledgeExists) {
+                    const files = await fs.promises.readdir(knowledgeDir);
+                    await Promise.all(
+                        files.map(async file => {
+                            if (file.endsWith('.md')) {
+                                backup.knowledge[file] = await fs.promises.readFile(path.join(knowledgeDir, file), 'utf8');
+                            }
+                        })
+                    );
                 }
-                if (fs.existsSync(skillsDir)) {
-                    fs.readdirSync(skillsDir).forEach(file => {
-                        if (file.endsWith('.md')) backup.skills[file] = fs.readFileSync(path.join(skillsDir, file), 'utf8');
-                    });
+
+                let skillsExists = false;
+                try {
+                    await fs.promises.access(skillsDir);
+                    skillsExists = true;
+                } catch {}
+
+                if (skillsExists) {
+                    const files = await fs.promises.readdir(skillsDir);
+                    await Promise.all(
+                        files.map(async file => {
+                            if (file.endsWith('.md')) {
+                                backup.skills[file] = await fs.promises.readFile(path.join(skillsDir, file), 'utf8');
+                            }
+                        })
+                    );
                 }
 
                 // DB-backed data
@@ -146,8 +178,14 @@ class SchedulerManager {
                 
                 // Settings: .env baseline + DB overrides
                 const envPath = path.resolve(process.cwd(), '.env');
-                if (fs.existsSync(envPath)) {
-                    const content = fs.readFileSync(envPath, 'utf-8');
+                let envExists = false;
+                try {
+                    await fs.promises.access(envPath);
+                    envExists = true;
+                } catch {}
+
+                if (envExists) {
+                    const content = await fs.promises.readFile(envPath, 'utf-8');
                     content.split('\n').forEach(line => {
                         const trimmed = line.trim();
                         if (!trimmed || trimmed.startsWith('#')) return;
@@ -165,18 +203,21 @@ class SchedulerManager {
                 // Save to data/backups/ with a timestamp filename
                 const dateStr = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
                 const backupPath = path.join(backupsDir, `noga_backup_${dateStr}.json`);
-                fs.writeFileSync(backupPath, JSON.stringify(backup, null, 2), 'utf8');
+                await fs.promises.writeFile(backupPath, JSON.stringify(backup, null, 2), 'utf8');
 
-                // Keep only last N backups (configured in admin UI, default 7)
-                const retention = parseInt(db.getConfig('backup_retention', 7)) || 7;
-                const backupFiles = fs.readdirSync(backupsDir)
-                    .filter(f => f.endsWith('.json'))
-                    .sort(); // ascending = oldest first
-                if (backupFiles.length > retention) {
-                    backupFiles.slice(0, backupFiles.length - retention).forEach(old => {
-                        fs.unlinkSync(path.join(backupsDir, old));
-                        logger.info('Deleted old backup', { file: old });
-                    });
+                // Keep only last N backups (configured in admin UI, default 7, 0 means keep all)
+                const retentionVal = db.getConfig('backup_retention', 7);
+                const retention = retentionVal !== null && retentionVal !== undefined ? parseInt(retentionVal) : 7;
+                if (retention > 0) {
+                    const files = await fs.promises.readdir(backupsDir);
+                    const backupFiles = files.filter(f => f.endsWith('.json')).sort(); // ascending = oldest first
+                    if (backupFiles.length > retention) {
+                        const filesToDelete = backupFiles.slice(0, backupFiles.length - retention);
+                        for (const old of filesToDelete) {
+                            await fs.promises.unlink(path.join(backupsDir, old));
+                            logger.info('Deleted old backup', { file: old });
+                        }
+                    }
                 }
 
                 const kCount = Object.keys(backup.knowledge).length;

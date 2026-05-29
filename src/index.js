@@ -53,7 +53,7 @@ async function main() {
 
         // Initialize Gemini AI with function calling
         logger.info('Initializing Gemini AI...');
-        geminiManager.init(functionDeclarations, functionHandlers);
+        await geminiManager.init(functionDeclarations, functionHandlers);
 
         // Pass Gemini manager back to skills (for reinit on memory updates)
         setGeminiManager(geminiManager);

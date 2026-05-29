@@ -16,7 +16,9 @@ class CalendarManager {
     async init() {
         try {
             // Check if service account file exists
-            if (!fs.existsSync(config.google.serviceAccountPath)) {
+            try {
+                await fs.promises.access(config.google.serviceAccountPath);
+            } catch {
                 logger.warn('Google Service Account file not found', {
                     path: config.google.serviceAccountPath
                 });
@@ -25,7 +27,7 @@ class CalendarManager {
 
             // Load service account credentials
             const credentials = JSON.parse(
-                fs.readFileSync(config.google.serviceAccountPath, 'utf-8')
+                await fs.promises.readFile(config.google.serviceAccountPath, 'utf-8')
             );
 
             // Create auth client

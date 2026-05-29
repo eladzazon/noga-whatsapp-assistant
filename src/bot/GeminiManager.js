@@ -47,7 +47,7 @@ class GeminiManager {
      * @param {Array} tools - Function definitions for tool use
      * @param {Object} handlers - Map of function names to handler functions
      */
-    init(tools = [], handlers = {}) {
+    async init(tools = [], handlers = {}) {
         if (!config.gemini.apiKey) {
             throw new Error('GEMINI_API_KEY is not configured');
         }
@@ -61,7 +61,7 @@ class GeminiManager {
         this.toolCallHandler = new ToolCallHandler({ toolHandlers: this.toolHandlers });
 
         // Load system prompt from files
-        this.systemPrompt = this.promptBuilder.build();
+        this.systemPrompt = await this.promptBuilder.build();
 
         this._buildModel();
 
@@ -77,8 +77,8 @@ class GeminiManager {
     /**
      * Re-initialize the model to pick up file changes
      */
-    reinit() {
-        this.systemPrompt = this.promptBuilder.build();
+    async reinit() {
+        this.systemPrompt = await this.promptBuilder.build();
         this._buildModel();
         logger.info('Gemini model re-initialized with updated system prompt from files');
     }

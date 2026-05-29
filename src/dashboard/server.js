@@ -24,6 +24,7 @@ import createSettingsRoutes from './routes/settings.js';
 import createBackupRoutes from './routes/backup.js';
 import createHaRoutes from './routes/ha.js';
 import setupSocketIO from './socket.js';
+import { errorHandler } from './middleware/error.js';
 
 // Pre-load singletons once at module level to avoid dynamic import overhead
 const whatsappManagerPromise = import('../bot/WhatsAppManager.js').then(m => m.default);
@@ -142,6 +143,9 @@ class DashboardServer {
         this.app.use(createSettingsRoutes(deps));
         this.app.use(createBackupRoutes(deps));
         this.app.use(createHaRoutes(deps));
+
+        // Centralized error handling middleware
+        this.app.use(errorHandler);
     }
 
     /**

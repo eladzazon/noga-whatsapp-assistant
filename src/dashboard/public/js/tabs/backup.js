@@ -102,7 +102,12 @@ export function setupBackup() {
 
     if (btnSaveBackupSettings) {
         btnSaveBackupSettings.addEventListener('click', async () => {
-            const retention = parseInt(document.getElementById('backup-retention')?.value) || 7;
+            const val = parseInt(document.getElementById('backup-retention')?.value);
+            const retention = isNaN(val) ? 7 : val;
+            if (retention < 0 || retention > 30) {
+                showBackupStatus('הגדרת גיבוי חייבת להיות בין 0 ל-30', 'error');
+                return;
+            }
             try {
                 const res = await fetch('/api/backup-settings', {
                     method: 'POST',

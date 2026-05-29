@@ -101,30 +101,80 @@ export function getRecentLogs(count = 50) {
 }
 
 /**
+ * Read the last N non-empty lines of a file backwards in chunks.
+ * @param {string} filePath 
+ * @param {number} maxLines 
+ */
+export async function readLastLines(filePath, maxLines) {
+    const fileHandle = await fs.promises.open(filePath, 'r');
+    try {
+        const { size } = await fileHandle.stat();
+        const chunkSize = 4096;
+        const buffer = Buffer.alloc(chunkSize);
+        let lines = [];
+        let leftover = '';
+        let position = size;
+
+        while (position > 0 && lines.length < maxLines) {
+            const length = Math.min(chunkSize, position);
+            position -= length;
+
+            const { bytesRead } = await fileHandle.read(buffer, 0, length, position);
+            const chunkStr = buffer.toString('utf8', 0, bytesRead) + leftover;
+            
+            const chunkLines = chunkStr.split('\n');
+            leftover = chunkLines.shift(); // The first item might be an incomplete line
+            
+            // Add lines from right to left
+            for (let i = chunkLines.length - 1; i >= 0; i--) {
+                const trimmed = chunkLines[i].trim();
+                if (trimmed) {
+                    lines.unshift(trimmed);
+                }
+            }
+        }
+        
+        if (leftover && leftover.trim() && lines.length < maxLines) {
+            lines.unshift(leftover.trim());
+        }
+
+        return lines.slice(-maxLines);
+    } finally {
+        await fileHandle.close();
+    }
+}
+
+/**
  * Read the last N lines from the combined server log file.
  * Falls back to in-memory buffer if the file doesn't exist yet.
  * @param {number} lines - Number of lines to retrieve
  */
-export function readServerLogs(lines = 50) {
+export async function readServerLogs(lines = 50) {
     const logFile = path.join('data', 'logs', 'combined.log');
     try {
-        if (!fs.existsSync(logFile)) return getRecentLogs(lines);
-        const content = fs.readFileSync(logFile, 'utf-8');
-        const rawLines = content.trim().split('\n').filter(Boolean);
-        return rawLines
-            .slice(-lines)
-            .map(line => {
-                try {
-                    const entry = JSON.parse(line);
-                    return {
-                        timestamp: entry.timestamp,
-                        level: entry.level,
-                        message: entry.message
-                    };
-                } catch {
-                    return { timestamp: '', level: 'info', message: line };
-                }
-            });
+        let exists = false;
+        try {
+            await fs.promises.access(logFile);
+            exists = true;
+        } catch {
+            // File does not exist
+        }
+
+        if (!exists) return getRecentLogs(lines);
+
+        const rawLines = await readLastLines(logFile, lines);
+        return rawLines.map(line => {
+            try {
+                const entry = JSON.parse(line);
+                return {
+                    timestamp: entry.timestamp,
+                    level: entry.level,
+                    message: entry.message
+                };
+            } catch {
+                return { timestamp: '', level: 'info', message: line };
+            }
+        });
     } catch {
         return getRecentLogs(lines);
     }

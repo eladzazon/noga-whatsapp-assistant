@@ -261,7 +261,7 @@ class MessageRouter {
                 const liveMsg = `🟢 *לוג חי (מאז ההפעלה האחרונה):*\n\n\`\`\`\n${liveText}\n\`\`\``;
 
                 // 2️⃣ Server Log — persistent file on disk
-                const serverLogs = readServerLogs(30);
+                const serverLogs = await readServerLogs(30);
                 const serverText = serverLogs.length > 0
                     ? formatLogLines(serverLogs)
                     : '(אין קובץ לוג)';
