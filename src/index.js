@@ -35,14 +35,8 @@ async function main() {
     ╚═══════════════════════════════════════╝
     `);
 
-    // Validate configuration
-    const configErrors = validateConfig();
-    if (configErrors.length > 0) {
-        logger.error('Configuration errors:', { errors: configErrors });
-        if (configErrors.some(e => e.includes('required'))) {
-            process.exit(1);
-        }
-    }
+    // Validate configuration (throws on critical errors)
+    validateConfig();
 
     try {
         // Initialize database

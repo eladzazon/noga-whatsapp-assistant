@@ -1,0 +1,61 @@
+<div class="tab-pane" id="tab-keywords">
+    <section class="panel keywords-panel">
+        <h2>
+            🔑 מילות מפתח
+            <button id="add-keyword-btn" class="btn btn-primary btn-small">+ הוסף</button>
+        </h2>
+        <p class="panel-hint">הגדר מילות מפתח: <strong>סטטי</strong> = תגובה קבועה מיידית,
+            <strong>AI</strong> = הוראות מותאמות ל-Gemini
+        </p>
+
+        <!-- Add/Edit Form -->
+        <div id="keyword-form" class="keyword-form" style="display: none;">
+            <input type="hidden" id="keyword-edit-id" value="">
+            <div class="form-row">
+                <div class="form-group form-group-grow">
+                    <label for="keyword-input">מילת מפתח</label>
+                    <input type="text" id="keyword-input" class="form-input"
+                        placeholder='למשל: עזרה,היי,שלום (מופרד בפסיקים)' dir="rtl">
+                    <small style="color: var(--gray); font-size: 11px;">ניתן להגדיר מספר מילות מפתח מופרדות
+                        בפסיקים</small>
+                </div>
+                <div class="form-group">
+                    <label for="keyword-type">סוג</label>
+                    <select id="keyword-type" class="form-input">
+                        <option value="static">⚡ סטטי</option>
+                        <option value="ai">🤖 AI</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="keyword-response" id="keyword-response-label">תגובה</label>
+                <textarea id="keyword-response" class="form-textarea"
+                    placeholder="התגובה שתישלח כשהמילה תתקבל" dir="rtl"></textarea>
+            </div>
+            <div class="form-actions">
+                <button id="keyword-save" class="btn btn-primary btn-small">שמור</button>
+                <button id="keyword-cancel" class="btn btn-secondary btn-small">ביטול</button>
+            </div>
+        </div>
+
+        <!-- Keywords Table -->
+        <div class="data-table-container">
+            <table class="data-table" id="keywords-table">
+                <thead>
+                    <tr>
+                        <th>מילת מפתח</th>
+                        <th>סוג</th>
+                        <th>תגובה / הוראות</th>
+                        <th>פעיל</th>
+                        <th>פעולות</th>
+                    </tr>
+                </thead>
+                <tbody id="keywords-tbody">
+                    <tr class="empty-row">
+                        <td colspan="5">...טוען</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>

@@ -497,36 +497,36 @@ select.form-input {
 }
 
 /* Keywords Table */
-.keywords-table-container {
+.data-table-container {
     overflow-x: auto;
 }
 
-.keywords-table {
+.data-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 14px;
+    margin-top: 20px;
 }
 
-.keywords-table th {
-    background: var(--light);
-    padding: 12px 15px;
-    text-align: right;
-    font-weight: 600;
+.data-table th {
+    background: var(--light-bg);
     color: var(--gray);
-    font-size: 12px;
+    font-weight: 500;
+    font-size: 13px;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    border-bottom: 2px solid var(--gray-light);
+    padding: 12px 15px;
+    text-align: right;
+    border-bottom: 2px solid var(--border);
 }
 
-.keywords-table td {
-    padding: 12px 15px;
-    border-bottom: 1px solid var(--gray-light);
+.data-table td {
+    padding: 15px;
+    border-bottom: 1px solid var(--border);
     vertical-align: middle;
 }
 
-.keywords-table tr:hover:not(.empty-row) {
-    background: var(--light);
+.data-table tr:hover:not(.empty-row) {
+    background: rgba(0, 0, 0, 0.02);
 }
 
 .kw-keyword {

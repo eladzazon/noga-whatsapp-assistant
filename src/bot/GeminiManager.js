@@ -2,8 +2,8 @@ import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/ge
 import config from '../utils/config.js';
 import logger from '../utils/logger.js';
 import db from '../database/DatabaseManager.js';
-import fs from 'fs';
-import path from 'path';
+import promptBuilder from './PromptBuilder.js';
+import { ToolCallHandler } from './ToolCallHandler.js';
 
 // Pricing per 1M tokens (USD) – update when Google changes rates
 const MODEL_PRICING = {
@@ -56,8 +56,12 @@ class GeminiManager {
         this.tools = tools;
         this.toolHandlers = handlers;
 
+        // Initialize PromptBuilder and ToolCallHandler
+        this.promptBuilder = promptBuilder;
+        this.toolCallHandler = new ToolCallHandler({ toolHandlers: this.toolHandlers });
+
         // Load system prompt from files
-        this.systemPrompt = this._buildDynamicSystemPrompt();
+        this.systemPrompt = this.promptBuilder.build();
 
         this._buildModel();
 
@@ -71,53 +75,10 @@ class GeminiManager {
     }
 
     /**
-     * Build system prompt dynamically from Markdown files
-     */
-    _buildDynamicSystemPrompt() {
-        const knowledgeDir = path.resolve(process.cwd(), 'data', 'knowledge');
-        const skillsDir = path.resolve(process.cwd(), 'data', 'skills');
-        
-        // Base system prompt is ALWAYS included
-        let promptParts = [config.gemini.systemPrompt];
-
-        try {
-            if (fs.existsSync(knowledgeDir)) {
-                const files = fs.readdirSync(knowledgeDir).filter(f => f.endsWith('.md'));
-                for (const file of files) {
-                    const content = fs.readFileSync(path.join(knowledgeDir, file), 'utf-8');
-                    promptParts.push(`--- BEGIN ${file} ---\n${content}\n--- END ${file} ---`);
-                }
-            }
-        } catch (err) {
-            logger.error('Failed to read knowledge files', { error: err.message });
-        }
-
-        try {
-            if (fs.existsSync(skillsDir)) {
-                const files = fs.readdirSync(skillsDir).filter(f => f.endsWith('.md'));
-                if (files.length > 0) {
-                    let skillsList = "--- BEGIN AVAILABLE SKILLS ---\nThese are the skills you know how to execute. You can use these procedures if asked.\n\n";
-                    for (const file of files) {
-                        const content = fs.readFileSync(path.join(skillsDir, file), 'utf-8');
-                        skillsList += `Skill File: ${file}\n${content}\n\n`;
-                    }
-                    skillsList += "--- END AVAILABLE SKILLS ---";
-                    promptParts.push(skillsList);
-                }
-            }
-        } catch (err) {
-            logger.error('Failed to read skills files', { error: err.message });
-        }
-
-        return promptParts.join('\n\n');
-    }
-
-
-    /**
      * Re-initialize the model to pick up file changes
      */
     reinit() {
-        this.systemPrompt = this._buildDynamicSystemPrompt();
+        this.systemPrompt = this.promptBuilder.build();
         this._buildModel();
         logger.info('Gemini model re-initialized with updated system prompt from files');
     }
@@ -287,7 +248,7 @@ class GeminiManager {
                 }
 
                 // Handle function calls
-                const functionCallResult = await this._handleFunctionCalls(chat, response, userId);
+                const functionCallResult = await this.toolCallHandler.handle(chat, response, userId);
                 response = functionCallResult.response;
 
                 if (functionCallResult.hasUnknownFunction && attempt < maxAttempts) {
@@ -470,7 +431,7 @@ class GeminiManager {
                 let response = result.response;
 
                 // Handle function calls
-                const functionCallResult = await this._handleFunctionCalls(chat, response, userId);
+                const functionCallResult = await this.toolCallHandler.handle(chat, response, userId);
                 response = functionCallResult.response;
 
                 if (functionCallResult.hasUnknownFunction && attempt < maxAttempts) {
@@ -565,76 +526,7 @@ class GeminiManager {
             return `עדכון מערכת: ${eventData.event}`;
         }
     }
-    async _handleFunctionCalls(chat, response, userId) {
-        let currentResponse = response;
-        let iterations = 0;
-        const maxIterations = 5; // Prevent infinite loops
-        let hasUnknownFunction = false;
-        let hasErrors = false;
-        let totalFunctionsCalled = 0;
 
-        while (iterations < maxIterations) {
-            const functionCalls = currentResponse.functionCalls();
-
-            if (!functionCalls || functionCalls.length === 0) {
-                break;
-            }
-
-            totalFunctionsCalled += functionCalls.length;
-
-            logger.info('Function call requested', {
-                functions: functionCalls.map(fc => fc.name)
-            });
-
-            // Execute each function call
-            const functionResponses = [];
-            for (const functionCall of functionCalls) {
-                const { name, args } = functionCall;
-
-                // Log the function call
-                db.logAction(userId, 'function_call', { name, args });
-
-                let result;
-                try {
-                    if (this.toolHandlers[name]) {
-                        result = await this.toolHandlers[name](args);
-                        logger.info('Function executed', { name, result: typeof result });
-                        if (result && typeof result === 'object' && result.error) {
-                            hasErrors = true;
-                        }
-                    } else {
-                        result = { error: `Unknown function: ${name}` };
-                        logger.warn('Unknown function called', { name });
-                        hasUnknownFunction = true;
-                        hasErrors = true;
-                    }
-                } catch (err) {
-                    result = { error: err.message };
-                    logger.error('Function execution error', { name, error: err.message });
-                    hasErrors = true;
-                }
-
-                functionResponses.push({
-                    functionResponse: {
-                        name,
-                        response: result
-                    }
-                });
-            }
-
-            // Send function results back to model
-            const functionResult = await chat.sendMessage(functionResponses);
-            currentResponse = functionResult.response;
-            iterations++;
-        }
-
-        return {
-            response: currentResponse,
-            hasUnknownFunction,
-            hasErrors,
-            totalFunctionsCalled
-        };
-    }
 
     /**
      * Build conversation history from database

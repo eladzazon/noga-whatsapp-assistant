@@ -1,0 +1,58 @@
+<div class="tab-pane" id="tab-reminders">
+    <section class="panel scheduled-prompts-panel">
+        <h2>
+            ✅ תזכורות (To-Do)
+            <button id="add-reminder-btn" class="btn btn-primary btn-small">+ הוסף</button>
+        </h2>
+        <p class="panel-hint">תזכורות הן משימות שנוגה תנדנד עליהן עד שיסומנו כבוצעות. שונות מאירועי יומן בכך
+            שתזכורות אינן נשמרות ביומן.</p>
+
+        <!-- Add/Edit Form -->
+        <div id="reminder-form" class="keyword-form" style="display: none;">
+            <input type="hidden" id="reminder-edit-id" value="">
+            <div class="form-row">
+                <div class="form-group form-group-grow">
+                    <label for="reminder-title">תיאור התזכורת</label>
+                    <input type="text" id="reminder-title" class="form-input"
+                        placeholder="למשל: להעביר את הכביסה למייבש" dir="rtl">
+                </div>
+                <div class="form-group">
+                    <label for="reminder-interval">תדירות נדנוד (דקות)</label>
+                    <input type="number" id="reminder-interval" class="form-input" value="60" min="1"
+                        style="width: 100px;" dir="ltr">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group form-group-grow">
+                    <label for="reminder-dueDate">תאריך ושעת יעד</label>
+                    <input type="datetime-local" id="reminder-dueDate" class="form-input">
+                </div>
+            </div>
+            <div class="form-actions">
+                <button id="reminder-save" class="btn btn-primary btn-small">שמור</button>
+                <button id="reminder-cancel" class="btn btn-secondary btn-small">ביטול</button>
+            </div>
+        </div>
+
+        <!-- Reminders Table -->
+        <div class="data-table-container">
+            <table class="data-table" id="reminders-table">
+                <thead>
+                    <tr>
+                        <th>משימה</th>
+                        <th>תאריך יעד</th>
+                        <th>נדנוד אחרון</th>
+                        <th>נדנוד הבא</th>
+                        <th>סטטוס</th>
+                        <th>פעולות</th>
+                    </tr>
+                </thead>
+                <tbody id="reminders-tbody">
+                    <tr class="empty-row">
+                        <td colspan="6">...טוען</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>

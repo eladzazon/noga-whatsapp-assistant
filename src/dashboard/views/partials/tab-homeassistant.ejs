@@ -1,0 +1,94 @@
+<div class="tab-pane" id="tab-homeassistant">
+    <section class="panel ha-panel">
+        <h2>
+            🏠 Home Assistant
+            <div style="display: flex; gap: 8px;">
+                <button id="add-ha-mapping-btn" class="btn btn-primary btn-small">+ הוסף מיפוי</button>
+                <button id="fetch-ha-entities-btn" class="btn btn-secondary btn-small">🔄 טען מכשירים
+                    מ-HA</button>
+            </div>
+        </h2>
+        <p class="panel-hint">למד את נוגה לזהות מכשירים בשמות ידידותיים ומיקומים. ההגדרות כאן משמשות לזיהוי
+            שפה טבעית.</p>
+
+        <!-- Add/Edit Form -->
+        <div id="ha-mapping-form" class="keyword-form" style="display: none;">
+            <input type="hidden" id="ha-mapping-edit-id" value="">
+            <div class="form-row">
+                <div class="form-group form-group-grow">
+                    <label for="ha-entity-id">מזהה מכשיר (Entity ID)</label>
+                    <input type="text" id="ha-entity-id" class="form-input"
+                        placeholder="למשל: light.kitchen_main" dir="ltr">
+                </div>
+                <div class="form-group">
+                    <label for="ha-nickname">כינוי (Nickname)</label>
+                    <input type="text" id="ha-nickname" class="form-input" placeholder="למשל: אור מטבח"
+                        dir="rtl">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="ha-location">מיקום (Location)</label>
+                    <input type="text" id="ha-location" class="form-input" placeholder="למשל: מטבח"
+                        dir="rtl">
+                </div>
+                <div class="form-group">
+                    <label for="ha-type">סוג (Type)</label>
+                    <select id="ha-type" class="form-input">
+                        <option value="light">💡 תאורה</option>
+                        <option value="switch">🔌 מתג</option>
+                        <option value="sensor">🌡️ חיישן</option>
+                        <option value="climate">❄️ מיזוג</option>
+                        <option value="other">⚙️ אחר</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-actions">
+                <button id="ha-mapping-save" class="btn btn-primary btn-small">שמור</button>
+                <button id="ha-mapping-cancel" class="btn btn-secondary btn-small">ביטול</button>
+            </div>
+        </div>
+
+        <!-- Mappings Table -->
+        <div class="data-table-container">
+            <table class="data-table" id="ha-mappings-table">
+                <thead>
+                    <tr>
+                        <th>מכשיר (HA)</th>
+                        <th>כינוי (Nickname)</th>
+                        <th>מיקום</th>
+                        <th>סוג</th>
+                        <th>פעולות</th>
+                    </tr>
+                </thead>
+                <tbody id="ha-mappings-tbody">
+                    <tr class="empty-row">
+                        <td colspan="5">...טוען</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Live HA Entities List (Hidden by default) -->
+        <div id="ha-entities-container" style="display: none; margin-top: 20px; border-top: 1px solid var(--border); padding-top: 15px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <h3>מכשירים מ-Home Assistant</h3>
+                <input type="text" id="ha-entity-filter" class="form-input" placeholder="חיפוש מכשיר..." style="width: 250px;">
+            </div>
+            <div class="data-table-container" style="max-height: 300px; overflow-y: auto;">
+                <table class="data-table" id="ha-entities-table">
+                    <thead>
+                        <tr>
+                            <th>Entity ID</th>
+                            <th>שם (Friendly Name)</th>
+                            <th>פעולה</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ha-entities-tbody">
+                        <!-- Populated dynamically -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+</div>

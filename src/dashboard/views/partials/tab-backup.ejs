@@ -1,0 +1,57 @@
+<div class="tab-pane" id="tab-backup">
+    <section class="panel settings-panel">
+        <h2>
+            💾 ניהול גיבויים
+            <div class="prompt-actions">
+                <span id="backup-status" class="save-status"></span>
+                <button id="btn-create-backup" class="btn btn-primary btn-small">➕ צור גיבוי עכשיו</button>
+            </div>
+        </h2>
+        <p class="panel-hint">גיבוי מלא של כל הידע, מיומנויות, מילות מפתח, מיפויי HA, תזמונים והגדרות.
+            הגיבויים נשמרים בשרת בתיקיית <code>data/backups/</code>.</p>
+
+        <!-- Backup Settings Card -->
+        <div class="settings-group" style="margin-bottom: 20px;">
+            <h3 class="settings-group-title">⚙️ הגדרות גיבוי אוטומטי</h3>
+            <div class="settings-grid">
+                <div class="setting-item">
+                    <label for="backup-retention">שמור גיבויים אחרונים</label>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <input type="number" id="backup-retention" class="form-input" min="1" max="30"
+                            value="7" style="width: 80px;" dir="ltr">
+                        <button id="btn-save-backup-settings"
+                            class="btn btn-secondary btn-small">שמור</button>
+                    </div>
+                    <small>גיבויים ישנים יותר יימחקו אוטומטית בכל גיבוי חדש (ברירת מחדל: 7)</small>
+                </div>
+                <div class="setting-item">
+                    <label>גיבוי אוטומטי</label>
+                    <div style="font-size: 14px; color: var(--gray); margin-top: 6px;">⏰ כל יום ב-02:00
+                        בבוקר (שעון ישראל)</div>
+                    <small>הגיבוי האוטומטי רץ ברקע ושומר קובץ בשם
+                        <code>noga_backup_YYYY-MM-DD.json</code></small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Restore from file -->
+        <div class="settings-group" style="margin-bottom: 20px;">
+            <h3 class="settings-group-title">📤 שחזור מגיבוי</h3>
+            <div style="display: flex; align-items: center; gap: 15px; margin-top: 10px;">
+                <label class="btn btn-secondary" style="cursor: pointer;">
+                    ⬆️ שחזר מקובץ JSON
+                    <input type="file" id="btn-restore" accept=".json" style="display: none;">
+                </label>
+                <span id="restore-status" style="font-weight: bold; font-size: 14px;"></span>
+            </div>
+        </div>
+
+        <!-- Saved Backups List -->
+        <div class="settings-group">
+            <h3 class="settings-group-title">📁 גיבויים שמורים בשרת</h3>
+            <div id="backups-list-container" style="margin-top: 12px;">
+                <div style="text-align: center; color: var(--gray); padding: 30px;">...טוען</div>
+            </div>
+        </div>
+    </section>
+</div>

@@ -8,8 +8,11 @@ import { getRecentLogs, readServerLogs } from '../utils/logger.js';
 
 class MessageRouter {
     constructor() {
-        this.processingQueue = new Map();
-        this.lastMessageTime = new Map(); // Track last message time per user
+        this.processingQueue = new Map(); // contextId -> boolean (currently processing)
+        this.messageQueue = new Map();    // contextId -> Array of pending messages
+        this.lastMessageTime = new Map();
+        this.MAX_QUEUE_SIZE = 3;
+        this.PROCESSING_TIMEOUT_MS = 120000; // 2 minutes
     }
 
     /**
@@ -39,14 +42,34 @@ class MessageRouter {
         // even if the user replies hours later.
         this.lastMessageTime.set(contextId, Date.now());
 
-        // Skip if already processing a message from this user
+        // If already processing a message for this context, queue it
         if (this.processingQueue.has(contextId)) {
-            logger.debug('Context already has message in queue', { contextId });
+            const queue = this.messageQueue.get(contextId) || [];
+            if (queue.length >= this.MAX_QUEUE_SIZE) {
+                logger.warn('Message queue full, dropping message', { contextId, queueSize: queue.length });
+                try {
+                    await whatsappManager.sendMessage(chat, 'יש לי כבר כמה הודעות בתור, אחזור אליך בקרוב 😅');
+                } catch (e) {
+                    logger.error('Failed to send queue-full notification', { error: e.message });
+                }
+                return;
+            }
+            queue.push(message);
+            this.messageQueue.set(contextId, queue);
+            logger.debug('Message queued', { contextId, queueSize: queue.length });
             return;
         }
 
         // Add to processing queue
         this.processingQueue.set(contextId, Date.now());
+
+        // Set processing timeout
+        const timeoutId = setTimeout(() => {
+            if (this.processingQueue.has(contextId)) {
+                logger.warn('Message processing timeout', { contextId });
+                this.processingQueue.delete(contextId);
+            }
+        }, this.PROCESSING_TIMEOUT_MS);
 
         try {
             let response;
@@ -98,8 +121,17 @@ class MessageRouter {
                 logger.error('Failed to send error message', { error: sendErr.message });
             }
         } finally {
-            // Remove from processing queue
+            clearTimeout(timeoutId);
             this.processingQueue.delete(contextId);
+
+            // Process next queued message if any
+            const queue = this.messageQueue.get(contextId);
+            if (queue && queue.length > 0) {
+                const nextMessage = queue.shift();
+                if (queue.length === 0) this.messageQueue.delete(contextId);
+                // Process asynchronously (don't await — let it run independently)
+                this.routeMessage(nextMessage);
+            }
         }
     }
 

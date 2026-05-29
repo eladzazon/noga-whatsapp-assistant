@@ -1,5 +1,6 @@
 import dotenv from 'dotenv';
 import path from 'path';
+import logger from './logger.js';
 
 // Load environment variables
 dotenv.config();
@@ -128,28 +129,28 @@ Always be warm and respond in Hebrew.`
 };
 
 /**
- * Validate required configuration
+ * Validate required configuration.
+ * Throws on critical missing config; logs warnings for non-critical issues.
  */
 export function validateConfig() {
-    const errors = [];
-
+    // Critical — fail fast
     if (!config.gemini.apiKey) {
-        errors.push('GEMINI_API_KEY is required');
+        throw new Error('GEMINI_API_KEY is required. Set it in .env or environment variables.');
     }
 
+    // Warnings
     if (config.whatsapp.whitelist.length === 0 && !config.whatsapp.groupId) {
-        errors.push('Either WHATSAPP_WHITELIST or WHATSAPP_GROUP_ID is required');
+        logger.warn('[Config] Neither WHATSAPP_WHITELIST nor WHATSAPP_GROUP_ID is set');
     }
-
     if (config.dashboard.password === 'changeme') {
-        console.warn('[Config] Warning: Using default dashboard password. Please change DASHBOARD_PASSWORD in production.');
+        logger.warn('[Config] Using default dashboard password. Set DASHBOARD_PASSWORD in production.');
     }
-
     if (config.dashboard.sessionSecret === 'default-secret-change-me') {
-        console.warn('[Config] Warning: Using default session secret. Please set SESSION_SECRET in production.');
+        logger.warn('[Config] Using default session secret. Set SESSION_SECRET in production.');
     }
-
-    return errors;
+    if (isNaN(config.dashboard.port) || config.dashboard.port < 1 || config.dashboard.port > 65535) {
+        throw new Error(`Invalid DASHBOARD_PORT: ${process.env.DASHBOARD_PORT}. Must be 1-65535.`);
+    }
 }
 /**
  * Apply DB-stored environment overrides to process.env and config.
