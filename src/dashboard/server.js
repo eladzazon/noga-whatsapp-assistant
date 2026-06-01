@@ -95,7 +95,8 @@ class DashboardServer {
         this.app.use(session({
             store: new FileStore({
                 path: path.resolve(process.cwd(), 'data', 'sessions'),
-                retries: 0
+                retries: 2,
+                logFn: () => {} // Suppress retry logs
             }),
             secret: config.dashboard.sessionSecret,
             resave: false,

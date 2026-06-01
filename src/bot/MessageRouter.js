@@ -37,7 +37,7 @@ class MessageRouter {
         const contextId = isGroup ? chat : from;
 
         // We removed the 10-minute context auto-clear.
-        // Noga will naturally rely on the sliding window (last 40 messages) 
+        // Noga will naturally rely on the sliding window (configured limit) 
         // to maintain context, allowing her to remember reminders she sent 
         // even if the user replies hours later.
         this.lastMessageTime.set(contextId, Date.now());

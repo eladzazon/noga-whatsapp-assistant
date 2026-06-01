@@ -42,6 +42,7 @@ const config = {
     gemini: {
         apiKey: process.env.GEMINI_API_KEY,
         model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
+        contextWindowMessages: parseInt(process.env.GEMINI_CONTEXT_WINDOW_MESSAGES, 10) || 10,
         systemPrompt: process.env.GEMINI_SYSTEM_PROMPT || `You are Noga (נוגה), a proactive Israeli home assistant.
 You speak Hebrew and English fluently, preferring Hebrew for responses.
 You are concise, friendly, and helpful.
@@ -185,6 +186,7 @@ export function applyDbOverrides(db) {
 
             config.gemini.apiKey = process.env.GEMINI_API_KEY;
             config.gemini.model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+            config.gemini.contextWindowMessages = parseInt(process.env.GEMINI_CONTEXT_WINDOW_MESSAGES, 10) || 10;
             if (process.env.GEMINI_SYSTEM_PROMPT) {
                 config.gemini.systemPrompt = process.env.GEMINI_SYSTEM_PROMPT;
             }

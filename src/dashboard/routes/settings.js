@@ -77,6 +77,9 @@ export default function createSettingsRoutes(deps) {
         if (settings.GEMINI_MODEL) {
             config.gemini.model = settings.GEMINI_MODEL;
         }
+        if (settings.GEMINI_CONTEXT_WINDOW_MESSAGES) {
+            config.gemini.contextWindowMessages = parseInt(settings.GEMINI_CONTEXT_WINDOW_MESSAGES, 10) || 10;
+        }
         if (settings.GEMINI_API_KEY) {
             config.gemini.apiKey = settings.GEMINI_API_KEY;
         }
