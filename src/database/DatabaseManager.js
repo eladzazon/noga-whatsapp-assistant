@@ -693,7 +693,7 @@ class DatabaseManager {
      * @param {number} days - Number of days after which to prune (default 7)
      * @returns {number} Number of deleted reminders
      */
-    pruneExpiredReminders(days = 7) {
+    pruneExpiredReminders(days = 1) {
         const stmt = this.db.prepare(`
             DELETE FROM reminders
             WHERE status IN ('done', 'cancelled')

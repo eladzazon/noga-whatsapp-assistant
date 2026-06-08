@@ -111,7 +111,7 @@ async function main() {
             logger.info('Running database cleanup...');
             const prunedMessages = db.pruneOldMessages(100);
             const cleanedCache = db.cleanOldCache(7);
-            const prunedReminders = db.pruneExpiredReminders(7);
+            const prunedReminders = db.pruneExpiredReminders(1);
             logger.info('Database cleanup complete', { prunedMessages, cleanedCache, prunedReminders });
         }, {
             timezone: 'Asia/Jerusalem'
