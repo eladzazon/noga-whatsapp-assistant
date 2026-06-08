@@ -209,8 +209,7 @@ rest_command:
     headers:
       x-webhook-secret: "my_super_secret_webhook_key_123"  # Must match your .env
     content_type: 'application/json; charset=utf-8'
-    payload: >
-      {"title": "{{ title }}", "due_date": "{{ due_date | default('+5m') }}", "nudge_interval_minutes": {{ nudge_interval_minutes | default(60) }} }
+    payload: '{"title": {{ title | to_json }}, "due_date": "{{ due_date | default(''+5m'') }}", "nudge_interval_minutes": {{ nudge_interval_minutes | default(60) }} }'
 ```
 
 > **Note**: Restart Home Assistant after editing `configuration.yaml`.
