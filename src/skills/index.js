@@ -323,7 +323,11 @@ export const functionHandlers = {
     snooze_reminder: async (args) => {
         logger.info('Executing: snooze_reminder', args);
         const success = db.updateReminderDueDate(args.id, args.new_due_date_iso);
-        return { success, message: success ? 'Reminder snoozed' : 'Reminder not found' };
+        if (success) {
+            return { success: true, message: `Reminder ${args.id} successfully rescheduled to ${args.new_due_date_iso}. Nudge timer has been reset.` };
+        } else {
+            return { success: false, message: `FAILED: Reminder with ID ${args.id} was not found or could not be updated. Do NOT tell the user it was rescheduled.` };
+        }
     },
 
     // ==================== Shopping List Handlers Removed (Now a Skill) ====================

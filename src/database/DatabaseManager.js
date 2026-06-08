@@ -640,10 +640,10 @@ class DatabaseManager {
     }
 
     /**
-     * Update the due date of a reminder (also sets status back to pending)
+     * Update the due date of a reminder (also resets nudge state so it won't fire early)
      */
     updateReminderDueDate(id, dueDate) {
-        const stmt = this.db.prepare("UPDATE reminders SET due_date = ?, status = 'pending', updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+        const stmt = this.db.prepare("UPDATE reminders SET due_date = ?, status = 'pending', last_nudged = NULL, nudge_count = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
         return stmt.run(dueDate, id).changes > 0;
     }
 

@@ -19,7 +19,29 @@ function renderReminders(reminders) {
         remindersTbody.innerHTML = '<tr class="empty-row"><td colspan="6">אין תזכורות. לחצו "הוסף" כדי להתחיל.</td></tr>';
         return;
     }
-    remindersTbody.innerHTML = reminders.map(r => {
+    // Compute the effective next-nudge timestamp for sorting
+    function getNextNudgeTime(r) {
+        const now = new Date();
+        const dueDate = new Date(r.due_date);
+        if (r.status !== 'pending') return Infinity; // non-pending go to bottom
+        if (now < dueDate) return dueDate.getTime(); // first nudge at due date
+        if (!r.last_nudged) return 0; // immediate nudge — put at very top
+        const nextNudge = new Date(r.last_nudged).getTime() + (r.nudge_interval_minutes * 60000);
+        return nextNudge <= now.getTime() ? 0 : nextNudge; // immediate or future
+    }
+
+    // Sort: pending first by next nudge ascending, then non-pending by updated_at descending
+    const sorted = [...reminders].sort((a, b) => {
+        const aPending = a.status === 'pending';
+        const bPending = b.status === 'pending';
+        if (aPending && !bPending) return -1;
+        if (!aPending && bPending) return 1;
+        if (aPending && bPending) return getNextNudgeTime(a) - getNextNudgeTime(b);
+        // Both non-pending: most recently updated first
+        return new Date(b.updated_at || b.created_at).getTime() - new Date(a.updated_at || a.created_at).getTime();
+    });
+
+    remindersTbody.innerHTML = sorted.map(r => {
         const now = new Date();
         const dueDate = new Date(r.due_date);
         const dueDateStr = r.due_date ? dueDate.toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' }) : '-';
