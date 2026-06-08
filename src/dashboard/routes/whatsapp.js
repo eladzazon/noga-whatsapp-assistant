@@ -140,5 +140,51 @@ export default function createWhatsappRoutes(deps) {
         }
     }));
 
+    // Create reminder via webhook (for Home Assistant automations)
+    router.post('/api/webhook/reminder', asyncHandler(async (req, res) => {
+        const secret = req.headers['x-webhook-secret'] || req.query.secret || req.body.secret;
+
+        // 1. Verify Secret
+        if (!config.dashboard.webhookSecret || secret !== config.dashboard.webhookSecret) {
+            logger.warn('Unauthorized webhook/reminder attempt', { ip: req.ip });
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        // 2. Validate required fields
+        const { title, due_date, nudge_interval_minutes } = req.body;
+        if (!title) {
+            return res.status(400).json({ error: 'title is required' });
+        }
+
+        // 3. Resolve due_date — supports ISO string or relative shorthand (+10m, +1h, +2h30m)
+        let resolvedDueDate;
+        const dueDateStr = (due_date || '').trim();
+
+        if (!dueDateStr) {
+            // Default: 5 minutes from now
+            resolvedDueDate = new Date(Date.now() + 5 * 60000).toISOString();
+        } else if (/^\+/.test(dueDateStr)) {
+            // Relative format: +10m, +1h, +2h30m, +90m etc.
+            let totalMinutes = 0;
+            const hourMatch = dueDateStr.match(/(\d+)\s*h/i);
+            const minMatch = dueDateStr.match(/(\d+)\s*m/i);
+            if (hourMatch) totalMinutes += parseInt(hourMatch[1]) * 60;
+            if (minMatch) totalMinutes += parseInt(minMatch[1]);
+            if (totalMinutes <= 0) totalMinutes = 5; // fallback
+            resolvedDueDate = new Date(Date.now() + totalMinutes * 60000).toISOString();
+        } else {
+            // Assume ISO string
+            resolvedDueDate = new Date(dueDateStr).toISOString();
+        }
+
+        // 4. Create reminder
+        const interval = parseInt(nudge_interval_minutes) || 60;
+        const id = db.addReminder(title, resolvedDueDate, interval);
+
+        logger.info('Webhook reminder created', { id, title, due_date: resolvedDueDate, interval });
+
+        res.json({ success: true, id, title, due_date: resolvedDueDate, nudge_interval_minutes: interval });
+    }));
+
     return router;
 }

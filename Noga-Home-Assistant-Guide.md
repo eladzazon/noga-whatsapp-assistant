@@ -166,7 +166,125 @@ action:
 **Noga will send:** The image of the front door with the exact text provided in the `event` field as the caption: "Motion detected at the front door". 
 *(Note: To ensure fast delivery, Noga bypasses AI text generation when an image is attached and simply uses your exact event text).*
 
-## 5. Control from WhatsApp (Entity Mapping & MCP)
+### Example: Washing Machine Finished + Reminder 🧺➡️👕
+When the washing machine finishes, notify the group **and** create a reminder to move clothes to the dryer:
+
+```yaml
+alias: "Washing Machine Finished"
+trigger:
+  - platform: state
+    entity_id: sensor.washing_machine_power
+    to: "off"
+    from: "on"
+action:
+  # 1. Announce it to the group
+  - service: rest_command.noga_notify
+    data:
+      event: "Washing Machine Finished"
+      data:
+        location: "Laundry Room"
+
+  # 2. Create a reminder to move clothes to the dryer
+  - service: rest_command.noga_create_reminder
+    data:
+      title: "להעביר את הכביסה למייבש 👕"
+      due_date: "+10m"
+      nudge_interval_minutes: 30
+```
+**Result:** Noga announces the washing is done, and 10 minutes later starts nudging you every 30 minutes to move the clothes — until you mark it done (👍 or "עשיתי").
+
+## 5. Reminder Webhook API
+
+Noga exposes a webhook that lets Home Assistant (or any external service) create reminders directly. This is perfect for automations where you need a persistent nudge until you act.
+
+### Setup
+
+Add this `rest_command` to your `configuration.yaml` (alongside the existing `noga_notify`):
+
+```yaml
+rest_command:
+  noga_create_reminder:
+    url: "http://YOUR_NOGA_IP:3000/api/webhook/reminder"
+    method: POST
+    headers:
+      x-webhook-secret: "my_super_secret_webhook_key_123"  # Must match your .env
+    content_type: 'application/json; charset=utf-8'
+    payload: >
+      {"title": "{{ title }}", "due_date": "{{ due_date | default('+5m') }}", "nudge_interval_minutes": {{ nudge_interval_minutes | default(60) }} }
+```
+
+> **Note**: Restart Home Assistant after editing `configuration.yaml`.
+
+### Fields
+
+| Field | Required | Description | Example |
+|-------|----------|-------------|---------|
+| `title` | ✅ Yes | What to remind about (Hebrew recommended) | `"להוציא את הזבל 🗑️"` |
+| `due_date` | No | When to start nudging. Supports ISO date or relative shorthand. Default: `+5m` | `"+10m"`, `"+1h"`, `"+2h30m"`, `"2025-01-15T18:00:00Z"` |
+| `nudge_interval_minutes` | No | How often to re-nudge (in minutes). Default: `60` | `30` |
+
+**Relative `due_date` examples:**
+- `+5m` — 5 minutes from now
+- `+1h` — 1 hour from now
+- `+2h30m` — 2 hours and 30 minutes from now
+- `+90m` — 90 minutes from now
+
+### More Automation Examples
+
+#### Medication Reminder 💊
+Remind to take medication every morning, nudge every 15 minutes until done:
+
+```yaml
+alias: "Morning Medication Reminder"
+trigger:
+  - platform: time
+    at: "08:00:00"
+action:
+  - service: rest_command.noga_create_reminder
+    data:
+      title: "לקחת תרופות בוקר 💊"
+      due_date: "+0m"
+      nudge_interval_minutes: 15
+```
+
+#### Garbage Day 🗑️
+The night before garbage collection, remind to take the bins out:
+
+```yaml
+alias: "Garbage Day Reminder"
+trigger:
+  - platform: time
+    at: "20:00:00"
+condition:
+  - condition: time
+    weekday:
+      - mon  # Adjust to your collection day
+action:
+  - service: rest_command.noga_create_reminder
+    data:
+      title: "להוציא את הפחים לרחוב 🗑️"
+      due_date: "+0m"
+      nudge_interval_minutes: 60
+```
+
+#### Robot Vacuum Needs Emptying 🤖
+When the robot vacuum's dustbin is full:
+
+```yaml
+alias: "Robot Vacuum Bin Full"
+trigger:
+  - platform: state
+    entity_id: sensor.roborock_dustbin
+    to: "full"
+action:
+  - service: rest_command.noga_create_reminder
+    data:
+      title: "לרוקן את הפח של השואב רובוט 🤖"
+      due_date: "+30m"
+      nudge_interval_minutes: 120
+```
+
+## 6. Control from WhatsApp (Entity Mapping & MCP)
 
 Noga uses the **Model Context Protocol (MCP)** to automatically pull all available services directly from your Home Assistant instance. This means Noga immediately knows how to control your lights, switches, media players, and more, without needing custom code.
 
@@ -188,7 +306,7 @@ Once mapped, you can send these commands to Noga:
 
 Noga uses your custom nicknames to find the exact Home Assistant `entity_id` and then uses the official MCP tools (like `HassTurnOn`, `HassTurnOff`, or `GetLiveContext`) to perform the action!
 
-## 6. AI Quota Handling
+## 7. AI Quota Handling
 
 If you are using the Gemini Free Tier and reach your daily limit (429 error), Noga will:
 1. Update the dashboard status for Gemini to **"מכסה נגמרה"** (Quota Exceeded) in red.
@@ -196,7 +314,7 @@ If you are using the Gemini Free Tier and reach your daily limit (429 error), No
 
 The system will automatically recover as soon as your quota is reset.
 
-## 7. Troubleshooting
+## 8. Troubleshooting
 
 - **Check Logs**: If it doesn't work, check the Noga logs (`npm run dev`).
 - **"Unauthorized"**: Make sure the secret in `configuration.yaml` matches `.env`.
