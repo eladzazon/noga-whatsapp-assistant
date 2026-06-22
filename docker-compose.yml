@@ -15,6 +15,7 @@ services:
       - ./.env:/app/.env:ro
     environment:
       - NODE_ENV=production
+      - TZ=America/New_York
     networks:
       - proxy-network
     # Limit resources
