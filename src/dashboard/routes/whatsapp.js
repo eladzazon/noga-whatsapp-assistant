@@ -45,6 +45,11 @@ export default function createWhatsappRoutes(deps) {
     // Accepts application/json OR multipart/form-data (for image uploads)
     router.post('/api/notify', upload.single('image'), asyncHandler(async (req, res) => {
         const event = req.body.event;
+        // 'message' is an alternative to 'event' specifically for raw/passthrough sends
+        const rawMessage = req.body.message;
+        // Accept boolean true, or the strings "true"/"1" (form-data/query values arrive as strings)
+        const isRaw = req.body.raw === true || req.body.raw === 'true' || req.body.raw === '1'
+            || req.query.raw === 'true' || req.query.raw === '1';
         let data = {};
         if (req.body.data) {
             try {
@@ -63,16 +68,31 @@ export default function createWhatsappRoutes(deps) {
         }
 
         // 2. Validate Data
-        if (!event) {
+        // For raw passthrough, accept either 'message' or 'event' as the literal text.
+        // For AI-composed broadcasts, 'event' is still required.
+        if (isRaw && !rawMessage && !event) {
+            return res.status(400).json({ error: '"message" (or "event") is required when raw=true' });
+        }
+        if (!isRaw && !event) {
             return res.status(400).json({ error: 'Event name required' });
         }
 
         // 3. Process Webhook
-        logger.info('Webhook received', { event });
+        logger.info('Webhook received', { event, raw: isRaw });
 
         try {
-            // Generate message: Use raw event text for images, or AI for text-only broadcasts
-            const message = req.file ? event : await server.geminiManager.generateBroadcastMessage({ event, ...data });
+            // Generate message:
+            // - Image uploads always use the literal event text as the caption
+            // - raw=true sends the literal text (message, falling back to event) with no AI rewrite
+            // - otherwise, AI composes a friendly broadcast from event + data
+            let message;
+            if (req.file) {
+                message = event;
+            } else if (isRaw) {
+                message = rawMessage || event;
+            } else {
+                message = await server.geminiManager.generateBroadcastMessage({ event, ...data });
+            }
 
             // Send to WhatsApp Group
             if (config.whatsapp.groupId) {
