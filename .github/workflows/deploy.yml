@@ -29,15 +29,17 @@ jobs:
           target: "/home/eladz/noga/"
 
       - name: SSH and deploy
-        uses: appleboy/ssh-action@v1.0.3
+        uses: nick-fields/retry@v3
         with:
-          host: ${{ secrets.GCP_VM_HOST }}
-          username: ${{ secrets.GCP_VM_USERNAME }}
-          key: ${{ secrets.GCP_VM_SSH_KEY }}
-          command_timeout: 5m
-          retry_count: 3
-          retry_wait: 10
-          script: |
+          max_attempts: 3
+          retry_wait_seconds: 10
+          timeout_minutes: 10
+          command: |
+            echo "${{ secrets.GCP_VM_SSH_KEY }}" > /tmp/ssh_key
+            chmod 600 /tmp/ssh_key
+            ssh -o StrictHostKeyChecking=no -i /tmp/ssh_key ${{ secrets.GCP_VM_USERNAME }}@${{ secrets.GCP_VM_HOST }} << 'EOF'
             cd /home/eladz/noga/
             docker pull eladzazon/noga-whatsapp-assistant:latest
             docker compose up -d noga
+            EOF
+            rm -f /tmp/ssh_key
