@@ -41,6 +41,29 @@ import { init as setupLogs } from './tabs/logs.js';
         });
     }
 
+    const btnRestart = document.getElementById('btn-restart');
+    if (btnRestart) {
+        btnRestart.addEventListener('click', async () => {
+            if (!confirm('האם אתה בטוח שברצונך להפעיל מחדש את המערכת?')) return;
+            btnRestart.disabled = true;
+            btnRestart.textContent = '...מפעיל מחדש';
+            try {
+                await fetch('/api/restart', { method: 'POST' });
+                setTimeout(() => {
+                    const poll = setInterval(async () => {
+                        try {
+                            const res = await fetch('/health');
+                            if (res.ok) { clearInterval(poll); window.location.reload(); }
+                        } catch {}
+                    }, 2000);
+                }, 3000);
+            } catch {
+                btnRestart.disabled = false;
+                btnRestart.textContent = '🔄 הפעל מחדש';
+            }
+        });
+    }
+
     // 3. Setup Tabs (Event Listeners & Lazy Loading)
     const tabBtns = document.querySelectorAll('.tab-btn');
     const tabPanes = document.querySelectorAll('.tab-pane');
