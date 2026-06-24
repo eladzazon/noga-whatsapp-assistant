@@ -34,6 +34,9 @@ jobs:
           host: ${{ secrets.GCP_VM_HOST }}
           username: ${{ secrets.GCP_VM_USERNAME }}
           key: ${{ secrets.GCP_VM_SSH_KEY }}
+          command_timeout: 5m
+          retry_count: 3
+          retry_wait: 10
           script: |
             cd /home/eladz/noga/
             docker pull eladzazon/noga-whatsapp-assistant:latest
