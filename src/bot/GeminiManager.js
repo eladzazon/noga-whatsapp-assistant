@@ -116,7 +116,26 @@ class GeminiManager {
         if (db) {
             const reminders = db.getPendingReminders();
             if (reminders && reminders.length > 0) {
-                pendingRemindersInfo = `\nPending Reminders (To-Do): ${reminders.map(r => `[ID: ${r.id}] ${r.title}`).join(', ')}. If the user says "done", "I did it", or reacts with a thumbs up / "like" emoji (👍), check the chat history for the "[Internal Context: Reminder ID X]" tag to know exactly which task they are reacting to, and use update_reminder_status to mark it done. IMPORTANT: Never include "[Internal Context: ...]" tags in your responses to the user. These are internal system metadata only.`;
+                // Sort by last_nudged descending so the most recently nudged is first
+                const sorted = [...reminders].sort((a, b) => {
+                    if (!a.last_nudged && !b.last_nudged) return 0;
+                    if (!a.last_nudged) return 1;
+                    if (!b.last_nudged) return -1;
+                    return new Date(b.last_nudged) - new Date(a.last_nudged);
+                });
+                const reminderList = sorted.map(r => {
+                    const nudgedInfo = r.last_nudged
+                        ? `last nudged: ${new Date(r.last_nudged).toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' })}`
+                        : 'not yet nudged';
+                    return `[ID: ${r.id}] "${r.title}" (${nudgedInfo})`;
+                }).join('; ');
+                pendingRemindersInfo = `\nPending Reminders (To-Do), sorted by most recently nudged first: ${reminderList}.`
+                    + `\nWhen the user says "done", "I did it", "עשיתי", or reacts with 👍:`
+                    + `\n1. First, check the recent chat history for a "[Internal Context: Reminder ID X]" tag — this tells you exactly which reminder the user is responding to.`
+                    + `\n2. If you find a matching tag, mark THAT specific reminder as done using update_reminder_status.`
+                    + `\n3. If there is only ONE pending reminder, you can safely assume they mean that one.`
+                    + `\n4. If there are MULTIPLE pending reminders and you CANNOT determine which one from the chat history, you MUST ASK the user which task they completed. List the options. Do NOT guess.`
+                    + `\nIMPORTANT: Never include "[Internal Context: ...]" tags in your responses to the user. These are internal system metadata only.`;
             }
         }
 
