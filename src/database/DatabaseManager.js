@@ -98,6 +98,10 @@ class DatabaseManager {
                 this.db.exec("ALTER TABLE reminders ADD COLUMN nudge_count INTEGER DEFAULT 0");
                 logger.info('[Database] Migrated reminders table: added nudge_count column');
             }
+            if (cols.length > 0 && !cols.find(c => c.name === 'last_nudge_message_id')) {
+                this.db.exec("ALTER TABLE reminders ADD COLUMN last_nudge_message_id TEXT");
+                logger.info('[Database] Migrated reminders table: added last_nudge_message_id column');
+            }
         } catch (err) {
             if (err.message && !err.message.includes('no such table')) throw err;
         }
@@ -678,6 +682,22 @@ class DatabaseManager {
     updateReminder(id, title, dueDate, nudgeInterval) {
         const stmt = this.db.prepare("UPDATE reminders SET title = ?, due_date = ?, nudge_interval_minutes = ? WHERE id = ?");
         return stmt.run(title, dueDate, nudgeInterval, id).changes > 0;
+    }
+
+    /**
+     * Update the WhatsApp message ID of the last nudge sent for a reminder
+     */
+    updateReminderNudgeMessageId(id, messageId) {
+        const stmt = this.db.prepare("UPDATE reminders SET last_nudge_message_id = ? WHERE id = ?");
+        return stmt.run(messageId, id).changes > 0;
+    }
+
+    /**
+     * Get a pending reminder by its last nudge WhatsApp message ID
+     */
+    getReminderByNudgeMessageId(messageId) {
+        const stmt = this.db.prepare("SELECT * FROM reminders WHERE last_nudge_message_id = ? AND status = 'pending'");
+        return stmt.get(messageId);
     }
 
     /**

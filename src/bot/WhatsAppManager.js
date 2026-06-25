@@ -313,7 +313,10 @@ class WhatsAppManager {
                 hasMedia = true;
             } else if (type === 'reactionMessage') {
                 const reactionEmoji = messageContent.reactionMessage?.text || '';
+                const reactedToKey = messageContent.reactionMessage?.key || null;
                 body = `[The user reacted to a previous message with the emoji: ${reactionEmoji}]`;
+                // Store reactedToKey on msg for downstream use
+                msg._reactedToKey = reactedToKey;
             }
 
             logger.info('Message received', {
@@ -350,7 +353,8 @@ class WhatsAppManager {
                 body: body,
                 timestamp: msg.messageTimestamp,
                 hasMedia: hasMedia,
-                media: null
+                media: null,
+                reactedToKey: msg._reactedToKey || null
             };
 
             // Download media for voice notes
@@ -414,8 +418,9 @@ class WhatsAppManager {
         }
 
         try {
-            await this.client.sendMessage(chatId, { text: text });
+            const sentMsg = await this.client.sendMessage(chatId, { text: text });
             logger.info('Message sent', { to: chatId, length: text.length });
+            return sentMsg?.key?.id || null;
         } catch (err) {
             logger.error('Failed to send message', { error: err.message, to: chatId });
             throw err;

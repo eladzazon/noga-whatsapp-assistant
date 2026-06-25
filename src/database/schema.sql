@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS reminders (
     last_nudged DATETIME,
     nudge_count INTEGER DEFAULT 0,
     nudge_interval_minutes INTEGER DEFAULT 60,
+    last_nudge_message_id TEXT,
     status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'done', 'cancelled')),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP

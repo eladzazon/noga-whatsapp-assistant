@@ -301,13 +301,16 @@ class SchedulerManager {
                         const response = await this.geminiManager.generateBroadcastMessage(eventData);
 
                         if (response && response.trim()) {
-                            await whatsappManager.sendMessage(config.whatsapp.groupId, response);
+                            const sentMessageId = await whatsappManager.sendMessage(config.whatsapp.groupId, response);
                             
                             // Log to history with the internal ID appended so Noga remembers exactly which reminder this was
                             db.addChatMessage(config.whatsapp.groupId, 'model', `${response} [Internal Context: Reminder ID ${reminder.id}]`);
                             
                             db.updateReminderLastNudged(reminder.id);
-                            logger.info(`Sent nudge for reminder ${reminder.id}: "${reminder.title}"`);
+                            if (sentMessageId) {
+                                db.updateReminderNudgeMessageId(reminder.id, sentMessageId);
+                            }
+                            logger.info(`Sent nudge for reminder ${reminder.id}: "${reminder.title}"`, { sentMessageId });
                         }
                     }
                 }

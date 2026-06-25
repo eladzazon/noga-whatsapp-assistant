@@ -32,9 +32,29 @@ class MessageRouter {
      * Route incoming message to appropriate handler
      */
     async routeMessage(message) {
-        const { from, chat, body, type, hasMedia, media, isGroup } = message;
+        const { from, chat, body, type, hasMedia, media, isGroup, reactedToKey } = message;
 
         const contextId = isGroup ? chat : from;
+
+        // Intercept 👍 reactions on reminder nudge messages — mark as done automatically
+        if (reactedToKey && body) {
+            const emojiMatch = body.match(/emoji:\s*(.+?)\]/);
+            const emoji = emojiMatch ? emojiMatch[1].trim() : '';
+            if (emoji === '👍') {
+                const reactedMsgId = reactedToKey.id;
+                if (reactedMsgId) {
+                    const reminder = db.getReminderByNudgeMessageId(reactedMsgId);
+                    if (reminder) {
+                        db.updateReminderStatus(reminder.id, 'done');
+                        const confirmMsg = `✅ המשימה "${reminder.title}" סומנה כבוצעה! 🎉`;
+                        await whatsappManager.sendMessage(chat, confirmMsg);
+                        db.addChatMessage(contextId, 'model', confirmMsg);
+                        logger.info(`Reminder ${reminder.id} marked as done via 👍 reaction`, { reactedMsgId });
+                        return;
+                    }
+                }
+            }
+        }
 
         // We removed the 10-minute context auto-clear.
         // Noga will naturally rely on the sliding window (configured limit) 
