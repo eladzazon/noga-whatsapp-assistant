@@ -315,8 +315,9 @@ class WhatsAppManager {
                 const reactionEmoji = messageContent.reactionMessage?.text || '';
                 const reactedToKey = messageContent.reactionMessage?.key || null;
                 body = `[The user reacted to a previous message with the emoji: ${reactionEmoji}]`;
-                // Store reactedToKey on msg for downstream use
+                // Store reaction data on msg for downstream use
                 msg._reactedToKey = reactedToKey;
+                msg._reactionEmoji = reactionEmoji;
             }
 
             logger.info('Message received', {
@@ -354,7 +355,8 @@ class WhatsAppManager {
                 timestamp: msg.messageTimestamp,
                 hasMedia: hasMedia,
                 media: null,
-                reactedToKey: msg._reactedToKey || null
+                reactedToKey: msg._reactedToKey || null,
+                reactionEmoji: msg._reactionEmoji || null
             };
 
             // Download media for voice notes

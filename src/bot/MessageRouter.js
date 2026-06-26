@@ -32,26 +32,26 @@ class MessageRouter {
      * Route incoming message to appropriate handler
      */
     async routeMessage(message) {
-        const { from, chat, body, type, hasMedia, media, isGroup, reactedToKey } = message;
+        const { from, chat, body, type, hasMedia, media, isGroup, reactedToKey, reactionEmoji } = message;
 
         const contextId = isGroup ? chat : from;
 
         // Intercept 👍 reactions on reminder nudge messages — mark as done automatically
-        if (reactedToKey && body) {
-            const emojiMatch = body.match(/emoji:\s*(.+?)\]/);
-            const emoji = emojiMatch ? emojiMatch[1].trim() : '';
-            if (emoji === '👍') {
-                const reactedMsgId = reactedToKey.id;
-                if (reactedMsgId) {
-                    const reminder = db.getReminderByNudgeMessageId(reactedMsgId);
-                    if (reminder) {
-                        db.updateReminderStatus(reminder.id, 'done');
-                        const confirmMsg = `✅ המשימה "${reminder.title}" סומנה כבוצעה! 🎉`;
-                        await whatsappManager.sendMessage(chat, confirmMsg);
-                        db.addChatMessage(contextId, 'model', confirmMsg);
-                        logger.info(`Reminder ${reminder.id} marked as done via 👍 reaction`, { reactedMsgId });
-                        return;
-                    }
+        if (reactedToKey && reactionEmoji === '👍') {
+            const reactedMsgId = reactedToKey.id;
+            logger.info('👍 reaction detected on message', { reactedMsgId, reactedToKey: JSON.stringify(reactedToKey) });
+
+            if (reactedMsgId) {
+                const reminder = db.getReminderByNudgeMessageId(reactedMsgId);
+                if (reminder) {
+                    db.updateReminderStatus(reminder.id, 'done');
+                    const confirmMsg = `✅ המשימה "${reminder.title}" סומנה כבוצעה! 🎉`;
+                    await whatsappManager.sendMessage(chat, confirmMsg);
+                    db.addChatMessage(contextId, 'model', confirmMsg);
+                    logger.info(`Reminder ${reminder.id} marked as done via 👍 reaction`, { reactedMsgId, title: reminder.title });
+                    return;
+                } else {
+                    logger.debug('👍 reaction did not match any pending reminder nudge', { reactedMsgId });
                 }
             }
         }
