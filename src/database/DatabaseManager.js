@@ -106,6 +106,18 @@ class DatabaseManager {
             if (err.message && !err.message.includes('no such table')) throw err;
         }
 
+        // Migration: Create reminder_nudge_messages mapping table
+        // Tracks ALL nudge message IDs (not just the latest) so reacting to any nudge works
+        this.db.exec(`
+            CREATE TABLE IF NOT EXISTS reminder_nudge_messages (
+                message_id TEXT PRIMARY KEY,
+                reminder_id INTEGER NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (reminder_id) REFERENCES reminders(id) ON DELETE CASCADE
+            );
+        `);
+        this.db.exec(`CREATE INDEX IF NOT EXISTS idx_nudge_msg_reminder ON reminder_nudge_messages(reminder_id);`);
+
         logger.info('[Database] Initialized successfully');
         return this;
     }
@@ -685,18 +697,22 @@ class DatabaseManager {
     }
 
     /**
-     * Update the WhatsApp message ID of the last nudge sent for a reminder
+     * Record a nudge message ID for a reminder (keeps ALL nudge IDs, not just the latest)
      */
-    updateReminderNudgeMessageId(id, messageId) {
-        const stmt = this.db.prepare("UPDATE reminders SET last_nudge_message_id = ? WHERE id = ?");
-        return stmt.run(messageId, id).changes > 0;
+    addReminderNudgeMessage(reminderId, messageId) {
+        const stmt = this.db.prepare("INSERT OR IGNORE INTO reminder_nudge_messages (message_id, reminder_id) VALUES (?, ?)");
+        return stmt.run(messageId, reminderId).changes > 0;
     }
 
     /**
-     * Get a pending reminder by its last nudge WhatsApp message ID
+     * Get a pending reminder by any of its nudge WhatsApp message IDs
      */
     getReminderByNudgeMessageId(messageId) {
-        const stmt = this.db.prepare("SELECT * FROM reminders WHERE last_nudge_message_id = ? AND status = 'pending'");
+        const stmt = this.db.prepare(`
+            SELECT r.* FROM reminders r
+            JOIN reminder_nudge_messages m ON m.reminder_id = r.id
+            WHERE m.message_id = ? AND r.status = 'pending'
+        `);
         return stmt.get(messageId);
     }
 
@@ -714,6 +730,16 @@ class DatabaseManager {
      * @returns {number} Number of deleted reminders
      */
     pruneExpiredReminders(days = 1) {
+        // Clean up nudge message mappings for reminders that will be pruned
+        this.db.prepare(`
+            DELETE FROM reminder_nudge_messages
+            WHERE reminder_id IN (
+                SELECT id FROM reminders
+                WHERE status IN ('done', 'cancelled')
+                AND updated_at < datetime('now', '-' || ? || ' days')
+            )
+        `).run(days);
+
         const stmt = this.db.prepare(`
             DELETE FROM reminders
             WHERE status IN ('done', 'cancelled')

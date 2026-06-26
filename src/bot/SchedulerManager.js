@@ -308,7 +308,7 @@ class SchedulerManager {
                             
                             db.updateReminderLastNudged(reminder.id);
                             if (sentMessageId) {
-                                db.updateReminderNudgeMessageId(reminder.id, sentMessageId);
+                                db.addReminderNudgeMessage(reminder.id, sentMessageId);
                             }
                             logger.info(`Sent nudge for reminder ${reminder.id}: "${reminder.title}"`, { sentMessageId });
                         }

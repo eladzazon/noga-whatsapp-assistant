@@ -76,6 +76,16 @@ CREATE INDEX IF NOT EXISTS idx_keywords_enabled ON keywords(enabled);
 -- Index for getPendingReminders() which queries WHERE status = 'pending'
 CREATE INDEX IF NOT EXISTS idx_reminders_status ON reminders(status);
 
+-- Mapping of WhatsApp message IDs to reminders (tracks ALL nudge messages, not just the latest)
+CREATE TABLE IF NOT EXISTS reminder_nudge_messages (
+    message_id TEXT PRIMARY KEY,
+    reminder_id INTEGER NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (reminder_id) REFERENCES reminders(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_nudge_msg_reminder ON reminder_nudge_messages(reminder_id);
+
 -- Usage tracking for Gemini API tokens and costs
 CREATE TABLE IF NOT EXISTS usage_logs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
