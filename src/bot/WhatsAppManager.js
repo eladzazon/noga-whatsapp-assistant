@@ -59,7 +59,7 @@ class WhatsAppManager {
             auth: state,
             printQRInTerminal: false, // We handle QR printing manually
             logger: pino({ level: 'silent' }), // Suppress baileys internal logs or set to 'debug' for troubleshooting
-            browser: Browsers.macOS('Desktop'),
+            browser: Browsers.ubuntu('Chrome'),
             ...(version && { version })
         });
 
