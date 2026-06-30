@@ -55,7 +55,7 @@ class CalendarManager {
     }
 
     /**
-     * List events in a date range
+     * List events in a date range from all configured calendars
      * @param {string} startDate - Start date (YYYY-MM-DD)
      * @param {string} endDate - End date (YYYY-MM-DD), optional
      */
@@ -68,9 +68,9 @@ class CalendarManager {
             // Use Intl to get the correct Israel timezone offset dynamically (+02:00 or +03:00)
             const getOffset = (dateStr) => {
                 const date = new Date(dateStr);
-                const tzString = new Intl.DateTimeFormat('en-US', { 
-                    timeZone: 'Asia/Jerusalem', 
-                    timeZoneName: 'longOffset' 
+                const tzString = new Intl.DateTimeFormat('en-US', {
+                    timeZone: 'Asia/Jerusalem',
+                    timeZoneName: 'longOffset'
                 }).format(date);
                 const match = tzString.match(/[+-]\d{2}:\d{2}/);
                 return match ? match[0] : '+02:00';
@@ -80,29 +80,57 @@ class CalendarManager {
             const endD = endDate || startDate;
             const timeMax = `${endD}T23:59:59${getOffset(endD)}`;
 
+            // Deduplicated list of all calendar IDs to query
+            const calendarIds = [...new Set([config.google.calendarId, ...(config.google.extraCalendarIds || [])])];
+
             logger.info('Fetching calendar events (Timezone Corrected)', {
                 startDate,
                 endDate: endDate || startDate,
                 timeMin,
-                timeMax
+                timeMax,
+                calendars: calendarIds
             });
 
-            const response = await this.calendar.events.list({
-                calendarId: config.google.calendarId,
-                timeMin: timeMin,
-                timeMax: timeMax,
-                singleEvents: true,
-                orderBy: 'startTime',
-                maxResults: 20
-            });
+            // Fetch from all calendars in parallel
+            const responses = await Promise.allSettled(
+                calendarIds.map(calId =>
+                    this.calendar.events.list({
+                        calendarId: calId,
+                        timeMin,
+                        timeMax,
+                        singleEvents: true,
+                        orderBy: 'startTime',
+                        maxResults: 50
+                    }).then(res => ({ calId, items: res.data.items || [] }))
+                )
+            );
 
-            const events = response.data.items || [];
+            // Collect results, log failures but don't abort
+            const allEvents = [];
+            for (const result of responses) {
+                if (result.status === 'fulfilled') {
+                    const { calId, items } = result.value;
+                    for (const event of items) {
+                        allEvents.push({ _calendarId: calId, ...event });
+                    }
+                } else {
+                    logger.warn('Failed to fetch from one calendar', { error: result.reason?.message });
+                }
+            }
+
+            // Sort merged results by start time
+            allEvents.sort((a, b) => {
+                const aTime = a.start.dateTime || a.start.date;
+                const bTime = b.start.dateTime || b.start.date;
+                return aTime.localeCompare(bTime);
+            });
 
             return {
                 success: true,
-                count: events.length,
-                events: events.map(event => ({
+                count: allEvents.length,
+                events: allEvents.map(event => ({
                     id: event.id,
+                    calendarId: event._calendarId,
                     title: event.summary || 'ללא כותרת',
                     description: event.description || '',
                     start: event.start.dateTime || event.start.date,
@@ -263,7 +291,8 @@ class CalendarManager {
     getStatus() {
         return {
             available: this.isAvailable(),
-            calendarId: config.google.calendarId
+            calendarId: config.google.calendarId,
+            extraCalendarIds: config.google.extraCalendarIds || []
         };
     }
 }

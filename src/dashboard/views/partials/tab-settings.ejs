@@ -98,10 +98,16 @@
                     <small>נתיב לקובץ Service Account JSON (ליומן)</small>
                 </div>
                 <div class="setting-item setting-item-wide">
-                    <label for="setting-CALENDAR_ID">Calendar ID</label>
+                    <label for="setting-CALENDAR_ID">יומן ראשי (Primary Calendar ID)</label>
                     <input type="text" id="setting-CALENDAR_ID" class="form-input" data-env="CALENDAR_ID"
                         placeholder="primary" dir="ltr">
-                    <small>מזהה יומן Google (primary או מזהה יומן ספציפי)</small>
+                    <small>יומן ראשי לכתיבה וקריאה (primary או מזהה כגון xxx@group.calendar.google.com)</small>
+                </div>
+                <div class="setting-item setting-item-wide">
+                    <label for="setting-CALENDAR_EXTRA_IDS">יומנים נוספים לקריאה</label>
+                    <input type="text" id="setting-CALENDAR_EXTRA_IDS" class="form-input" data-env="CALENDAR_EXTRA_IDS"
+                        placeholder="xxx@group.calendar.google.com,yyy@gmail.com" dir="ltr">
+                    <small>יומנים נוספים לקריאה בלבד, מופרדים בפסיק — נוגה תציג אירועים מכולם</small>
                 </div>
                 <div class="setting-item setting-item-wide">
                     <label for="setting-GOOGLE_OAUTH_CLIENT_ID">OAuth Client ID</label>

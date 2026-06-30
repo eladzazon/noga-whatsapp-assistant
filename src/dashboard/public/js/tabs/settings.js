@@ -4,7 +4,8 @@ export async function loadSettings() {
         const data = await res.json();
         if (data.settings) {
             Object.keys(data.settings).forEach(key => {
-                const el = document.getElementById(key);
+                // Find input by data-env attribute (canonical env var name)
+                const el = document.querySelector(`[data-env="${key}"]`);
                 if (el) el.value = data.settings[key];
             });
         }
@@ -23,9 +24,11 @@ export function setupSettings() {
             saveSettingsBtn.textContent = '...שומר';
 
             const payload = {};
-            document.querySelectorAll('.settings-panel input, .settings-panel select, .settings-panel textarea').forEach(el => {
-                if (el.id && el.value !== undefined) {
-                    payload[el.id] = el.value;
+            // Use data-env attribute as the key so the correct env var name is stored
+            document.querySelectorAll('.settings-panel [data-env]').forEach(el => {
+                const envKey = el.dataset.env;
+                if (envKey && el.value !== undefined) {
+                    payload[envKey] = el.value;
                 }
             });
 
@@ -46,7 +49,7 @@ export function setupSettings() {
                 showStatus('שגיאה בשמירה', 'error');
             } finally {
                 saveSettingsBtn.disabled = false;
-                saveSettingsBtn.textContent = 'שמור שינויים';
+                saveSettingsBtn.textContent = '💾 שמור הגדרות';
             }
         });
     }

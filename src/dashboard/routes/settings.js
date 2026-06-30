@@ -98,6 +98,10 @@ export default function createSettingsRoutes(deps) {
         if (settings.CALENDAR_ID) {
             config.google.calendarId = settings.CALENDAR_ID;
         }
+        if (settings.CALENDAR_EXTRA_IDS !== undefined) {
+            config.google.extraCalendarIds = settings.CALENDAR_EXTRA_IDS
+                .split(',').map(s => s.trim()).filter(Boolean);
+        }
         if (settings.WEBHOOK_SECRET) {
             config.dashboard.webhookSecret = settings.WEBHOOK_SECRET;
         }
