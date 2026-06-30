@@ -107,8 +107,12 @@ class DashboardServer {
             }
         }));
 
-        // Serve static files
-        this.app.use('/public', express.static(path.join(__dirname, 'public')));
+        // Serve static files — no-cache so browsers always validate after deploys
+        this.app.use('/public', express.static(path.join(__dirname, 'public'), {
+            setHeaders: (res) => {
+                res.setHeader('Cache-Control', 'no-cache');
+            }
+        }));
         
         // Serve PWA assets at root to ensure proper Service Worker scope
         this.app.get('/sw.js', (req, res) => {
