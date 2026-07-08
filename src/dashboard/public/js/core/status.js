@@ -52,6 +52,31 @@ export async function fetchStatus() {
             updateStatusItem('homeassistant', data.skills.homeAssistant?.available);
         }
 
+        if (data.version) {
+            const versionEl = document.getElementById('status-version-number');
+            if (versionEl) versionEl.textContent = `v${data.version.version}`;
+
+            const updateBadge = document.getElementById('status-update-badge');
+            if (updateBadge) {
+                const updateAvailable = data.latestVersion && data.latestVersion !== data.version.version;
+                if (updateAvailable) {
+                    updateBadge.textContent = `עדכון זמין: v${data.latestVersion}`;
+                    updateBadge.className = 'status-badge disconnected';
+                    updateBadge.style.display = 'inline-flex';
+                } else {
+                    updateBadge.style.display = 'none';
+                }
+            }
+        }
+
+        if (typeof data.recentErrorCount === 'number') {
+            const errorCountEl = document.getElementById('status-error-count');
+            if (errorCountEl) {
+                errorCountEl.textContent = data.recentErrorCount;
+                errorCountEl.className = `status-value ${data.recentErrorCount > 0 ? 'disconnected' : 'connected'}`;
+            }
+        }
+
         if (data.usage) {
             // Update Today's Usage
             const usageTodayInput = document.getElementById('usage-today-input');

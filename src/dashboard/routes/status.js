@@ -3,6 +3,19 @@ import fs from 'fs';
 import path from 'path';
 import { asyncHandler } from '../middleware/error.js';
 import { readLastLines } from '../../utils/logger.js';
+import { getVersionInfo } from '../../utils/version.js';
+
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+
+// Count how many buffered log entries were at 'error' level within the last 24h
+function countRecentErrors(recentLogs) {
+    const cutoff = Date.now() - ONE_DAY_MS;
+    return recentLogs.filter(entry => {
+        if (entry.level !== 'error') return false;
+        const ts = Date.parse(entry.timestamp);
+        return !Number.isNaN(ts) && ts >= cutoff;
+    }).length;
+}
 
 // Helper to count newlines streaming
 function countNewlines(filePath) {
@@ -29,8 +42,18 @@ export default function createStatusRoutes(deps) {
             whatsapp: server.getWhatsAppStatus ? server.getWhatsAppStatus() : { isReady: false },
             gemini: server.getGeminiStatus ? server.getGeminiStatus() : { isInitialized: false },
             skills: server.getSkillsStatus ? await server.getSkillsStatus() : {},
-            usage: db ? db.getUsageStats() : { today: {}, month: {} }
+            usage: db ? db.getUsageStats() : { today: {}, month: {} },
+            version: getVersionInfo(),
+            latestVersion: db ? db.getConfig('last_known_latest_version', null) : null,
+            lastUpdateCheck: db ? db.getConfig('last_update_check', null) : null,
+            recentErrorCount: countRecentErrors(deps.getRecentLogs(200))
         });
+    }));
+
+    // API: Get running version (unauthenticated — for external monitoring tools)
+    router.get('/api/v1/version', asyncHandler(async (req, res) => {
+        const { version, gitCommit, buildDate } = getVersionInfo();
+        res.json({ version, build_date: buildDate, git_commit: gitCommit });
     }));
 
     // API: Update config

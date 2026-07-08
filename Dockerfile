@@ -19,6 +19,12 @@ FROM node:24-slim
 
 WORKDIR /app
 
+# Version metadata, passed at build time (e.g. --build-arg GIT_COMMIT=$(git rev-parse --short HEAD))
+ARG GIT_COMMIT=unknown
+ARG BUILD_DATE
+ENV GIT_COMMIT=$GIT_COMMIT
+ENV BUILD_DATE=$BUILD_DATE
+
 # Create non-root user for security
 RUN groupadd -g 1001 noga && \
     useradd -u 1001 -g noga -s /bin/sh noga
