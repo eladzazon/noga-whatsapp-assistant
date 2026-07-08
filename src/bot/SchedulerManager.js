@@ -388,17 +388,23 @@ class SchedulerManager {
                 } catch {}
                 if (!exists) return;
 
-                const lines = await readLastLines(errorLogPath, 50);
+                const lines = await readLastLines(errorLogPath, 200);
                 if (lines.length === 0) return;
 
-                const marker = db.getConfig('last_diagnostics_marker', null);
+                // Marker must be stored wrapped in an object, not as a bare string. error.log
+                // lines are themselves JSON text, and db.getConfig() JSON.parses string values
+                // on read — a bare marker string would silently come back as a parsed object,
+                // which would never match against `lines` (an array of strings) below.
+                const storedMarker = db.getConfig('last_diagnostics_marker', null);
+                const marker = storedMarker && typeof storedMarker.line === 'string' ? storedMarker.line : null;
+
                 let newLines = [];
                 if (marker !== null) {
                     const idx = lines.lastIndexOf(marker);
                     newLines = idx === -1 ? lines : lines.slice(idx + 1);
                 }
                 // Always advance the marker so the same lines aren't re-sent next hour
-                db.setConfig('last_diagnostics_marker', lines[lines.length - 1]);
+                db.setConfig('last_diagnostics_marker', { line: lines[lines.length - 1] });
 
                 if (newLines.length === 0) return;
 
