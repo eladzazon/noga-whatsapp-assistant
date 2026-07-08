@@ -36,7 +36,7 @@ export function setupSettings() {
                 const res = await fetch('/api/settings', {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ settings: payload })
+                    body: JSON.stringify(payload)
                 });
                 const data = await res.json();
 
