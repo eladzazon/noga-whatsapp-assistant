@@ -1,23 +1,9 @@
 import cron from 'node-cron';
-import axios from 'axios';
-import logger, { readLastLines } from '../utils/logger.js';
+import logger from '../utils/logger.js';
 import db from '../database/DatabaseManager.js';
 import config from '../utils/config.js';
-import { getVersionInfo } from '../utils/version.js';
 import fs from 'fs';
 import path from 'path';
-
-const UPDATE_FEED_URL = 'https://api.github.com/repos/eladzazon/noga-whatsapp-assistant/releases/latest';
-
-// Compares two semver strings (ignoring an optional leading "v"). Returns true if `latest` > `current`.
-function isNewerVersion(latest, current) {
-    const parse = (v) => String(v).replace(/^v/i, '').split('.').map(n => parseInt(n, 10) || 0);
-    const [lMajor, lMinor, lPatch] = parse(latest);
-    const [cMajor, cMinor, cPatch] = parse(current);
-    if (lMajor !== cMajor) return lMajor > cMajor;
-    if (lMinor !== cMinor) return lMinor > cMinor;
-    return lPatch > cPatch;
-}
 
 class SchedulerManager {
     constructor() {
@@ -35,8 +21,6 @@ class SchedulerManager {
         this.reload();
         this._scheduleAutomatedBackup();
         this._scheduleReminderNudger();
-        this._scheduleUpdateCheck();
-        this._scheduleSelfDiagnostics();
         return this;
     }
 
@@ -334,95 +318,6 @@ class SchedulerManager {
                 logger.error('Failed to run reminder nudger', { error: err.message });
             }
         });
-    }
-
-    /**
-     * Daily check against GitHub Releases for a newer version than the one running.
-     * Non-blocking, fails silently on network error, never auto-applies.
-     */
-    _scheduleUpdateCheck() {
-        const runCheck = async () => {
-            try {
-                const { data } = await axios.get(UPDATE_FEED_URL, {
-                    timeout: 10000,
-                    headers: { 'User-Agent': 'NogaBot-UpdateChecker' }
-                });
-
-                const latestVersion = String(data.tag_name || '').replace(/^v/i, '');
-                const { version: currentVersion } = getVersionInfo();
-
-                db.setConfig('last_update_check', new Date().toISOString());
-
-                if (latestVersion && isNewerVersion(latestVersion, currentVersion)) {
-                    db.setConfig('last_known_latest_version', latestVersion);
-                    logger.info(`Update available: v${latestVersion} (running v${currentVersion})`);
-                } else {
-                    db.setConfig('last_known_latest_version', currentVersion);
-                }
-            } catch (err) {
-                // Fails silently on network error — never surfaced as an application error
-                logger.debug('Update check failed', { error: err.message });
-            }
-        };
-
-        // Run once at startup, then daily at 04:00 (Israel time)
-        runCheck();
-        cron.schedule('0 4 * * *', runCheck, { scheduled: true, timezone: 'Asia/Jerusalem' });
-    }
-
-    /**
-     * Stop-gap self-diagnostics: hourly, reads new lines from error.log since the last run,
-     * asks Gemini to summarize/de-duplicate them, and sends a WhatsApp digest if anything new turned up.
-     */
-    _scheduleSelfDiagnostics() {
-        cron.schedule('0 * * * *', async () => {
-            try {
-                if (!config.whatsapp.groupId) return;
-
-                const errorLogPath = path.resolve(process.cwd(), 'data', 'logs', 'error.log');
-
-                let exists = false;
-                try {
-                    await fs.promises.access(errorLogPath);
-                    exists = true;
-                } catch {}
-                if (!exists) return;
-
-                const lines = await readLastLines(errorLogPath, 50);
-                if (lines.length === 0) return;
-
-                const marker = db.getConfig('last_diagnostics_marker', null);
-                let newLines = [];
-                if (marker !== null) {
-                    const idx = lines.lastIndexOf(marker);
-                    newLines = idx === -1 ? lines : lines.slice(idx + 1);
-                }
-                // Always advance the marker so the same lines aren't re-sent next hour
-                db.setConfig('last_diagnostics_marker', lines[lines.length - 1]);
-
-                if (newLines.length === 0) return;
-
-                const { default: whatsappManager } = await import('./WhatsAppManager.js');
-                if (!whatsappManager.isReady) return;
-
-                const eventData = {
-                    event: 'Self-Diagnostics: New System Errors',
-                    data: {
-                        error_count: newLines.length,
-                        errors: newLines.slice(-10),
-                        instruction: 'Summarize and de-duplicate these system error log lines into a short, clear Hebrew message for the admin. Group similar/repeated errors together instead of listing each one.'
-                    }
-                };
-
-                const digest = await this.geminiManager.generateBroadcastMessage(eventData);
-                if (digest && digest.trim()) {
-                    await whatsappManager.sendMessage(config.whatsapp.groupId, digest);
-                    logger.info('Self-diagnostics digest sent', { newErrorCount: newLines.length });
-                }
-            } catch (err) {
-                logger.error('Failed to run self-diagnostics', { error: err.message });
-            }
-        }, { scheduled: true, timezone: 'Asia/Jerusalem' });
     }
 }
 

@@ -9,9 +9,6 @@ services:
     volumes:
       # Persistent data (SQLite + WhatsApp session)
       - noga-data:/app/data
-      # Logs on their own volume — different lifecycle/backup policy than the DB/session,
-      # keeps rotation and high-frequency writes off the same mount as the SQLite file.
-      - noga-logs:/app/data/logs
       # Mount credentials folder
       - ./credentials:/app/credentials:ro
       # Environment file
@@ -29,8 +26,6 @@ services:
 
 volumes:
   noga-data:
-    driver: local
-  noga-logs:
     driver: local
 
 networks:
