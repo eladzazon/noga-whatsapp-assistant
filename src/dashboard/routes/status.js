@@ -4,6 +4,7 @@ import path from 'path';
 import { asyncHandler } from '../middleware/error.js';
 import { readLastLines } from '../../utils/logger.js';
 import { getVersionInfo } from '../../utils/version.js';
+import config from '../../utils/config.js';
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -38,14 +39,16 @@ export default function createStatusRoutes(deps) {
 
     // API: Get status
     router.get('/api/status', requireAuth, asyncHandler(async (req, res) => {
+        const instance = db ? await db.getInstanceInfo() : null;
         res.json({
             whatsapp: server.getWhatsAppStatus ? server.getWhatsAppStatus() : { isReady: false },
             gemini: server.getGeminiStatus ? server.getGeminiStatus() : { isInitialized: false },
             skills: server.getSkillsStatus ? await server.getSkillsStatus() : {},
-            usage: db ? db.getUsageStats() : { today: {}, month: {} },
+            usage: db ? await db.getUsageStats(config.tenantId) : { today: {}, month: {} },
             version: getVersionInfo(),
-            latestVersion: db ? db.getConfig('last_known_latest_version', null) : null,
-            lastUpdateCheck: db ? db.getConfig('last_update_check', null) : null,
+            schemaVersion: instance ? instance.schema_version : null,
+            latestVersion: db ? await db.getConfig(config.tenantId, 'last_known_latest_version', null) : null,
+            lastUpdateCheck: db ? await db.getConfig(config.tenantId, 'last_update_check', null) : null,
             recentErrorCount: countRecentErrors(deps.getRecentLogs(200))
         });
     }));
@@ -53,7 +56,13 @@ export default function createStatusRoutes(deps) {
     // API: Get running version (unauthenticated — for external monitoring tools)
     router.get('/api/v1/version', asyncHandler(async (req, res) => {
         const { version, gitCommit, buildDate } = getVersionInfo();
-        res.json({ version, build_date: buildDate, git_commit: gitCommit });
+        const instance = db ? await db.getInstanceInfo() : null;
+        res.json({
+            version,
+            build_date: buildDate,
+            git_commit: gitCommit,
+            schema_version: instance ? instance.schema_version : null
+        });
     }));
 
     // API: Update config

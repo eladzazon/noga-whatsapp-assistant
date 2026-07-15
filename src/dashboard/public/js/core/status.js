@@ -56,6 +56,11 @@ export async function fetchStatus() {
             const versionEl = document.getElementById('status-version-number');
             if (versionEl) versionEl.textContent = `v${data.version.version}`;
 
+            const schemaVersionEl = document.getElementById('status-schema-version');
+            if (schemaVersionEl) {
+                schemaVersionEl.textContent = data.schemaVersion != null ? `Schema v${data.schemaVersion}` : '';
+            }
+
             const updateBadge = document.getElementById('status-update-badge');
             if (updateBadge) {
                 const updateAvailable = data.latestVersion && data.latestVersion !== data.version.version;
