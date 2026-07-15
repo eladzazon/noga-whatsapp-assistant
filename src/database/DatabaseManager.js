@@ -1,180 +1,91 @@
-import Database from 'better-sqlite3';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import pg from 'pg';
 import logger from '../utils/logger.js';
+import { runMigrations } from '../../scripts/run_migrations.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const { Pool } = pg;
 
 class DatabaseManager {
-    constructor(dbPath = './data/noga.db') {
-        this.dbPath = dbPath;
-        this.db = null;
-        // In-memory keyword cache (invalidated on any write to keywords table)
-        this._keywordCache = null;
+    constructor(connectionString = process.env.DB_URL) {
+        this.connectionString = connectionString;
+        this.pool = null;
+        // In-memory keyword cache, keyed by tenantId (invalidated on any write to that tenant's keywords)
+        this._keywordCache = new Map();
     }
 
     /**
-     * Initialize the database connection and schema
+     * Initialize the connection pool and apply any pending schema migrations
      */
-    init() {
-        // Ensure data directory exists
-        const dir = path.dirname(this.dbPath);
-        if (!fs.existsSync(dir)) {
-            fs.mkdirSync(dir, { recursive: true });
-        }
-
-        // Open database connection
-        this.db = new Database(this.dbPath);
-        this.db.pragma('journal_mode = WAL');
-        this.db.pragma('foreign_keys = ON');
-
-        // Run schema
-        const schemaPath = path.join(__dirname, 'schema.sql');
-        const schema = fs.readFileSync(schemaPath, 'utf-8');
-        this.db.exec(schema);
-
-        // Migrations: add type column to keywords if missing
-        try {
-            const cols = this.db.pragma('table_info(keywords)');
-            if (cols.length > 0 && !cols.find(c => c.name === 'type')) {
-                this.db.exec("ALTER TABLE keywords ADD COLUMN type TEXT DEFAULT 'static' CHECK(type IN ('static', 'ai'))");
-                logger.info('[Database] Migrated keywords table: added type column');
-            }
-        } catch (err) { 
-            if (err.message && !err.message.includes('no such table')) throw err;
-        }
-
-        // Migration: Create ha_mappings table if missing
-        this.db.exec(`
-            CREATE TABLE IF NOT EXISTS ha_mappings (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                entity_id TEXT NOT NULL UNIQUE,
-                nickname TEXT NOT NULL,
-                location TEXT,
-                type TEXT,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-            );
-        `);
-
-        // Migration: Indexes for ha_mappings
-        this.db.exec(`CREATE INDEX IF NOT EXISTS idx_ha_entity ON ha_mappings(entity_id);`);
-        this.db.exec(`CREATE INDEX IF NOT EXISTS idx_ha_nickname ON ha_mappings(nickname);`);
-
-        // Migration: Create scheduled_prompts table if missing
-        this.db.exec(`
-            CREATE TABLE IF NOT EXISTS scheduled_prompts (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL,
-                prompt TEXT NOT NULL,
-                cron_expression TEXT NOT NULL,
-                enabled INTEGER DEFAULT 1,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-            );
-        `);
-
-        // Migration: Create reminders table if missing
-        this.db.exec(`
-            CREATE TABLE IF NOT EXISTS reminders (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                title TEXT NOT NULL,
-                due_date DATETIME NOT NULL,
-                last_nudged DATETIME,
-                nudge_count INTEGER DEFAULT 0,
-                nudge_interval_minutes INTEGER DEFAULT 60,
-                status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'done', 'cancelled')),
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-            );
-        `);
-
-        // Migration: Add nudge_count column to reminders if missing
-        try {
-            const cols = this.db.pragma('table_info(reminders)');
-            if (cols.length > 0 && !cols.find(c => c.name === 'nudge_count')) {
-                this.db.exec("ALTER TABLE reminders ADD COLUMN nudge_count INTEGER DEFAULT 0");
-                logger.info('[Database] Migrated reminders table: added nudge_count column');
-            }
-            if (cols.length > 0 && !cols.find(c => c.name === 'last_nudge_message_id')) {
-                this.db.exec("ALTER TABLE reminders ADD COLUMN last_nudge_message_id TEXT");
-                logger.info('[Database] Migrated reminders table: added last_nudge_message_id column');
-            }
-        } catch (err) {
-            if (err.message && !err.message.includes('no such table')) throw err;
-        }
-
-        // Migration: Create reminder_nudge_messages mapping table
-        // Tracks ALL nudge message IDs (not just the latest) so reacting to any nudge works
-        this.db.exec(`
-            CREATE TABLE IF NOT EXISTS reminder_nudge_messages (
-                message_id TEXT PRIMARY KEY,
-                reminder_id INTEGER NOT NULL,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (reminder_id) REFERENCES reminders(id) ON DELETE CASCADE
-            );
-        `);
-        this.db.exec(`CREATE INDEX IF NOT EXISTS idx_nudge_msg_reminder ON reminder_nudge_messages(reminder_id);`);
-
-        logger.info('[Database] Initialized successfully');
+    async init() {
+        this.pool = new Pool({ connectionString: this.connectionString });
+        await this.pool.query('SELECT 1'); // fail fast if Postgres is unreachable
+        await runMigrations(this.pool);
+        logger.info('[Database] Initialized successfully (Postgres)');
         return this;
     }
 
     /**
      * Close the database connection
      */
-    close() {
-        if (this.db) {
-            this.db.close();
-            this.db = null;
+    async close() {
+        if (this.pool) {
+            await this.pool.end();
+            this.pool = null;
         }
+    }
+
+    // ==================== Instance Operations ====================
+    // (Block 1's version/status surfaces; instance is a global singleton, not tenant-scoped)
+
+    async getInstanceInfo() {
+        const { rows } = await this.pool.query(
+            `SELECT instance_id, current_version, schema_version, last_update_check,
+                    last_known_latest_version, update_notification_dismissed_at
+             FROM instance WHERE instance_id = 'default'`
+        );
+        return rows[0] || null;
+    }
+
+    async setInstanceVersion(version) {
+        await this.pool.query(
+            `UPDATE instance SET current_version = $1 WHERE instance_id = 'default'`,
+            [version]
+        );
     }
 
     // ==================== Config Operations ====================
 
-    /**
-     * Get a configuration value
-     * @param {string} key - Configuration key
-     * @param {*} defaultValue - Default value if not found
-     */
-    getConfig(key, defaultValue = null) {
-        const stmt = this.db.prepare('SELECT value FROM config WHERE key = ?');
-        const row = stmt.get(key);
-        if (row) {
+    async getConfig(tenantId, key, defaultValue = null) {
+        const { rows } = await this.pool.query(
+            'SELECT value FROM config WHERE tenant_id = $1 AND key = $2',
+            [tenantId, key]
+        );
+        if (rows.length > 0) {
             try {
-                return JSON.parse(row.value);
+                return JSON.parse(rows[0].value);
             } catch {
-                return row.value;
+                return rows[0].value;
             }
         }
         return defaultValue;
     }
 
-    /**
-     * Set a configuration value
-     * @param {string} key - Configuration key
-     * @param {*} value - Value to store
-     */
-    setConfig(key, value) {
-        const stmt = this.db.prepare(`
-            INSERT INTO config (key, value, updated_at) 
-            VALUES (?, ?, CURRENT_TIMESTAMP)
-            ON CONFLICT(key) DO UPDATE SET 
-                value = excluded.value,
-                updated_at = CURRENT_TIMESTAMP
-        `);
+    async setConfig(tenantId, key, value) {
         const serialized = typeof value === 'object' ? JSON.stringify(value) : String(value);
-        stmt.run(key, serialized);
+        await this.pool.query(
+            `INSERT INTO config (tenant_id, key, value, updated_at)
+             VALUES ($1, $2, $3, now())
+             ON CONFLICT (tenant_id, key) DO UPDATE SET
+                value = excluded.value,
+                updated_at = excluded.updated_at`,
+            [tenantId, key, serialized]
+        );
     }
 
-    /**
-     * Get all configuration values
-     */
-    getAllConfig() {
-        const stmt = this.db.prepare('SELECT key, value FROM config');
-        const rows = stmt.all();
+    async getAllConfig(tenantId) {
+        const { rows } = await this.pool.query(
+            'SELECT key, value FROM config WHERE tenant_id = $1',
+            [tenantId]
+        );
         const config = {};
         for (const row of rows) {
             try {
@@ -188,36 +99,24 @@ class DatabaseManager {
 
     // ==================== Chat Context Operations ====================
 
-    /**
-     * Add a message to chat context
-     * @param {string} userId - User identifier
-     * @param {string} role - Message role (user, model, function)
-     * @param {string} content - Message content
-     * @param {object} functionCall - Optional function call data
-     */
-    addChatMessage(userId, role, content, functionCall = null) {
-        const stmt = this.db.prepare(`
-            INSERT INTO chat_context (user_id, role, content, function_call)
-            VALUES (?, ?, ?, ?)
-        `);
+    async addChatMessage(tenantId, userId, role, content, functionCall = null) {
         const fcStr = functionCall ? JSON.stringify(functionCall) : null;
-        stmt.run(userId, role, content, fcStr);
+        await this.pool.query(
+            `INSERT INTO chats (tenant_id, user_id, role, content, function_call)
+             VALUES ($1, $2, $3, $4, $5)`,
+            [tenantId, userId, role, content, fcStr]
+        );
     }
 
-    /**
-     * Get chat history for a user
-     * @param {string} userId - User identifier
-     * @param {number} limit - Maximum messages to retrieve
-     */
-    getChatHistory(userId, limit = 20) {
-        const stmt = this.db.prepare(`
-            SELECT role, content, function_call, created_at
-            FROM chat_context
-            WHERE user_id = ?
-            ORDER BY created_at DESC
-            LIMIT ?
-        `);
-        const rows = stmt.all(userId, limit);
+    async getChatHistory(tenantId, userId, limit = 20) {
+        const { rows } = await this.pool.query(
+            `SELECT role, content, function_call, created_at
+             FROM chats
+             WHERE tenant_id = $1 AND user_id = $2
+             ORDER BY created_at DESC
+             LIMIT $3`,
+            [tenantId, userId, limit]
+        );
         return rows.reverse().map(row => ({
             role: row.role,
             content: row.content,
@@ -226,61 +125,46 @@ class DatabaseManager {
         }));
     }
 
-    /**
-     * Clear old chat history (keep last N messages per user)
-     * @param {number} keepLast - Number of messages to keep per user
-     */
-    pruneOldMessages(keepLast = 50) {
-        const stmt = this.db.prepare(`
-            DELETE FROM chat_context
-            WHERE id NOT IN (
+    async pruneOldMessages(tenantId, keepLast = 50) {
+        const { rowCount } = await this.pool.query(
+            `DELETE FROM chats
+             WHERE tenant_id = $1 AND id NOT IN (
                 SELECT id FROM (
-                    SELECT id, user_id,
-                           ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY created_at DESC) as rn
-                    FROM chat_context
-                ) WHERE rn <= ?
-            )
-        `);
-        const result = stmt.run(keepLast);
-        return result.changes;
+                    SELECT id, ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY created_at DESC) as rn
+                    FROM chats WHERE tenant_id = $1
+                ) ranked WHERE rn <= $2
+             )`,
+            [tenantId, keepLast]
+        );
+        return rowCount;
     }
 
-    /**
-     * Clear all chat history for a specific user
-     * @param {string} userId - User identifier
-     */
-    clearChatHistory(userId) {
-        const stmt = this.db.prepare('DELETE FROM chat_context WHERE user_id = ?');
-        const result = stmt.run(userId);
-        return result.changes;
+    async clearChatHistory(tenantId, userId) {
+        const { rowCount } = await this.pool.query(
+            'DELETE FROM chats WHERE tenant_id = $1 AND user_id = $2',
+            [tenantId, userId]
+        );
+        return rowCount;
     }
 
     // ==================== Cache Operations ====================
 
-    /**
-     * Add an item to cache
-     * @param {string} type - Cache type (e.g., 'failed_task', 'local_note')
-     * @param {object} data - Data to cache
-     */
-    addToCache(type, data) {
-        const stmt = this.db.prepare(`
-            INSERT INTO cache (type, data) VALUES (?, ?)
-        `);
-        stmt.run(type, JSON.stringify(data));
+    async addToCache(tenantId, type, data) {
+        await this.pool.query(
+            'INSERT INTO cache (tenant_id, type, data) VALUES ($1, $2, $3)',
+            [tenantId, type, JSON.stringify(data)]
+        );
     }
 
-    /**
-     * Get pending cache items by type
-     * @param {string} type - Cache type
-     */
-    getPendingCache(type) {
-        const stmt = this.db.prepare(`
-            SELECT id, data, retry_count, created_at
-            FROM cache
-            WHERE type = ? AND status = 'pending'
-            ORDER BY created_at ASC
-        `);
-        return stmt.all(type).map(row => ({
+    async getPendingCache(tenantId, type) {
+        const { rows } = await this.pool.query(
+            `SELECT id, data, retry_count, created_at
+             FROM cache
+             WHERE tenant_id = $1 AND type = $2 AND status = 'pending'
+             ORDER BY created_at ASC`,
+            [tenantId, type]
+        );
+        return rows.map(row => ({
             id: row.id,
             data: JSON.parse(row.data),
             retryCount: row.retry_count,
@@ -288,65 +172,42 @@ class DatabaseManager {
         }));
     }
 
-    /**
-     * Update cache item status
-     * @param {number} id - Cache item ID
-     * @param {string} status - New status
-     * @param {string} errorMessage - Optional error message
-     */
-    updateCacheStatus(id, status, errorMessage = null) {
-        const stmt = this.db.prepare(`
-            UPDATE cache 
-            SET status = ?, 
-                error_message = ?,
-                retry_count = retry_count + 1,
-                updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?
-        `);
-        stmt.run(status, errorMessage, id);
+    async updateCacheStatus(tenantId, id, status, errorMessage = null) {
+        await this.pool.query(
+            `UPDATE cache
+             SET status = $1, error_message = $2, retry_count = retry_count + 1, updated_at = now()
+             WHERE tenant_id = $3 AND id = $4`,
+            [status, errorMessage, tenantId, id]
+        );
     }
 
-    /**
-     * Clear completed cache items older than specified days
-     * @param {number} days - Days to keep
-     */
-    cleanOldCache(days = 7) {
-        const stmt = this.db.prepare(`
-            DELETE FROM cache
-            WHERE status IN ('completed', 'failed')
-            AND created_at < datetime('now', '-' || ? || ' days')
-        `);
-        return stmt.run(days).changes;
+    async cleanOldCache(tenantId, days = 7) {
+        const { rowCount } = await this.pool.query(
+            `DELETE FROM cache
+             WHERE tenant_id = $1 AND status IN ('completed', 'failed')
+             AND created_at < now() - make_interval(days => $2::integer)`,
+            [tenantId, days]
+        );
+        return rowCount;
     }
 
     // ==================== Audit Log Operations ====================
 
-    /**
-     * Log an action
-     * @param {string} userId - User identifier (optional)
-     * @param {string} action - Action name
-     * @param {object} details - Action details
-     */
-    logAction(userId, action, details = null) {
-        const stmt = this.db.prepare(`
-            INSERT INTO audit_log (user_id, action, details)
-            VALUES (?, ?, ?)
-        `);
-        stmt.run(userId, action, details ? JSON.stringify(details) : null);
+    async logAction(tenantId, userId, action, details = null) {
+        await this.pool.query(
+            'INSERT INTO audit_log (tenant_id, user_id, action, details) VALUES ($1, $2, $3, $4)',
+            [tenantId, userId, action, details ? JSON.stringify(details) : null]
+        );
     }
 
-    /**
-     * Get recent audit logs
-     * @param {number} limit - Maximum entries to retrieve
-     */
-    getRecentLogs(limit = 100) {
-        const stmt = this.db.prepare(`
-            SELECT user_id, action, details, created_at
-            FROM audit_log
-            ORDER BY created_at DESC
-            LIMIT ?
-        `);
-        return stmt.all(limit).map(row => ({
+    async getRecentLogs(tenantId, limit = 100) {
+        const { rows } = await this.pool.query(
+            `SELECT user_id, action, details, created_at
+             FROM audit_log WHERE tenant_id = $1
+             ORDER BY created_at DESC LIMIT $2`,
+            [tenantId, limit]
+        );
+        return rows.map(row => ({
             userId: row.user_id,
             action: row.action,
             details: row.details ? JSON.parse(row.details) : null,
@@ -356,39 +217,40 @@ class DatabaseManager {
 
     // ==================== Keyword Operations ====================
 
-    /**
-     * Get all keywords
-     */
-    getKeywords() {
-        const stmt = this.db.prepare('SELECT * FROM keywords ORDER BY keyword ASC');
-        return stmt.all();
+    async getKeywords(tenantId) {
+        const { rows } = await this.pool.query(
+            'SELECT * FROM keywords WHERE tenant_id = $1 ORDER BY keyword ASC',
+            [tenantId]
+        );
+        return rows;
     }
 
-    /**
-     * Get enabled keywords only
-     */
-    getEnabledKeywords() {
-        const stmt = this.db.prepare('SELECT * FROM keywords WHERE enabled = 1 ORDER BY keyword ASC');
-        return stmt.all();
+    async getEnabledKeywords(tenantId) {
+        const { rows } = await this.pool.query(
+            'SELECT * FROM keywords WHERE tenant_id = $1 AND enabled = TRUE ORDER BY keyword ASC',
+            [tenantId]
+        );
+        return rows;
     }
 
     /**
      * Find a keyword by its text (case-insensitive exact match)
      * Supports comma-separated keywords like "עזרה,היי"
-     * Uses an in-memory cache to avoid a full table scan on every message.
-     * @param {string} text - The keyword text to search for
+     * Uses an in-memory cache (per tenant) to avoid a full table scan on every message.
      */
-    getKeywordByText(text) {
+    async getKeywordByText(tenantId, text) {
         const trimmedText = text.trim();
 
-        // Populate cache if empty
-        if (!this._keywordCache) {
-            const keywords = this.db.prepare('SELECT * FROM keywords WHERE enabled = 1').all();
-            this._keywordCache = keywords;
+        if (!this._keywordCache.has(tenantId)) {
+            const { rows } = await this.pool.query(
+                'SELECT * FROM keywords WHERE tenant_id = $1 AND enabled = TRUE',
+                [tenantId]
+            );
+            this._keywordCache.set(tenantId, rows);
         }
 
-        // Check each keyword (which may contain comma-separated values)
-        for (const kw of this._keywordCache) {
+        const keywords = this._keywordCache.get(tenantId);
+        for (const kw of keywords) {
             const variants = kw.keyword.split(',').map(v => v.trim());
             if (variants.some(variant => variant === trimmedText)) {
                 return kw;
@@ -398,354 +260,312 @@ class DatabaseManager {
         return null;
     }
 
-    /**
-     * Add a new keyword
-     * @param {string} keyword - Keyword trigger text
-     * @param {string} response - Response text (static) or custom instructions (ai)
-     * @param {string} type - 'static' or 'ai'
-     */
-    addKeyword(keyword, response, type = 'static') {
-        const stmt = this.db.prepare(`
-            INSERT INTO keywords (keyword, response, type)
-            VALUES (?, ?, ?)
-        `);
-        const result = stmt.run(keyword.trim(), response, type);
-        this._keywordCache = null; // Invalidate cache
-        return result.lastInsertRowid;
+    async addKeyword(tenantId, keyword, response, type = 'static') {
+        const { rows } = await this.pool.query(
+            `INSERT INTO keywords (tenant_id, keyword, response, type)
+             VALUES ($1, $2, $3, $4) RETURNING id`,
+            [tenantId, keyword.trim(), response, type]
+        );
+        this._keywordCache.delete(tenantId);
+        return rows[0].id;
     }
 
-    /**
-     * Update an existing keyword
-     * @param {number} id - Keyword ID
-     * @param {string} keyword - New keyword text
-     * @param {string} response - New response text or instructions
-     * @param {boolean} enabled - Whether the keyword is enabled
-     * @param {string} type - 'static' or 'ai'
-     */
-    updateKeyword(id, keyword, response, enabled, type = 'static') {
-        const stmt = this.db.prepare(`
-            UPDATE keywords 
-            SET keyword = ?, response = ?, enabled = ?, type = ?, updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?
-        `);
-        stmt.run(keyword.trim(), response, enabled ? 1 : 0, type, id);
-        this._keywordCache = null; // Invalidate cache
+    async updateKeyword(tenantId, id, keyword, response, enabled, type = 'static') {
+        await this.pool.query(
+            `UPDATE keywords
+             SET keyword = $1, response = $2, enabled = $3, type = $4, updated_at = now()
+             WHERE tenant_id = $5 AND id = $6`,
+            [keyword.trim(), response, !!enabled, type, tenantId, id]
+        );
+        this._keywordCache.delete(tenantId);
     }
 
-    /**
-     * Delete a keyword
-     * @param {number} id - Keyword ID
-     */
-    deleteKeyword(id) {
-        const stmt = this.db.prepare('DELETE FROM keywords WHERE id = ?');
-        stmt.run(id);
-        this._keywordCache = null; // Invalidate cache
+    async deleteKeyword(tenantId, id) {
+        await this.pool.query('DELETE FROM keywords WHERE tenant_id = $1 AND id = $2', [tenantId, id]);
+        this._keywordCache.delete(tenantId);
+    }
+
+    async clearKeywords(tenantId) {
+        await this.pool.query('DELETE FROM keywords WHERE tenant_id = $1', [tenantId]);
+        this._keywordCache.delete(tenantId);
     }
 
     // ==================== Scheduled Prompt Operations ====================
 
-    /**
-     * Get all scheduled prompts
-     */
-    getScheduledPrompts() {
-        const stmt = this.db.prepare('SELECT * FROM scheduled_prompts ORDER BY name ASC');
-        return stmt.all();
+    async getScheduledPrompts(tenantId) {
+        const { rows } = await this.pool.query(
+            'SELECT * FROM scheduled_prompts WHERE tenant_id = $1 ORDER BY name ASC',
+            [tenantId]
+        );
+        return rows;
     }
 
-    /**
-     * Get enabled scheduled prompts
-     */
-    getEnabledScheduledPrompts() {
-        const stmt = this.db.prepare('SELECT * FROM scheduled_prompts WHERE enabled = 1 ORDER BY name ASC');
-        return stmt.all();
+    async getEnabledScheduledPrompts(tenantId) {
+        const { rows } = await this.pool.query(
+            'SELECT * FROM scheduled_prompts WHERE tenant_id = $1 AND enabled = TRUE ORDER BY name ASC',
+            [tenantId]
+        );
+        return rows;
     }
 
-    /**
-     * Add a scheduled prompt
-     */
-    addScheduledPrompt(name, prompt, cronExpression, enabled = true) {
-        const stmt = this.db.prepare(`
-            INSERT INTO scheduled_prompts (name, prompt, cron_expression, enabled)
-            VALUES (?, ?, ?, ?)
-        `);
-        const result = stmt.run(name.trim(), prompt.trim(), cronExpression.trim(), enabled ? 1 : 0);
-        return result.lastInsertRowid;
+    async addScheduledPrompt(tenantId, name, prompt, cronExpression, enabled = true) {
+        const { rows } = await this.pool.query(
+            `INSERT INTO scheduled_prompts (tenant_id, name, prompt, cron_expression, enabled)
+             VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+            [tenantId, name.trim(), prompt.trim(), cronExpression.trim(), !!enabled]
+        );
+        return rows[0].id;
     }
 
-    /**
-     * Update a scheduled prompt
-     */
-    updateScheduledPrompt(id, name, prompt, cronExpression, enabled) {
-        const stmt = this.db.prepare(`
-            UPDATE scheduled_prompts
-            SET name = ?, prompt = ?, cron_expression = ?, enabled = ?, updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?
-        `);
-        stmt.run(name.trim(), prompt.trim(), cronExpression.trim(), enabled ? 1 : 0, id);
+    async updateScheduledPrompt(tenantId, id, name, prompt, cronExpression, enabled) {
+        await this.pool.query(
+            `UPDATE scheduled_prompts
+             SET name = $1, prompt = $2, cron_expression = $3, enabled = $4, updated_at = now()
+             WHERE tenant_id = $5 AND id = $6`,
+            [name.trim(), prompt.trim(), cronExpression.trim(), !!enabled, tenantId, id]
+        );
     }
 
-    /**
-     * Delete a scheduled prompt
-     */
-    deleteScheduledPrompt(id) {
-        const stmt = this.db.prepare('DELETE FROM scheduled_prompts WHERE id = ?');
-        stmt.run(id);
+    async deleteScheduledPrompt(tenantId, id) {
+        await this.pool.query('DELETE FROM scheduled_prompts WHERE tenant_id = $1 AND id = $2', [tenantId, id]);
+    }
+
+    async clearScheduledPrompts(tenantId) {
+        await this.pool.query('DELETE FROM scheduled_prompts WHERE tenant_id = $1', [tenantId]);
     }
 
     // ==================== Home Assistant Mapping Operations ====================
 
-    /**
-     * Get all Home Assistant mappings
-     */
-    getHaMappings() {
-        const stmt = this.db.prepare('SELECT * FROM ha_mappings ORDER BY location ASC, nickname ASC');
-        return stmt.all();
+    async getHaMappings(tenantId) {
+        const { rows } = await this.pool.query(
+            'SELECT * FROM ha_mappings WHERE tenant_id = $1 ORDER BY location ASC, nickname ASC',
+            [tenantId]
+        );
+        return rows;
     }
 
-    /**
-     * Add a new Home Assistant mapping
-     */
-    addHaMapping(entityId, nickname, location = null, type = null) {
-        const stmt = this.db.prepare(`
-            INSERT INTO ha_mappings (entity_id, nickname, location, type)
-            VALUES (?, ?, ?, ?)
-        `);
-        const result = stmt.run(entityId.trim(), nickname.trim(), location ? location.trim() : null, type ? type.trim() : null);
-        return result.lastInsertRowid;
+    async addHaMapping(tenantId, entityId, nickname, location = null, type = null) {
+        const { rows } = await this.pool.query(
+            `INSERT INTO ha_mappings (tenant_id, entity_id, nickname, location, type)
+             VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+            [tenantId, entityId.trim(), nickname.trim(), location ? location.trim() : null, type ? type.trim() : null]
+        );
+        return rows[0].id;
     }
 
-    /**
-     * Update an existing Home Assistant mapping
-     */
-    updateHaMapping(id, entityId, nickname, location, type) {
-        const stmt = this.db.prepare(`
-            UPDATE ha_mappings 
-            SET entity_id = ?, nickname = ?, location = ?, type = ?, updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?
-        `);
-        stmt.run(entityId.trim(), nickname.trim(), location ? location.trim() : null, type ? type.trim() : null, id);
+    async updateHaMapping(tenantId, id, entityId, nickname, location, type) {
+        await this.pool.query(
+            `UPDATE ha_mappings
+             SET entity_id = $1, nickname = $2, location = $3, type = $4, updated_at = now()
+             WHERE tenant_id = $5 AND id = $6`,
+            [entityId.trim(), nickname.trim(), location ? location.trim() : null, type ? type.trim() : null, tenantId, id]
+        );
     }
 
-    /**
-     * Delete a Home Assistant mapping
-     */
-    deleteHaMapping(id) {
-        const stmt = this.db.prepare('DELETE FROM ha_mappings WHERE id = ?');
-        stmt.run(id);
+    async deleteHaMapping(tenantId, id) {
+        await this.pool.query('DELETE FROM ha_mappings WHERE tenant_id = $1 AND id = $2', [tenantId, id]);
     }
 
-    /**
-     * Search HA mappings by nickname or location
-     * @param {string} query - The search query
-     * @param {string} type - Optional type filter
-     */
-    findHaMappingsByName(query, type = null) {
+    async clearHaMappings(tenantId) {
+        await this.pool.query('DELETE FROM ha_mappings WHERE tenant_id = $1', [tenantId]);
+    }
+
+    async findHaMappingsByName(tenantId, query, type = null) {
         const search = `%${query.trim()}%`;
-        let sql = 'SELECT * FROM ha_mappings WHERE (nickname LIKE ? OR location LIKE ?)';
-        const params = [search, search];
+        let sql = 'SELECT * FROM ha_mappings WHERE tenant_id = $1 AND (nickname ILIKE $2 OR location ILIKE $2)';
+        const params = [tenantId, search];
 
         if (type) {
-            sql += ' AND type = ?';
+            sql += ' AND type = $3';
             params.push(type);
         }
 
         sql += ' ORDER BY nickname ASC';
 
-        const stmt = this.db.prepare(sql);
-        return stmt.all(...params);
+        const { rows } = await this.pool.query(sql, params);
+        return rows;
     }
 
     // ==================== Usage Tracking ====================
 
-    /**
-     * Log API usage
-     * @param {string} model - The model used (e.g., 'gpt-4')
-     * @param {number} inputTokens - Number of input tokens
-     * @param {number} outputTokens - Number of output tokens
-     * @param {number} totalTokens - Total tokens (input + output)
-     * @param {number} cost - Cost in USD
-     */
-    logUsage(model, inputTokens, outputTokens, totalTokens, cost) {
-        const stmt = this.db.prepare(`
-            INSERT INTO usage_logs (model, input_tokens, output_tokens, total_tokens, cost_usd)
-            VALUES (?, ?, ?, ?, ?)
-        `);
-        stmt.run(model, inputTokens, outputTokens, totalTokens, cost);
+    async logUsage(tenantId, model, inputTokens, outputTokens, totalTokens, cost) {
+        await this.pool.query(
+            `INSERT INTO usage_logs (tenant_id, model, input_tokens, output_tokens, total_tokens, cost_usd)
+             VALUES ($1, $2, $3, $4, $5, $6)`,
+            [tenantId, model, inputTokens, outputTokens, totalTokens, cost]
+        );
     }
 
-    /**
-     * Get usage metrics for today and this month
-     */
-    getUsageStats() {
-        // Calculate correctly aligned local timestamps for SQLite
-        // SQLite uses UTC string matching for datetimes, so we must align local midnight to UTC.
+    async getUsageStats(tenantId) {
         const now = new Date();
-
-        // Start of today (local time)
         const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
-        // Start of this month (local time)
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-        const todayStmt = this.db.prepare(`
-            SELECT 
-                SUM(input_tokens) as input, 
-                SUM(output_tokens) as output, 
-                SUM(total_tokens) as total, 
-                SUM(cost_usd) as cost 
-            FROM usage_logs 
-            WHERE timestamp >= ?
-        `);
+        const query = `
+            SELECT
+                SUM(input_tokens) as input,
+                SUM(output_tokens) as output,
+                SUM(total_tokens) as total,
+                SUM(cost_usd) as cost
+            FROM usage_logs
+            WHERE tenant_id = $1 AND timestamp >= $2
+        `;
 
-        const monthStmt = this.db.prepare(`
-            SELECT 
-                SUM(input_tokens) as input, 
-                SUM(output_tokens) as output, 
-                SUM(total_tokens) as total, 
-                SUM(cost_usd) as cost 
-            FROM usage_logs 
-            WHERE timestamp >= ?
-        `);
+        const [todayRes, monthRes] = await Promise.all([
+            this.pool.query(query, [tenantId, startOfDay]),
+            this.pool.query(query, [tenantId, startOfMonth])
+        ]);
 
-        // Convert exactly local midnight to SQLite UTC string format (YYYY-MM-DD HH:MM:SS) 
-        // Note: usage_logs stores UTC timestamps via CURRENT_TIMESTAMP
-        const formatSqliteDate = d => {
-            const pad = n => n.toString().padStart(2, '0');
-            return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`;
-        };
-
-        const today = todayStmt.get(formatSqliteDate(startOfDay));
-        const month = monthStmt.get(formatSqliteDate(startOfMonth));
+        const today = todayRes.rows[0];
+        const month = monthRes.rows[0];
 
         return {
             today: {
-                input: today.input || 0,
-                output: today.output || 0,
-                total: today.total || 0,
-                cost: today.cost || 0
+                input: Number(today.input) || 0,
+                output: Number(today.output) || 0,
+                total: Number(today.total) || 0,
+                cost: Number(today.cost) || 0
             },
             month: {
-                input: month.input || 0,
-                output: month.output || 0,
-                total: month.total || 0,
-                cost: month.cost || 0
+                input: Number(month.input) || 0,
+                output: Number(month.output) || 0,
+                total: Number(month.total) || 0,
+                cost: Number(month.cost) || 0
             }
         };
     }
 
     // ==================== Reminders ====================
 
-    /**
-     * Add a new reminder
-     * @param {string} title 
-     * @param {string} dueDate (ISO string or datetime)
-     * @param {number} nudgeIntervalMinutes 
-     */
-    addReminder(title, dueDate, nudgeIntervalMinutes = 60) {
-        const stmt = this.db.prepare('INSERT INTO reminders (title, due_date, nudge_interval_minutes) VALUES (?, ?, ?)');
-        const result = stmt.run(title, dueDate, nudgeIntervalMinutes);
-        return result.lastInsertRowid;
+    async addReminder(tenantId, title, dueDate, nudgeIntervalMinutes = 60) {
+        const { rows } = await this.pool.query(
+            'INSERT INTO reminders (tenant_id, title, due_date, nudge_interval_minutes) VALUES ($1, $2, $3, $4) RETURNING id',
+            [tenantId, title, dueDate, nudgeIntervalMinutes]
+        );
+        return rows[0].id;
+    }
+
+    async updateReminderStatus(tenantId, id, status) {
+        const { rowCount } = await this.pool.query(
+            'UPDATE reminders SET status = $1, updated_at = now() WHERE tenant_id = $2 AND id = $3',
+            [status, tenantId, id]
+        );
+        return rowCount > 0;
+    }
+
+    async updateReminderDueDate(tenantId, id, dueDate) {
+        const { rowCount } = await this.pool.query(
+            `UPDATE reminders
+             SET due_date = $1, status = 'pending', last_nudged = NULL, nudge_count = 0, updated_at = now()
+             WHERE tenant_id = $2 AND id = $3`,
+            [dueDate, tenantId, id]
+        );
+        return rowCount > 0;
+    }
+
+    async updateReminderLastNudged(tenantId, id) {
+        const { rowCount } = await this.pool.query(
+            'UPDATE reminders SET last_nudged = now(), nudge_count = nudge_count + 1 WHERE tenant_id = $1 AND id = $2',
+            [tenantId, id]
+        );
+        return rowCount > 0;
+    }
+
+    async getPendingReminders(tenantId) {
+        const { rows } = await this.pool.query(
+            "SELECT * FROM reminders WHERE tenant_id = $1 AND status = 'pending'",
+            [tenantId]
+        );
+        return rows;
+    }
+
+    async getAllReminders(tenantId) {
+        const { rows } = await this.pool.query(
+            'SELECT * FROM reminders WHERE tenant_id = $1 ORDER BY created_at DESC',
+            [tenantId]
+        );
+        return rows;
+    }
+
+    async updateReminder(tenantId, id, title, dueDate, nudgeInterval) {
+        const { rowCount } = await this.pool.query(
+            'UPDATE reminders SET title = $1, due_date = $2, nudge_interval_minutes = $3 WHERE tenant_id = $4 AND id = $5',
+            [title, dueDate, nudgeInterval, tenantId, id]
+        );
+        return rowCount > 0;
+    }
+
+    async clearReminders(tenantId) {
+        await this.pool.query('DELETE FROM reminders WHERE tenant_id = $1', [tenantId]);
     }
 
     /**
-     * Update the status of a reminder
+     * Directly set a reminder's timestamp/count fields (used by backup restore, which
+     * needs to reproduce historical last_nudged/nudge_count/created_at/updated_at exactly).
      */
-    updateReminderStatus(id, status) {
-        const stmt = this.db.prepare("UPDATE reminders SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
-        return stmt.run(status, id).changes > 0;
+    async setReminderTimestamps(tenantId, id, { lastNudged, nudgeCount, createdAt, updatedAt }) {
+        const { rowCount } = await this.pool.query(
+            `UPDATE reminders
+             SET last_nudged = $1, nudge_count = $2, created_at = $3, updated_at = $4
+             WHERE tenant_id = $5 AND id = $6`,
+            [lastNudged, nudgeCount || 0, createdAt, updatedAt, tenantId, id]
+        );
+        return rowCount > 0;
     }
 
     /**
-     * Update the due date of a reminder (also resets nudge state so it won't fire early)
+     * Record a nudge message ID for a reminder (keeps ALL nudge IDs, not just the latest).
+     * Scoped via a join so a message can only be attached to a reminder owned by tenantId.
      */
-    updateReminderDueDate(id, dueDate) {
-        const stmt = this.db.prepare("UPDATE reminders SET due_date = ?, status = 'pending', last_nudged = NULL, nudge_count = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
-        return stmt.run(dueDate, id).changes > 0;
+    async addReminderNudgeMessage(tenantId, reminderId, messageId) {
+        const { rowCount } = await this.pool.query(
+            `INSERT INTO reminder_nudge_messages (message_id, reminder_id)
+             SELECT $1, id FROM reminders WHERE id = $2 AND tenant_id = $3
+             ON CONFLICT (message_id) DO NOTHING`,
+            [messageId, reminderId, tenantId]
+        );
+        return rowCount > 0;
     }
 
-    /**
-     * Update the last_nudged timestamp and increment nudge_count
-     */
-    updateReminderLastNudged(id) {
-        const isoString = new Date().toISOString();
-        const stmt = this.db.prepare("UPDATE reminders SET last_nudged = ?, nudge_count = nudge_count + 1 WHERE id = ?");
-        return stmt.run(isoString, id).changes > 0;
+    async getReminderByNudgeMessageId(tenantId, messageId) {
+        const { rows } = await this.pool.query(
+            `SELECT r.* FROM reminders r
+             JOIN reminder_nudge_messages m ON m.reminder_id = r.id
+             WHERE m.message_id = $1 AND r.tenant_id = $2 AND r.status = 'pending'`,
+            [messageId, tenantId]
+        );
+        return rows[0] || null;
     }
 
-    /**
-     * Get all pending reminders
-     */
-    getPendingReminders() {
-        const stmt = this.db.prepare("SELECT * FROM reminders WHERE status = 'pending'");
-        return stmt.all();
-    }
-
-    /**
-     * Get all reminders (pending, done, cancelled)
-     */
-    getAllReminders() {
-        const stmt = this.db.prepare("SELECT * FROM reminders ORDER BY created_at DESC");
-        return stmt.all();
-    }
-
-    /**
-     * Update a reminder's core details
-     */
-    updateReminder(id, title, dueDate, nudgeInterval) {
-        const stmt = this.db.prepare("UPDATE reminders SET title = ?, due_date = ?, nudge_interval_minutes = ? WHERE id = ?");
-        return stmt.run(title, dueDate, nudgeInterval, id).changes > 0;
-    }
-
-    /**
-     * Record a nudge message ID for a reminder (keeps ALL nudge IDs, not just the latest)
-     */
-    addReminderNudgeMessage(reminderId, messageId) {
-        const stmt = this.db.prepare("INSERT OR IGNORE INTO reminder_nudge_messages (message_id, reminder_id) VALUES (?, ?)");
-        return stmt.run(messageId, reminderId).changes > 0;
-    }
-
-    /**
-     * Get a pending reminder by any of its nudge WhatsApp message IDs
-     */
-    getReminderByNudgeMessageId(messageId) {
-        const stmt = this.db.prepare(`
-            SELECT r.* FROM reminders r
-            JOIN reminder_nudge_messages m ON m.reminder_id = r.id
-            WHERE m.message_id = ? AND r.status = 'pending'
-        `);
-        return stmt.get(messageId);
-    }
-
-    /**
-     * Delete a reminder
-     */
-    deleteReminder(id) {
-        const stmt = this.db.prepare("DELETE FROM reminders WHERE id = ?");
-        return stmt.run(id).changes > 0;
+    async deleteReminder(tenantId, id) {
+        const { rowCount } = await this.pool.query(
+            'DELETE FROM reminders WHERE tenant_id = $1 AND id = $2',
+            [tenantId, id]
+        );
+        return rowCount > 0;
     }
 
     /**
      * Delete reminders with status 'done' or 'cancelled' that were updated more than N days ago
-     * @param {number} days - Number of days after which to prune (default 7)
-     * @returns {number} Number of deleted reminders
      */
-    pruneExpiredReminders(days = 1) {
-        // Clean up nudge message mappings for reminders that will be pruned
-        this.db.prepare(`
-            DELETE FROM reminder_nudge_messages
-            WHERE reminder_id IN (
+    async pruneExpiredReminders(tenantId, days = 1) {
+        await this.pool.query(
+            `DELETE FROM reminder_nudge_messages
+             WHERE reminder_id IN (
                 SELECT id FROM reminders
-                WHERE status IN ('done', 'cancelled')
-                AND updated_at < datetime('now', '-' || ? || ' days')
-            )
-        `).run(days);
+                WHERE tenant_id = $1 AND status IN ('done', 'cancelled')
+                AND updated_at < now() - make_interval(days => $2::integer)
+             )`,
+            [tenantId, days]
+        );
 
-        const stmt = this.db.prepare(`
-            DELETE FROM reminders
-            WHERE status IN ('done', 'cancelled')
-            AND updated_at < datetime('now', '-' || ? || ' days')
-        `);
-        return stmt.run(days).changes;
+        const { rowCount } = await this.pool.query(
+            `DELETE FROM reminders
+             WHERE tenant_id = $1 AND status IN ('done', 'cancelled')
+             AND updated_at < now() - make_interval(days => $2::integer)`,
+            [tenantId, days]
+        );
+        return rowCount;
     }
 }
 
