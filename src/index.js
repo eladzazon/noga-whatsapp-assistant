@@ -4,6 +4,7 @@ dotenv.config();
 import config, { validateConfig, applyDbOverrides } from './utils/config.js';
 import logger from './utils/logger.js';
 import db from './database/DatabaseManager.js';
+import { getVersionInfo } from './utils/version.js';
 import whatsappManager from './bot/WhatsAppManager.js';
 import geminiManager from './bot/GeminiManager.js';
 import messageRouter from './bot/MessageRouter.js';
@@ -41,11 +42,12 @@ async function main() {
     try {
         // Initialize database
         logger.info('Initializing database...');
-        db.init();
+        await db.init();
+        await db.setInstanceVersion(getVersionInfo().version);
 
         // Apply DB-stored setting overrides (from dashboard settings page)
         logger.info('Applying DB setting overrides...');
-        applyDbOverrides(db);
+        await applyDbOverrides(db);
 
         // Initialize skills (Google APIs, Home Assistant)
         logger.info('Initializing skills...');
@@ -60,7 +62,7 @@ async function main() {
 
         // Initialize Scheduled Prompts
         logger.info('Initializing Scheduler...');
-        schedulerManager.init(geminiManager);
+        await schedulerManager.init(geminiManager);
 
         // Initialize dashboard server
         logger.info('Initializing dashboard...');
@@ -107,11 +109,11 @@ async function main() {
 
 
         // Set up database cleanup cron (runs daily at 3 AM)
-        cron.schedule('0 3 * * *', () => {
+        cron.schedule('0 3 * * *', async () => {
             logger.info('Running database cleanup...');
-            const prunedMessages = db.pruneOldMessages(100);
-            const cleanedCache = db.cleanOldCache(7);
-            const prunedReminders = db.pruneExpiredReminders(1);
+            const prunedMessages = await db.pruneOldMessages(config.tenantId, 100);
+            const cleanedCache = await db.cleanOldCache(config.tenantId, 7);
+            const prunedReminders = await db.pruneExpiredReminders(config.tenantId, 1);
             logger.info('Database cleanup complete', { prunedMessages, cleanedCache, prunedReminders });
         }, {
             timezone: 'Asia/Jerusalem'
@@ -135,7 +137,7 @@ async function shutdown(signal) {
         await whatsappManager.destroy();
 
         // Close database
-        db.close();
+        await db.close();
 
         // Stop dashboard server
         dashboardServer.stop();

@@ -37,7 +37,7 @@ export default function createWhatsappRoutes(deps) {
             whatsapp: server.getWhatsAppStatus ? server.getWhatsAppStatus() : { isReady: false },
             gemini: server.getGeminiStatus ? server.getGeminiStatus() : { isInitialized: false },
             skills: server.getSkillsStatus ? await server.getSkillsStatus() : {},
-            usage: db ? db.getUsageStats() : { today: {}, month: {} }
+            usage: db ? await db.getUsageStats(config.tenantId) : { today: {}, month: {} }
         });
     }));
 
@@ -116,7 +116,7 @@ export default function createWhatsappRoutes(deps) {
                             
                             // Log to history
                             if (db) {
-                                db.addChatMessage(config.whatsapp.groupId, 'model', `[Image Notification] ${message}`);
+                                await db.addChatMessage(config.tenantId, config.whatsapp.groupId, 'model', `[Image Notification] ${message}`);
                             }
 
                             // Clean up
@@ -133,7 +133,7 @@ export default function createWhatsappRoutes(deps) {
                         await whatsappManager.sendMessage(config.whatsapp.groupId, message);
                         // Log to history
                         if (db) {
-                            db.addChatMessage(config.whatsapp.groupId, 'model', message);
+                            await db.addChatMessage(config.tenantId, config.whatsapp.groupId, 'model', message);
                         }
                     }
                     
@@ -199,7 +199,7 @@ export default function createWhatsappRoutes(deps) {
 
         // 4. Create reminder
         const interval = parseInt(nudge_interval_minutes) || 60;
-        const id = db.addReminder(title, resolvedDueDate, interval);
+        const id = await db.addReminder(config.tenantId, title, resolvedDueDate, interval);
 
         logger.info('Webhook reminder created', { id, title, due_date: resolvedDueDate, interval });
 

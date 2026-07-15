@@ -42,12 +42,12 @@ class MessageRouter {
             logger.info('👍 reaction detected on message', { reactedMsgId, reactedToKey: JSON.stringify(reactedToKey) });
 
             if (reactedMsgId) {
-                const reminder = db.getReminderByNudgeMessageId(reactedMsgId);
+                const reminder = await db.getReminderByNudgeMessageId(config.tenantId, reactedMsgId);
                 if (reminder) {
-                    db.updateReminderStatus(reminder.id, 'done');
+                    await db.updateReminderStatus(config.tenantId, reminder.id, 'done');
                     const confirmMsg = `✅ המשימה "${reminder.title}" סומנה כבוצעה! 🎉`;
                     await whatsappManager.sendMessage(chat, confirmMsg);
-                    db.addChatMessage(contextId, 'model', confirmMsg);
+                    await db.addChatMessage(config.tenantId, contextId, 'model', confirmMsg);
                     logger.info(`Reminder ${reminder.id} marked as done via 👍 reaction`, { reactedMsgId, title: reminder.title });
                     return;
                 } else {
@@ -120,7 +120,7 @@ class MessageRouter {
                 const fallbackMsg = 'סליחה, המערכת סיימה לעבד את הבקשה אבל לא ייצרה שום טקסט כתשובה. ייתכן שיש תקלה פנימית או שהפעולה בוצעה בשקט. 😅';
                 await whatsappManager.sendMessage(chat, fallbackMsg);
                 // Log fallback message to chat history
-                db.addChatMessage(contextId, 'model', fallbackMsg);
+                await db.addChatMessage(config.tenantId, contextId, 'model', fallbackMsg);
             }
         } catch (err) {
             logger.error('Error processing message', { error: err.message, from });
@@ -136,7 +136,7 @@ class MessageRouter {
 
                 await whatsappManager.sendMessage(chat, errorMessage);
                 // Log error message to chat history
-                db.addChatMessage(contextId, 'model', errorMessage);
+                await db.addChatMessage(config.tenantId, contextId, 'model', errorMessage);
             } catch (sendErr) {
                 logger.error('Failed to send error message', { error: sendErr.message });
             }
@@ -177,7 +177,7 @@ class MessageRouter {
      */
     async processText(userId, text, message = null) {
         // Check for keyword match before sending to Gemini
-        const keywordMatch = db.getKeywordByText(text.trim());
+        const keywordMatch = await db.getKeywordByText(config.tenantId, text.trim());
         if (keywordMatch) {
             logger.info('Keyword matched', { from: userId, keyword: keywordMatch.keyword, type: keywordMatch.type });
 
@@ -255,11 +255,11 @@ class MessageRouter {
 
             case '/status':
             case '/סטטוס':
-                return this.getStatusText();
+                return await this.getStatusText();
 
             case '/clear':
             case '/נקה':
-                geminiManager.clearHistory(contextId);
+                await geminiManager.clearHistory(contextId);
                 return 'היסטוריית השיחה נמחקה 🗑️';
 
             case '/log':
@@ -339,10 +339,10 @@ class MessageRouter {
     /**
      * Get system status
      */
-    getStatusText() {
+    async getStatusText() {
         const waStatus = whatsappManager.getStatus();
         const geminiStatus = geminiManager.getStatus();
-        const usage = db.getUsageStats();
+        const usage = await db.getUsageStats(config.tenantId);
 
         const formatCost = (cost) => {
             return cost.toFixed(4);

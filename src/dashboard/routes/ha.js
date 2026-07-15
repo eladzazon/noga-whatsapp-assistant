@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { asyncHandler } from '../middleware/error.js';
+import config from '../../utils/config.js';
 
 export default function createHaRoutes(deps) {
     const router = Router();
@@ -12,7 +13,7 @@ export default function createHaRoutes(deps) {
             err.statusCode = 500;
             throw err;
         }
-        const mappings = db.getHaMappings();
+        const mappings = await db.getHaMappings(config.tenantId);
         res.json({ mappings });
     }));
 
@@ -30,11 +31,11 @@ export default function createHaRoutes(deps) {
             throw err;
         }
         try {
-            const id = db.addHaMapping(entityId, nickname, location, type);
+            const id = await db.addHaMapping(config.tenantId, entityId, nickname, location, type);
             logger.info('HA mapping added via dashboard', { entityId, nickname });
             res.json({ success: true, id });
         } catch (err) {
-            if (err.message.includes('UNIQUE')) {
+            if (err.code === '23505') {
                 return res.status(409).json({ error: 'Mapping for this entity already exists' });
             }
             throw err;
@@ -55,7 +56,7 @@ export default function createHaRoutes(deps) {
             err.statusCode = 500;
             throw err;
         }
-        db.updateHaMapping(parseInt(id), entityId, nickname, location, type);
+        await db.updateHaMapping(config.tenantId, parseInt(id), entityId, nickname, location, type);
         logger.info('HA mapping updated via dashboard', { id, entityId });
         res.json({ success: true });
     }));
@@ -68,7 +69,7 @@ export default function createHaRoutes(deps) {
             err.statusCode = 500;
             throw err;
         }
-        db.deleteHaMapping(parseInt(id));
+        await db.deleteHaMapping(config.tenantId, parseInt(id));
         logger.info('HA mapping deleted via dashboard', { id });
         res.json({ success: true });
     }));

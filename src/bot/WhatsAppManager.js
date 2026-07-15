@@ -141,8 +141,10 @@ class WhatsAppManager {
                     const bootMsg = `🚀 *נוגה התחברה בהצלחה!*\nהסיסטם מוכן לפעולה.\nזמן חיבור: ${bootTime}`;
                     this.sendMessage(adminJid, bootMsg);
                     // Log boot notification to chat history
-                    if (db && db.db) {
-                        db.addChatMessage(adminJid, 'model', bootMsg);
+                    if (db) {
+                        db.addChatMessage(config.tenantId, adminJid, 'model', bootMsg).catch(err => {
+                            logger.error('Failed to log boot notification', { error: err.message });
+                        });
                     }
                 }
             }

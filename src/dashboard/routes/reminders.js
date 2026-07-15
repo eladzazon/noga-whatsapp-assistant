@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { asyncHandler } from '../middleware/error.js';
+import config from '../../utils/config.js';
 
 export default function createRemindersRoutes(deps) {
     const router = Router();
@@ -12,7 +13,7 @@ export default function createRemindersRoutes(deps) {
             err.statusCode = 500;
             throw err;
         }
-        const reminders = db.getAllReminders();
+        const reminders = await db.getAllReminders(config.tenantId);
         res.json({ success: true, reminders });
     }));
 
@@ -29,7 +30,7 @@ export default function createRemindersRoutes(deps) {
             err.statusCode = 500;
             throw err;
         }
-        const id = db.addReminder(title, dueDate, nudgeIntervalMinutes || 60);
+        const id = await db.addReminder(config.tenantId, title, dueDate, nudgeIntervalMinutes || 60);
         res.json({ success: true, id });
     }));
 
@@ -47,7 +48,7 @@ export default function createRemindersRoutes(deps) {
             err.statusCode = 500;
             throw err;
         }
-        db.updateReminder(parseInt(id), title, dueDate, nudgeIntervalMinutes || 60);
+        await db.updateReminder(config.tenantId, parseInt(id), title, dueDate, nudgeIntervalMinutes || 60);
         res.json({ success: true });
     }));
 
@@ -65,7 +66,7 @@ export default function createRemindersRoutes(deps) {
             err.statusCode = 500;
             throw err;
         }
-        db.updateReminderStatus(parseInt(id), status);
+        await db.updateReminderStatus(config.tenantId, parseInt(id), status);
         res.json({ success: true });
     }));
 
@@ -77,7 +78,7 @@ export default function createRemindersRoutes(deps) {
             err.statusCode = 500;
             throw err;
         }
-        db.deleteReminder(parseInt(id));
+        await db.deleteReminder(config.tenantId, parseInt(id));
         res.json({ success: true });
     }));
 

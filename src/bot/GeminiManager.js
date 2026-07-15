@@ -63,7 +63,7 @@ class GeminiManager {
         // Load system prompt from files
         this.systemPrompt = await this.promptBuilder.build();
 
-        this._buildModel();
+        await this._buildModel();
 
         logger.info('Gemini AI initialized', {
             model: config.gemini.model,
@@ -79,7 +79,7 @@ class GeminiManager {
      */
     async reinit() {
         this.systemPrompt = await this.promptBuilder.build();
-        this._buildModel();
+        await this._buildModel();
         logger.info('Gemini model re-initialized with updated system prompt from files');
     }
 
@@ -93,14 +93,14 @@ class GeminiManager {
     /**
      * Build/rebuild the Gemini model with current settings
      */
-    _buildModel() {
-        this.model = this._getModel();
+    async _buildModel() {
+        this.model = await this._getModel();
     }
 
     /**
      * Get a fresh GenerativeModel instance with dynamic date injection
      */
-    _getModel() {
+    async _getModel() {
         if (!this.genAI) return this.model;
 
         // Inject current date and time into the system prompt
@@ -114,7 +114,7 @@ class GeminiManager {
         // Inject pending reminders so the AI knows what the user might be referring to
         let pendingRemindersInfo = '';
         if (db) {
-            const reminders = db.getPendingReminders();
+            const reminders = await db.getPendingReminders(config.tenantId);
             if (reminders && reminders.length > 0) {
                 // Sort by last_nudged descending so the most recently nudged is first
                 const sorted = [...reminders].sort((a, b) => {
@@ -187,7 +187,7 @@ class GeminiManager {
         if (options.keepHistory === false) {
             logger.info('keepHistory explicitly false - using empty history');
         } else {
-            history = this._buildHistory(userId);
+            history = await this._buildHistory(userId);
         }
 
         // ── Context Awareness: inject a hint for short follow-up messages ──
@@ -203,7 +203,7 @@ class GeminiManager {
         }
 
         // Store user message once
-        db.addChatMessage(userId, 'user', text);
+        await db.addChatMessage(config.tenantId, userId, 'user', text);
 
         const maxAttempts = 2;
         let lastError = null;
@@ -211,7 +211,8 @@ class GeminiManager {
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
             try {
                 // Start chat session
-                const chat = this._getModel().startChat({
+                const model = await this._getModel();
+                const chat = model.startChat({
                     history: [...history],
                     generationConfig: {
                         maxOutputTokens: 1024,
@@ -318,7 +319,7 @@ class GeminiManager {
                 responseText = responseText.replace(/\s*\[Internal Context:[^\]]*\]/gi, '').trim();
 
                 // Store assistant response
-                db.addChatMessage(userId, 'model', responseText);
+                await db.addChatMessage(config.tenantId, userId, 'model', responseText);
 
                 // Log usage and cost
                 if (response.usageMetadata) {
@@ -334,7 +335,7 @@ class GeminiManager {
                     const totalCost = inputCost + outputCost;
 
                     try {
-                        db.logUsage(config.gemini.model, inputTokens, outputTokens, totalTokens, totalCost);
+                        await db.logUsage(config.tenantId, config.gemini.model, inputTokens, outputTokens, totalTokens, totalCost);
                         logger.info('Usage logged', { inputTokens, outputTokens, totalCost: totalCost.toFixed(6) });
                     } catch (err) {
                         logger.error('Failed to log usage', { error: err.message });
@@ -397,11 +398,11 @@ class GeminiManager {
         logger.info('Processing voice message with Gemini', { userId, mimeType });
 
         // Get conversation history
-        const history = this._buildHistory(userId);
+        const history = await this._buildHistory(userId);
 
         // Store reference to voice message once
         const logMsg = senderId ? `[Voice Message from Sender: ${senderId}]` : '[Voice Message]';
-        db.addChatMessage(userId, 'user', logMsg);
+        await db.addChatMessage(config.tenantId, userId, 'user', logMsg);
 
         const maxAttempts = 2;
         let lastError = null;
@@ -409,7 +410,8 @@ class GeminiManager {
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
             try {
                 // Start chat session
-                const chat = this._getModel().startChat({
+                const model = await this._getModel();
+                const chat = model.startChat({
                     history: [...history],
                     generationConfig: {
                         maxOutputTokens: 1024,
@@ -482,7 +484,7 @@ class GeminiManager {
                 }
 
                 // Store assistant response
-                db.addChatMessage(userId, 'model', responseText);
+                await db.addChatMessage(config.tenantId, userId, 'model', responseText);
 
                 logger.info('Voice message processed', { userId, responseLength: responseText.length, attempt });
 
@@ -550,8 +552,8 @@ class GeminiManager {
     /**
      * Build conversation history from database
      */
-    _buildHistory(userId) {
-        const messages = db.getChatHistory(userId, config.gemini.contextWindowMessages);
+    async _buildHistory(userId) {
+        const messages = await db.getChatHistory(config.tenantId, userId, config.gemini.contextWindowMessages);
 
         // Convert to Gemini format
         let history = messages.map(msg => ({
@@ -583,9 +585,9 @@ class GeminiManager {
     /**
      * Clear conversation history for a user
      */
-    clearHistory(userId) {
+    async clearHistory(userId) {
         logger.info('Clearing chat history', { userId });
-        const deleted = db.clearChatHistory(userId);
+        const deleted = await db.clearChatHistory(config.tenantId, userId);
         logger.info('Chat history cleared', { userId, deleted });
     }
 

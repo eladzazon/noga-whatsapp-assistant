@@ -29,10 +29,10 @@ class SchedulerManager {
      * Initialize the scheduler
      * @param {Object} geminiManager - Instance of GeminiManager for processing prompts
      */
-    init(geminiManager) {
+    async init(geminiManager) {
         this.geminiManager = geminiManager;
         logger.info('Initializing Scheduler Manager...');
-        this.reload();
+        await this.reload();
         this._scheduleAutomatedBackup();
         this._scheduleReminderNudger();
         this._scheduleUpdateCheck();
@@ -43,7 +43,7 @@ class SchedulerManager {
     /**
      * Stop all tasks and reload from database
      */
-    reload() {
+    async reload() {
         logger.info('Reloading scheduled prompts...');
 
         // Stop all existing tasks
@@ -53,7 +53,7 @@ class SchedulerManager {
         this.scheduledTasks.clear();
 
         // Load new tasks
-        const prompts = db.getEnabledScheduledPrompts();
+        const prompts = await db.getEnabledScheduledPrompts(config.tenantId);
 
         for (const prompt of prompts) {
             this._scheduleTask(prompt);
@@ -187,10 +187,10 @@ class SchedulerManager {
                 }
 
                 // DB-backed data
-                backup.keywords = db.getKeywords().map(k => ({ keyword: k.keyword, response: k.response, type: k.type, enabled: k.enabled }));
-                backup.ha_mappings = db.getHaMappings().map(m => ({ entity_id: m.entity_id, nickname: m.nickname, location: m.location, type: m.type }));
-                backup.scheduled_prompts = db.getScheduledPrompts().map(p => ({ name: p.name, prompt: p.prompt, cron_expression: p.cron_expression, enabled: p.enabled }));
-                backup.reminders = db.getAllReminders();
+                backup.keywords = (await db.getKeywords(config.tenantId)).map(k => ({ keyword: k.keyword, response: k.response, type: k.type, enabled: k.enabled }));
+                backup.ha_mappings = (await db.getHaMappings(config.tenantId)).map(m => ({ entity_id: m.entity_id, nickname: m.nickname, location: m.location, type: m.type }));
+                backup.scheduled_prompts = (await db.getScheduledPrompts(config.tenantId)).map(p => ({ name: p.name, prompt: p.prompt, cron_expression: p.cron_expression, enabled: p.enabled }));
+                backup.reminders = await db.getAllReminders(config.tenantId);
                 
                 // Settings: .env baseline + DB overrides
                 const envPath = path.resolve(process.cwd(), '.env');
@@ -210,7 +210,7 @@ class SchedulerManager {
                         backup.settings[trimmed.substring(0, eqIdx).trim()] = trimmed.substring(eqIdx + 1).trim();
                     });
                 }
-                const allConfig = db.getAllConfig();
+                const allConfig = await db.getAllConfig(config.tenantId);
                 const ENV_PREFIX = 'env_';
                 for (const [key, value] of Object.entries(allConfig)) {
                     if (key.startsWith(ENV_PREFIX)) backup.settings[key.substring(ENV_PREFIX.length)] = value;
@@ -222,7 +222,7 @@ class SchedulerManager {
                 await fs.promises.writeFile(backupPath, JSON.stringify(backup, null, 2), 'utf8');
 
                 // Keep only last N backups (configured in admin UI, default 7, 0 means keep all)
-                const retentionVal = db.getConfig('backup_retention', 7);
+                const retentionVal = await db.getConfig(config.tenantId, 'backup_retention', 7);
                 const retention = retentionVal !== null && retentionVal !== undefined ? parseInt(retentionVal) : 7;
                 if (retention > 0) {
                     const files = await fs.promises.readdir(backupsDir);
@@ -258,7 +258,7 @@ class SchedulerManager {
                 const { default: whatsappManager } = await import('./WhatsAppManager.js');
                 if (!whatsappManager.isReady) return;
 
-                const reminders = db.getPendingReminders();
+                const reminders = await db.getPendingReminders(config.tenantId);
                 const now = new Date();
 
                 for (const reminder of reminders) {
@@ -267,7 +267,7 @@ class SchedulerManager {
 
                     let shouldNudge = false;
                     if (reminder.nudge_count >= 10) {
-                        db.updateReminderStatus(reminder.id, 'cancelled');
+                        await db.updateReminderStatus(config.tenantId, reminder.id, 'cancelled');
                         logger.info(`Reminder ${reminder.id} cancelled due to reaching nudge limit (10)`);
                         const msg = `אני מפסיקה לנדנד על המשימה "${reminder.title}". סימנתי אותה כמבוטלת.`;
                         await whatsappManager.sendMessage(config.whatsapp.groupId, msg);
@@ -318,13 +318,13 @@ class SchedulerManager {
 
                         if (response && response.trim()) {
                             const sentMessageId = await whatsappManager.sendMessage(config.whatsapp.groupId, response);
-                            
+
                             // Log to history with the internal ID appended so Noga remembers exactly which reminder this was
-                            db.addChatMessage(config.whatsapp.groupId, 'model', `${response} [Internal Context: Reminder ID ${reminder.id}]`);
-                            
-                            db.updateReminderLastNudged(reminder.id);
+                            await db.addChatMessage(config.tenantId, config.whatsapp.groupId, 'model', `${response} [Internal Context: Reminder ID ${reminder.id}]`);
+
+                            await db.updateReminderLastNudged(config.tenantId, reminder.id);
                             if (sentMessageId) {
-                                db.addReminderNudgeMessage(reminder.id, sentMessageId);
+                                await db.addReminderNudgeMessage(config.tenantId, reminder.id, sentMessageId);
                             }
                             logger.info(`Sent nudge for reminder ${reminder.id}: "${reminder.title}"`, { sentMessageId });
                         }
@@ -351,13 +351,13 @@ class SchedulerManager {
                 const latestVersion = String(data.tag_name || '').replace(/^v/i, '');
                 const { version: currentVersion } = getVersionInfo();
 
-                db.setConfig('last_update_check', new Date().toISOString());
+                await db.setConfig(config.tenantId, 'last_update_check', new Date().toISOString());
 
                 if (latestVersion && isNewerVersion(latestVersion, currentVersion)) {
-                    db.setConfig('last_known_latest_version', latestVersion);
+                    await db.setConfig(config.tenantId, 'last_known_latest_version', latestVersion);
                     logger.info(`Update available: v${latestVersion} (running v${currentVersion})`);
                 } else {
-                    db.setConfig('last_known_latest_version', currentVersion);
+                    await db.setConfig(config.tenantId, 'last_known_latest_version', currentVersion);
                 }
             } catch (err) {
                 // Fails silently on network error — never surfaced as an application error
@@ -395,7 +395,7 @@ class SchedulerManager {
                 // lines are themselves JSON text, and db.getConfig() JSON.parses string values
                 // on read — a bare marker string would silently come back as a parsed object,
                 // which would never match against `lines` (an array of strings) below.
-                const storedMarker = db.getConfig('last_diagnostics_marker', null);
+                const storedMarker = await db.getConfig(config.tenantId, 'last_diagnostics_marker', null);
                 const marker = storedMarker && typeof storedMarker.line === 'string' ? storedMarker.line : null;
 
                 let newLines = [];
@@ -404,7 +404,7 @@ class SchedulerManager {
                     newLines = idx === -1 ? lines : lines.slice(idx + 1);
                 }
                 // Always advance the marker so the same lines aren't re-sent next hour
-                db.setConfig('last_diagnostics_marker', { line: lines[lines.length - 1] });
+                await db.setConfig(config.tenantId, 'last_diagnostics_marker', { line: lines[lines.length - 1] });
 
                 if (newLines.length === 0) return;
 

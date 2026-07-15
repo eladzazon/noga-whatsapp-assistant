@@ -3,6 +3,7 @@ import express from 'express';
 import fs from 'fs';
 import path from 'path';
 import { asyncHandler } from '../middleware/error.js';
+import config from '../../utils/config.js';
 
 // Helper to check file/dir existence asynchronously
 async function exists(filePath) {
@@ -59,39 +60,45 @@ export default function createBackupRoutes(deps) {
 
         // Restore DB-backed data
         if (db) {
+            const tenantId = config.tenantId;
+
             if (keywords && Array.isArray(keywords)) {
                 // Clear existing keywords and re-insert
-                db.db.exec('DELETE FROM keywords');
+                await db.clearKeywords(tenantId);
                 for (const k of keywords) {
-                    try { db.addKeyword(k.keyword, k.response, k.type || 'static'); } catch { /* skip duplicates */ }
+                    try { await db.addKeyword(tenantId, k.keyword, k.response, k.type || 'static'); } catch { /* skip duplicates */ }
                 }
                 logger.info('Restored keywords', { count: keywords.length });
             }
 
             if (ha_mappings && Array.isArray(ha_mappings)) {
-                db.db.exec('DELETE FROM ha_mappings');
+                await db.clearHaMappings(tenantId);
                 for (const m of ha_mappings) {
-                    try { db.addHaMapping(m.entity_id, m.nickname, m.location, m.type); } catch { /* skip duplicates */ }
+                    try { await db.addHaMapping(tenantId, m.entity_id, m.nickname, m.location, m.type); } catch { /* skip duplicates */ }
                 }
                 logger.info('Restored HA mappings', { count: ha_mappings.length });
             }
 
             if (scheduled_prompts && Array.isArray(scheduled_prompts)) {
-                db.db.exec('DELETE FROM scheduled_prompts');
+                await db.clearScheduledPrompts(tenantId);
                 for (const p of scheduled_prompts) {
-                    try { db.addScheduledPrompt(p.name, p.prompt, p.cron_expression, p.enabled); } catch { /* skip */ }
+                    try { await db.addScheduledPrompt(tenantId, p.name, p.prompt, p.cron_expression, p.enabled); } catch { /* skip */ }
                 }
                 logger.info('Restored scheduled prompts', { count: scheduled_prompts.length });
             }
 
             if (reminders && Array.isArray(reminders)) {
-                db.db.exec('DELETE FROM reminders');
-                const stmt = db.db.prepare("UPDATE reminders SET last_nudged = ?, nudge_count = ?, created_at = ?, updated_at = ? WHERE id = ?");
+                await db.clearReminders(tenantId);
                 for (const r of reminders) {
-                    try { 
-                        const id = db.addReminder(r.title, r.due_date, r.nudge_interval_minutes);
-                        db.updateReminderStatus(id, r.status);
-                        stmt.run(r.last_nudged, r.nudge_count || 0, r.created_at, r.updated_at, id);
+                    try {
+                        const id = await db.addReminder(tenantId, r.title, r.due_date, r.nudge_interval_minutes);
+                        await db.updateReminderStatus(tenantId, id, r.status);
+                        await db.setReminderTimestamps(tenantId, id, {
+                            lastNudged: r.last_nudged,
+                            nudgeCount: r.nudge_count || 0,
+                            createdAt: r.created_at,
+                            updatedAt: r.updated_at
+                        });
                     } catch { /* skip */ }
                 }
                 logger.info('Restored reminders', { count: reminders.length });
@@ -100,7 +107,7 @@ export default function createBackupRoutes(deps) {
             if (settings && typeof settings === 'object') {
                 const ENV_PREFIX = 'env_';
                 for (const [key, value] of Object.entries(settings)) {
-                    db.setConfig(`${ENV_PREFIX}${key}`, value);
+                    await db.setConfig(tenantId, `${ENV_PREFIX}${key}`, value);
                 }
                 logger.info('Restored settings', { count: Object.keys(settings).length });
             }
@@ -181,10 +188,11 @@ export default function createBackupRoutes(deps) {
         }
         
         if (db) {
-            backup.keywords = db.getKeywords().map(k => ({ keyword: k.keyword, response: k.response, type: k.type, enabled: k.enabled }));
-            backup.ha_mappings = db.getHaMappings().map(m => ({ entity_id: m.entity_id, nickname: m.nickname, location: m.location, type: m.type }));
-            backup.scheduled_prompts = db.getScheduledPrompts().map(p => ({ name: p.name, prompt: p.prompt, cron_expression: p.cron_expression, enabled: p.enabled }));
-            backup.reminders = db.getAllReminders();
+            const tenantId = config.tenantId;
+            backup.keywords = (await db.getKeywords(tenantId)).map(k => ({ keyword: k.keyword, response: k.response, type: k.type, enabled: k.enabled }));
+            backup.ha_mappings = (await db.getHaMappings(tenantId)).map(m => ({ entity_id: m.entity_id, nickname: m.nickname, location: m.location, type: m.type }));
+            backup.scheduled_prompts = (await db.getScheduledPrompts(tenantId)).map(p => ({ name: p.name, prompt: p.prompt, cron_expression: p.cron_expression, enabled: p.enabled }));
+            backup.reminders = await db.getAllReminders(tenantId);
         }
 
         // Settings: .env baseline + DB overrides
@@ -201,7 +209,7 @@ export default function createBackupRoutes(deps) {
         }
         
         if (db) {
-            const dbOverrides2 = db.getAllConfig();
+            const dbOverrides2 = await db.getAllConfig(config.tenantId);
             for (const [key, value] of Object.entries(dbOverrides2)) {
                 if (key.startsWith('env_')) backup.settings[key.substring(4)] = value;
             }
@@ -215,7 +223,7 @@ export default function createBackupRoutes(deps) {
 
         // Enforce retention limit (0 means disabled)
         if (db) {
-            const retentionVal = db.getConfig('backup_retention', 7);
+            const retentionVal = await db.getConfig(config.tenantId, 'backup_retention', 7);
             const retention = retentionVal !== null && retentionVal !== undefined ? parseInt(retentionVal) : 7;
             if (retention > 0) {
                 const allFiles = await fs.promises.readdir(backupsDir);
@@ -274,7 +282,7 @@ export default function createBackupRoutes(deps) {
 
     // GET /api/backup-settings — get retention setting
     router.get('/api/backup-settings', requireAuth, asyncHandler(async (req, res) => {
-        const retentionVal = db ? db.getConfig('backup_retention', 7) : 7;
+        const retentionVal = db ? await db.getConfig(config.tenantId, 'backup_retention', 7) : 7;
         const retention = retentionVal !== null && retentionVal !== undefined ? parseInt(retentionVal) : 7;
         res.json({ retention });
     }));
@@ -288,7 +296,7 @@ export default function createBackupRoutes(deps) {
             throw err;
         }
         if (db) {
-            db.setConfig('backup_retention', retention);
+            await db.setConfig(config.tenantId, 'backup_retention', retention);
         }
         logger.info('Backup retention updated', { retention });
         res.json({ success: true, retention });

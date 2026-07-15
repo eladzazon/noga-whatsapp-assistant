@@ -304,25 +304,25 @@ export const functionHandlers = {
     // ==================== Reminder Handlers ====================
     add_reminder: async (args) => {
         logger.info('Executing: add_reminder', args);
-        const id = db.addReminder(args.title, args.due_date_iso, args.nudge_interval_minutes || 60);
+        const id = await db.addReminder(config.tenantId, args.title, args.due_date_iso, args.nudge_interval_minutes || 60);
         return { success: true, reminder_id: id, message: `Reminder added successfully.` };
     },
 
     get_pending_reminders: async () => {
         logger.info('Executing: get_pending_reminders');
-        const reminders = db.getPendingReminders();
+        const reminders = await db.getPendingReminders(config.tenantId);
         return { success: true, count: reminders.length, reminders };
     },
 
     update_reminder_status: async (args) => {
         logger.info('Executing: update_reminder_status', args);
-        const success = db.updateReminderStatus(args.id, args.status);
+        const success = await db.updateReminderStatus(config.tenantId, args.id, args.status);
         return { success, message: success ? `Reminder marked as ${args.status}` : 'Reminder not found' };
     },
 
     snooze_reminder: async (args) => {
         logger.info('Executing: snooze_reminder', args);
-        const success = db.updateReminderDueDate(args.id, args.new_due_date_iso);
+        const success = await db.updateReminderDueDate(config.tenantId, args.id, args.new_due_date_iso);
         if (success) {
             return { success: true, message: `Reminder ${args.id} successfully rescheduled to ${args.new_due_date_iso}. Nudge timer has been reset.` };
         } else {
@@ -391,7 +391,7 @@ export const functionHandlers = {
             await whatsappManager.sendMessage(targetJid, args.message);
 
             // Log outbound message to chat history so Noga remembers what she sent
-            db.addChatMessage(targetJid, 'model', args.message);
+            await db.addChatMessage(config.tenantId, targetJid, 'model', args.message);
 
             return { success: true, status: `Message sent successfully to ${args.recipient}` };
         } catch (err) {
@@ -434,7 +434,7 @@ export const functionHandlers = {
         logger.info('Executing: find_device', args);
 
         // 1. Check custom mappings
-        const mappings = db.findHaMappingsByName(args.name, args.device_type);
+        const mappings = await db.findHaMappingsByName(config.tenantId, args.name, args.device_type);
 
         // 2. Check native HA entities
         const nativeResult = await homeAssistantManager.findEntityByName(args.name, args.device_type);

@@ -21,6 +21,10 @@ const config = {
     nodeEnv: process.env.NODE_ENV || 'development',
     isDevelopment: process.env.NODE_ENV !== 'production',
 
+    // Single-tenant today (Block 2) — every DatabaseManager call is scoped to this tenant.
+    // Block 4 replaces this with a per-request tenant resolved from profiles.
+    tenantId: process.env.DEFAULT_TENANT_ID || 'family_core',
+
     // Dashboard
     dashboard: {
         port: parseInt(process.env.DASHBOARD_PORT, 10) || 3000,
@@ -119,11 +123,6 @@ Always be warm and respond in Hebrew.`
         token: process.env.HOME_ASSISTANT_TOKEN
     },
 
-    // Database
-    database: {
-        path: process.env.DATABASE_PATH || './data/noga.db'
-    },
-
     // Logging
     logging: {
         level: process.env.LOG_LEVEL || 'info'
@@ -159,9 +158,9 @@ export function validateConfig() {
  * Called after DB is initialized to load settings saved via dashboard.
  * @param {object} db - DatabaseManager instance
  */
-export function applyDbOverrides(db) {
+export async function applyDbOverrides(db) {
     try {
-        const allConfig = db.getAllConfig();
+        const allConfig = await db.getAllConfig(config.tenantId);
         const ENV_PREFIX = 'env_';
         let appliedCount = 0;
 
