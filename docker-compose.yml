@@ -1,13 +1,41 @@
 services:
+  db:
+    image: postgres:15-alpine
+    container_name: noga-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-noga}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB:-noga}
+    volumes:
+      - noga-pgdata:/var/lib/postgresql/data
+    networks:
+      - proxy-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-noga} -d ${POSTGRES_DB:-noga}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    # Block 2 introduces this service — Postgres 15-alpine idles well under 256MB at this
+    # data size. Sized independently from the app's own limit below, not shared with it.
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
   noga:
     build: .
     image: eladzazon/noga-whatsapp-assistant:latest
     container_name: noga-assistant
     restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
     ports:
       - "${DASHBOARD_PORT:-3000}:3000"
     volumes:
-      # Persistent data (SQLite + WhatsApp session)
+      # Persistent data (legacy SQLite file + WhatsApp session — the SQLite file is kept
+      # read-only after the Block 2 migration as a rollback fallback, not written to anymore)
       - noga-data:/app/data
       # Logs on their own volume — different lifecycle/backup policy than the DB/session,
       # keeps rotation and high-frequency writes off the same mount as the SQLite file.
@@ -19,6 +47,7 @@ services:
     environment:
       - NODE_ENV=production
       - TZ=America/New_York
+      - DB_URL=postgresql://${POSTGRES_USER:-noga}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-noga}
     networks:
       - proxy-network
     # Limit resources
@@ -31,6 +60,8 @@ volumes:
   noga-data:
     driver: local
   noga-logs:
+    driver: local
+  noga-pgdata:
     driver: local
 
 networks:
