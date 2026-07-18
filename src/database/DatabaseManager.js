@@ -1,4 +1,5 @@
 import pg from 'pg';
+import crypto from 'crypto';
 import logger from '../utils/logger.js';
 import { runMigrations } from '../../scripts/run_migrations.js';
 
@@ -53,12 +54,89 @@ class DatabaseManager {
     }
 
     // ==================== Tenant/Profile Operations ====================
-    // Block 4 groundwork — only the read used to iterate tenants for per-tenant cron ticks.
-    // Full profiles CRUD (pending approval, credential updates, etc.) is a later Block 4 phase.
 
     async getEnabledProfiles() {
         const { rows } = await this.pool.query('SELECT * FROM profiles WHERE enabled = TRUE');
         return rows;
+    }
+
+    async getAllProfiles() {
+        const { rows } = await this.pool.query('SELECT * FROM profiles ORDER BY created_at DESC');
+        return rows;
+    }
+
+    async getProfileByGroupJid(groupJid) {
+        const { rows } = await this.pool.query('SELECT * FROM profiles WHERE group_jid = $1', [groupJid]);
+        return rows[0] || null;
+    }
+
+    async getProfileByTenantId(tenantId) {
+        const { rows } = await this.pool.query('SELECT * FROM profiles WHERE tenant_id = $1', [tenantId]);
+        return rows[0] || null;
+    }
+
+    /**
+     * Register a newly-seen WhatsApp group as a pending (disabled) tenant. Safe to call
+     * concurrently for the same group_jid (e.g. a burst of messages from a brand-new group) —
+     * a unique index on group_jid means only one insert wins; the loser looks up and returns
+     * the winner's tenant_id instead of leaving an orphaned generated id.
+     */
+    async createPendingProfile(groupJid, displayName) {
+        const tenantId = crypto.randomUUID();
+        const { rows } = await this.pool.query(
+            `INSERT INTO profiles (tenant_id, group_jid, display_name, enabled)
+             VALUES ($1, $2, $3, FALSE)
+             ON CONFLICT (group_jid) DO NOTHING
+             RETURNING tenant_id`,
+            [tenantId, groupJid, displayName || null]
+        );
+        if (rows.length > 0) return rows[0].tenant_id;
+        const existing = await this.getProfileByGroupJid(groupJid);
+        return existing ? existing.tenant_id : tenantId;
+    }
+
+    /**
+     * Approve a pending tenant with its credentials, or update an already-approved one.
+     * Any field left undefined/null keeps its current value (COALESCE) rather than being cleared.
+     */
+    async approveProfile(tenantId, { haUrl, haToken, googleCalendarId, displayName } = {}) {
+        await this.pool.query(
+            `UPDATE profiles
+             SET enabled = TRUE,
+                 ha_url = COALESCE($2, ha_url),
+                 ha_token = COALESCE($3, ha_token),
+                 google_calendar_id = COALESCE($4, google_calendar_id),
+                 display_name = COALESCE($5, display_name),
+                 updated_at = now()
+             WHERE tenant_id = $1`,
+            [tenantId, haUrl || null, haToken || null, googleCalendarId || null, displayName || null]
+        );
+    }
+
+    /** Remove a still-pending (not yet approved) tenant. Refuses to touch an approved one. */
+    async rejectProfile(tenantId) {
+        const { rowCount } = await this.pool.query(
+            'DELETE FROM profiles WHERE tenant_id = $1 AND enabled = FALSE',
+            [tenantId]
+        );
+        return rowCount > 0;
+    }
+
+    /**
+     * One-time self-healing fix: Block 2's migration script seeded profiles.group_jid from the
+     * .env file directly, missing any WHATSAPP_GROUP_ID set later via the dashboard's DB-stored
+     * override mechanism. If a tenant's group_jid is still empty, backfill it from the resolved
+     * config value. No-ops once group_jid is set — safe to call on every startup.
+     */
+    async reconcileDefaultTenantGroupJid(tenantId, groupJid) {
+        if (!groupJid) return;
+        const { rows } = await this.pool.query('SELECT group_jid FROM profiles WHERE tenant_id = $1', [tenantId]);
+        if (rows.length === 0 || rows[0].group_jid) return;
+        await this.pool.query(
+            'UPDATE profiles SET group_jid = $1, updated_at = now() WHERE tenant_id = $2',
+            [groupJid, tenantId]
+        );
+        logger.info('[Database] Reconciled profiles.group_jid from config.whatsapp.groupId', { tenantId, groupJid });
     }
 
     // ==================== Config Operations ====================
