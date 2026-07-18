@@ -3,6 +3,7 @@ import geminiManager from './GeminiManager.js';
 import logger from '../utils/logger.js';
 import db from '../database/DatabaseManager.js';
 import config from '../utils/config.js';
+import tenantContext from '../utils/tenantContext.js';
 import { getRecentLogs, readServerLogs } from '../utils/logger.js';
 
 
@@ -29,9 +30,18 @@ class MessageRouter {
     }
 
     /**
-     * Route incoming message to appropriate handler
+     * Route incoming message to appropriate handler. Resolves the message's tenant and binds it
+     * for the whole processing chain via tenantContext — everything called from here reads it
+     * with tenantContext.getTenantId() instead of taking it as a parameter.
      */
     async routeMessage(message) {
+        // Phase 1 of Block 4: always the single default tenant. Phase 2 resolves this from
+        // message.groupId via profiles.group_jid (multi-tenant group routing + admin approval).
+        const tenantId = config.tenantId;
+        return tenantContext.run(tenantId, () => this._routeMessage(message));
+    }
+
+    async _routeMessage(message) {
         const { from, chat, body, type, hasMedia, media, isGroup, reactedToKey, reactionEmoji } = message;
 
         const contextId = isGroup ? chat : from;
@@ -42,12 +52,12 @@ class MessageRouter {
             logger.info('👍 reaction detected on message', { reactedMsgId, reactedToKey: JSON.stringify(reactedToKey) });
 
             if (reactedMsgId) {
-                const reminder = await db.getReminderByNudgeMessageId(config.tenantId, reactedMsgId);
+                const reminder = await db.getReminderByNudgeMessageId(tenantContext.getTenantId(), reactedMsgId);
                 if (reminder) {
-                    await db.updateReminderStatus(config.tenantId, reminder.id, 'done');
+                    await db.updateReminderStatus(tenantContext.getTenantId(), reminder.id, 'done');
                     const confirmMsg = `✅ המשימה "${reminder.title}" סומנה כבוצעה! 🎉`;
                     await whatsappManager.sendMessage(chat, confirmMsg);
-                    await db.addChatMessage(config.tenantId, contextId, 'model', confirmMsg);
+                    await db.addChatMessage(tenantContext.getTenantId(), contextId, 'model', confirmMsg);
                     logger.info(`Reminder ${reminder.id} marked as done via 👍 reaction`, { reactedMsgId, title: reminder.title });
                     return;
                 } else {
@@ -120,7 +130,7 @@ class MessageRouter {
                 const fallbackMsg = 'סליחה, המערכת סיימה לעבד את הבקשה אבל לא ייצרה שום טקסט כתשובה. ייתכן שיש תקלה פנימית או שהפעולה בוצעה בשקט. 😅';
                 await whatsappManager.sendMessage(chat, fallbackMsg);
                 // Log fallback message to chat history
-                await db.addChatMessage(config.tenantId, contextId, 'model', fallbackMsg);
+                await db.addChatMessage(tenantContext.getTenantId(), contextId, 'model', fallbackMsg);
             }
         } catch (err) {
             logger.error('Error processing message', { error: err.message, from });
@@ -136,7 +146,7 @@ class MessageRouter {
 
                 await whatsappManager.sendMessage(chat, errorMessage);
                 // Log error message to chat history
-                await db.addChatMessage(config.tenantId, contextId, 'model', errorMessage);
+                await db.addChatMessage(tenantContext.getTenantId(), contextId, 'model', errorMessage);
             } catch (sendErr) {
                 logger.error('Failed to send error message', { error: sendErr.message });
             }
@@ -177,7 +187,7 @@ class MessageRouter {
      */
     async processText(userId, text, message = null) {
         // Check for keyword match before sending to Gemini
-        const keywordMatch = await db.getKeywordByText(config.tenantId, text.trim());
+        const keywordMatch = await db.getKeywordByText(tenantContext.getTenantId(), text.trim());
         if (keywordMatch) {
             logger.info('Keyword matched', { from: userId, keyword: keywordMatch.keyword, type: keywordMatch.type });
 
@@ -342,7 +352,7 @@ class MessageRouter {
     async getStatusText() {
         const waStatus = whatsappManager.getStatus();
         const geminiStatus = geminiManager.getStatus();
-        const usage = await db.getUsageStats(config.tenantId);
+        const usage = await db.getUsageStats(tenantContext.getTenantId());
 
         const formatCost = (cost) => {
             return cost.toFixed(4);

@@ -10,6 +10,7 @@ import compression from 'compression';
 import config from '../utils/config.js';
 import logger, { subscribeToLogs, getRecentLogs } from '../utils/logger.js';
 import db from '../database/DatabaseManager.js';
+import tenantContext from '../utils/tenantContext.js';
 import multer from 'multer';
 
 // Import newly separated routes and socket handler
@@ -106,6 +107,16 @@ class DashboardServer {
                 maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
             }
         }));
+
+        // Block 4 groundwork: bind the tenant an admin request operates on for everything
+        // downstream (route handlers, DatabaseManager/MemoryManager calls) via tenantContext,
+        // same mechanism WhatsApp messages use. No tenant-switcher UI exists yet (Phase 2), so
+        // req.session.tenantId is never actually set today — this always falls through to
+        // config.tenantId, unchanged behavior.
+        this.app.use((req, res, next) => {
+            const tenantId = (req.session && req.session.tenantId) || config.tenantId;
+            tenantContext.run(tenantId, next);
+        });
 
         // Serve static files — no-cache so browsers always validate after deploys
         this.app.use('/public', express.static(path.join(__dirname, 'public'), {

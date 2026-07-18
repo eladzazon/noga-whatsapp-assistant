@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import config from '../utils/config.js';
+import tenantContext from '../utils/tenantContext.js';
 
 export default function setupSocketIO(io, deps) {
     const { logger, server, subscribeToLogs, getRecentLogs } = deps;
@@ -25,13 +26,18 @@ export default function setupSocketIO(io, deps) {
         // Dashboard Chat: Receive message from dashboard
         socket.on('dashboard_message', async (text) => {
             if (!server.messageRouter) {
-                return socket.emit('dashboard_response', { 
-                    error: 'Message Router not initialized' 
+                return socket.emit('dashboard_response', {
+                    error: 'Message Router not initialized'
                 });
             }
 
+            // Socket.IO events aren't covered by the Express tenantContext middleware — bind it
+            // here too. No session-sharing with Socket.IO exists yet (see the placeholder auth
+            // middleware above), so this is always config.tenantId today, same as before.
             try {
-                const response = await server.messageRouter.processText('dashboard_admin', text);
+                const response = await tenantContext.run(config.tenantId, () =>
+                    server.messageRouter.processText('dashboard_admin', text)
+                );
                 socket.emit('dashboard_response', { text: response });
             } catch (err) {
                 socket.emit('dashboard_response', { error: err.message });
@@ -41,7 +47,7 @@ export default function setupSocketIO(io, deps) {
         // Dashboard Chat: Clear history
         socket.on('clear_chat', () => {
             if (server.geminiManager) {
-                server.geminiManager.clearHistory('dashboard_admin');
+                tenantContext.run(config.tenantId, () => server.geminiManager.clearHistory('dashboard_admin'));
                 socket.emit('chat_cleared');
             }
         });
