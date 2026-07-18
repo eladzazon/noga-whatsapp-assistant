@@ -1,17 +1,8 @@
-import fs from 'fs';
-import path from 'path';
 import config from '../utils/config.js';
 import logger from '../utils/logger.js';
+import memoryManager from '../skills/MemoryManager.js';
 
-// Helper to check file/dir existence asynchronously
-async function exists(filePath) {
-    try {
-        await fs.promises.access(filePath);
-        return true;
-    } catch {
-        return false;
-    }
-}
+const IDENTITY_FILENAME = 'identity.md';
 
 class PromptBuilder {
     constructor() {
@@ -23,53 +14,50 @@ class PromptBuilder {
      * @returns {Promise<string>} The assembled system prompt
      */
     async build() {
-        const knowledgeDir = path.resolve(process.cwd(), 'data', 'knowledge');
-        const skillsDir = path.resolve(process.cwd(), 'data', 'skills');
-        
-        // Base system prompt is ALWAYS included
-        let promptParts = [config.gemini.systemPrompt];
+        const tenantId = config.tenantId;
 
+        let knowledgeFiles = [];
+        let skillFiles = [];
         try {
-            if (await exists(knowledgeDir)) {
-                const files = await fs.promises.readdir(knowledgeDir);
-                const mdFiles = files.filter(f => f.endsWith('.md'));
-                
-                const contents = await Promise.all(
-                    mdFiles.map(async file => {
-                        const content = await fs.promises.readFile(path.join(knowledgeDir, file), 'utf-8');
-                        return `--- BEGIN ${file} ---\n${content}\n--- END ${file} ---`;
-                    })
-                );
-                promptParts.push(...contents);
-            }
+            knowledgeFiles = await memoryManager.getKnowledgeFiles(tenantId);
         } catch (err) {
             logger.error('Failed to read knowledge files', { error: err.message });
         }
-
         try {
-            if (await exists(skillsDir)) {
-                const files = await fs.promises.readdir(skillsDir);
-                const mdFiles = files.filter(f => f.endsWith('.md'));
-                if (mdFiles.length > 0) {
-                    let skillsList = "--- BEGIN AVAILABLE SKILLS ---\nThese are the skills you know how to execute. You can use these procedures if asked.\n\n";
-                    
-                    const contents = await Promise.all(
-                        mdFiles.map(async file => {
-                            const content = await fs.promises.readFile(path.join(skillsDir, file), 'utf-8');
-                            return `Skill File: ${file}\n${content}\n\n`;
-                        })
-                    );
-                    skillsList += contents.join('');
-                    skillsList += "--- END AVAILABLE SKILLS ---";
-                    promptParts.push(skillsList);
-                }
-            }
+            skillFiles = await memoryManager.getSkillFiles(tenantId);
         } catch (err) {
             logger.error('Failed to read skills files', { error: err.message });
         }
 
+        let promptParts;
+        if (config.behaviorEngine === 'markdown') {
+            const identityFile = knowledgeFiles.find(f => f.name.toLowerCase() === IDENTITY_FILENAME);
+            let base = config.gemini.systemPrompt;
+            if (identityFile) {
+                base = identityFile.content;
+            } else {
+                logger.warn('[PromptBuilder] BEHAVIOR_ENGINE=markdown but identity.md was not found for tenant; falling back to config.gemini.systemPrompt', { tenantId });
+            }
+            const otherKnowledge = knowledgeFiles.filter(f => f.name.toLowerCase() !== IDENTITY_FILENAME);
+            promptParts = [base, ...otherKnowledge.map(f => this._wrapKnowledge(f))];
+        } else {
+            // legacy — unchanged behavior: fixed prompt + every knowledge file, always
+            promptParts = [config.gemini.systemPrompt, ...knowledgeFiles.map(f => this._wrapKnowledge(f))];
+        }
+
+        if (skillFiles.length > 0) {
+            let skillsList = "--- BEGIN AVAILABLE SKILLS ---\nThese are the skills you know how to execute. You can use these procedures if asked.\n\n";
+            skillsList += skillFiles.map(f => `Skill File: ${f.name}\n${f.content}\n\n`).join('');
+            skillsList += "--- END AVAILABLE SKILLS ---";
+            promptParts.push(skillsList);
+        }
+
         this._cachedPrompt = promptParts.join('\n\n');
         return this._cachedPrompt;
+    }
+
+    _wrapKnowledge(file) {
+        return `--- BEGIN ${file.name} ---\n${file.content}\n--- END ${file.name} ---`;
     }
 
     /**
