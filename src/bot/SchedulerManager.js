@@ -4,6 +4,7 @@ import logger, { readLastLines } from '../utils/logger.js';
 import db from '../database/DatabaseManager.js';
 import config from '../utils/config.js';
 import { getVersionInfo } from '../utils/version.js';
+import memoryManager from '../skills/MemoryManager.js';
 import fs from 'fs';
 import path from 'path';
 
@@ -138,8 +139,6 @@ class SchedulerManager {
                     await fs.promises.mkdir(backupsDir, { recursive: true });
                 }
 
-                const knowledgeDir = path.resolve(process.cwd(), 'data', 'knowledge');
-                const skillsDir = path.resolve(process.cwd(), 'data', 'skills');
                 const backup = {
                     version: 2,
                     generated_at: new Date().toISOString(),
@@ -152,39 +151,10 @@ class SchedulerManager {
                     settings: {}
                 };
 
-                let knowledgeExists = false;
-                try {
-                    await fs.promises.access(knowledgeDir);
-                    knowledgeExists = true;
-                } catch {}
-
-                if (knowledgeExists) {
-                    const files = await fs.promises.readdir(knowledgeDir);
-                    await Promise.all(
-                        files.map(async file => {
-                            if (file.endsWith('.md')) {
-                                backup.knowledge[file] = await fs.promises.readFile(path.join(knowledgeDir, file), 'utf8');
-                            }
-                        })
-                    );
-                }
-
-                let skillsExists = false;
-                try {
-                    await fs.promises.access(skillsDir);
-                    skillsExists = true;
-                } catch {}
-
-                if (skillsExists) {
-                    const files = await fs.promises.readdir(skillsDir);
-                    await Promise.all(
-                        files.map(async file => {
-                            if (file.endsWith('.md')) {
-                                backup.skills[file] = await fs.promises.readFile(path.join(skillsDir, file), 'utf8');
-                            }
-                        })
-                    );
-                }
+                const knowledgeFiles = await memoryManager.getKnowledgeFiles(config.tenantId);
+                for (const f of knowledgeFiles) backup.knowledge[f.name] = f.content;
+                const skillFiles = await memoryManager.getSkillFiles(config.tenantId);
+                for (const f of skillFiles) backup.skills[f.name] = f.content;
 
                 // DB-backed data
                 backup.keywords = (await db.getKeywords(config.tenantId)).map(k => ({ keyword: k.keyword, response: k.response, type: k.type, enabled: k.enabled }));
@@ -411,12 +381,22 @@ class SchedulerManager {
                 const { default: whatsappManager } = await import('./WhatsAppManager.js');
                 if (!whatsappManager.isReady) return;
 
+                let instruction = 'Summarize and de-duplicate these system error log lines into a short, clear Hebrew message for the admin. Group similar/repeated errors together instead of listing each one.';
+                if (config.behaviorEngine === 'markdown') {
+                    const skillFile = await memoryManager.readFile(config.tenantId, 'skills', 'self_diagnostics.md');
+                    if (skillFile.success) {
+                        instruction = skillFile.content;
+                    } else {
+                        logger.warn('[SchedulerManager] BEHAVIOR_ENGINE=markdown but self_diagnostics.md skill not found for tenant; falling back to built-in instruction', { tenantId: config.tenantId });
+                    }
+                }
+
                 const eventData = {
                     event: 'Self-Diagnostics: New System Errors',
                     data: {
                         error_count: newLines.length,
                         errors: newLines.slice(-10),
-                        instruction: 'Summarize and de-duplicate these system error log lines into a short, clear Hebrew message for the admin. Group similar/repeated errors together instead of listing each one.'
+                        instruction
                     }
                 };
 
