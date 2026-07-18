@@ -52,6 +52,15 @@ class DatabaseManager {
         );
     }
 
+    // ==================== Tenant/Profile Operations ====================
+    // Block 4 groundwork — only the read used to iterate tenants for per-tenant cron ticks.
+    // Full profiles CRUD (pending approval, credential updates, etc.) is a later Block 4 phase.
+
+    async getEnabledProfiles() {
+        const { rows } = await this.pool.query('SELECT * FROM profiles WHERE enabled = TRUE');
+        return rows;
+    }
+
     // ==================== Config Operations ====================
 
     async getConfig(tenantId, key, defaultValue = null) {
