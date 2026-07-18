@@ -116,8 +116,9 @@ const COMMON_HANDLERS = {
         // 1. Check custom mappings
         const mappings = await db.findHaMappingsByName(tenantContext.getTenantId(), args.name, args.device_type);
 
-        // 2. Check native HA entities
-        const nativeResult = await homeAssistantManager.findEntityByName(args.name, args.device_type);
+        // 2. Check native HA entities (this tenant's own HA connection)
+        const ha = await homeAssistantManager.getCurrent();
+        const nativeResult = await ha.findEntityByName(args.name, args.device_type);
 
         if (mappings.length > 0) {
             const mappedEntities = mappings.map(m => ({
@@ -693,7 +694,13 @@ export async function initializeSkills() {
     logger.info('Initializing skills...');
 
     await calendarManager.init();
-    await homeAssistantManager.init();
+    // Block 4 Phase 2: HA is now a per-tenant registry. Eagerly connect the default tenant here
+    // (matches pre-Phase-2 startup behavior exactly) — other tenants' connections are created
+    // lazily on their first tool call. See HomeAssistantRegistry's docstring for the known
+    // limitation this implies: the MCP tool list below is built once from this default
+    // connection, shared across tenants, even though each tool call executes against the
+    // calling tenant's own HA instance.
+    const defaultHa = await homeAssistantManager.getForTenant(config.tenantId);
     await memoryManager.init(tenantContext.getTenantId());
 
     const modeDeclarations = config.behaviorEngine === 'markdown' ? MARKDOWN_DECLARATIONS : LEGACY_DECLARATIONS;
@@ -705,10 +712,9 @@ export async function initializeSkills() {
     logger.info(`Registered ${functionDeclarations.length} tool(s) for BEHAVIOR_ENGINE=${config.behaviorEngine}`);
 
     // Register MCP tools dynamically
-    if (homeAssistantManager.isAvailable()) {
+    if (defaultHa.isAvailable()) {
         try {
-            const mcpClient = homeAssistantManager.getMcpClient();
-            const { tools } = await mcpClient.listTools();
+            const { tools } = await defaultHa.getMcpClient().listTools();
             logger.info(`Fetched ${tools.length} MCP tools from Home Assistant`);
 
             for (const tool of tools) {
@@ -723,11 +729,16 @@ export async function initializeSkills() {
                     }
                 });
 
-                // Add to handlers
+                // Add to handlers — resolves the CALLING tenant's own HA connection at execution
+                // time, not the default tenant's connection used to build the declaration above.
                 functionHandlers[tool.name] = async (args) => {
                     logger.info(`Executing MCP tool: ${tool.name}`, args);
                     try {
-                        const result = await mcpClient.callTool({
+                        const ha = await homeAssistantManager.getCurrent();
+                        if (!ha.isAvailable()) {
+                            return { error: 'Home Assistant not available for this tenant' };
+                        }
+                        const result = await ha.getMcpClient().callTool({
                             name: tool.name,
                             arguments: args
                         });
@@ -761,9 +772,10 @@ export async function initializeSkills() {
  * Get status of all skills
  */
 export async function getSkillsStatus() {
+    const ha = await homeAssistantManager.getCurrent();
     return {
         calendar: calendarManager.getStatus(),
-        homeAssistant: homeAssistantManager.getStatus(),
+        homeAssistant: ha.getStatus(),
         memory: await memoryManager.getStatus(tenantContext.getTenantId())
     };
 }

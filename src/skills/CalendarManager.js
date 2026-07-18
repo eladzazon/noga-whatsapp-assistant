@@ -3,6 +3,7 @@ import fs from 'fs';
 import config from '../utils/config.js';
 import logger from '../utils/logger.js';
 import db from '../database/DatabaseManager.js';
+import tenantContext from '../utils/tenantContext.js';
 
 class CalendarManager {
     constructor() {
@@ -55,6 +56,30 @@ class CalendarManager {
     }
 
     /**
+     * Resolve the calendar(s) the current tenant should read/write. The default tenant keeps
+     * its exact existing behavior (config.google.calendarId + extraCalendarIds, unchanged).
+     * Any other tenant (Block 4 Phase 2's approved groups) uses its own single
+     * profiles.google_calendar_id — same shared service account, just a different calendar.
+     */
+    async _resolveCalendarIds() {
+        const tenantId = tenantContext.getTenantId();
+        if (tenantId === config.tenantId) {
+            return [...new Set([config.google.calendarId, ...(config.google.extraCalendarIds || [])])];
+        }
+        const profile = await db.getProfileByTenantId(tenantId);
+        if (!profile || !profile.google_calendar_id) {
+            logger.warn('No google_calendar_id configured for tenant', { tenantId });
+            return [];
+        }
+        return [profile.google_calendar_id];
+    }
+
+    async _resolveCalendarId() {
+        const [first] = await this._resolveCalendarIds();
+        return first || config.google.calendarId;
+    }
+
+    /**
      * List events in a date range from all configured calendars
      * @param {string} startDate - Start date (YYYY-MM-DD)
      * @param {string} endDate - End date (YYYY-MM-DD), optional
@@ -80,8 +105,10 @@ class CalendarManager {
             const endD = endDate || startDate;
             const timeMax = `${endD}T23:59:59${getOffset(endD)}`;
 
-            // Deduplicated list of all calendar IDs to query
-            const calendarIds = [...new Set([config.google.calendarId, ...(config.google.extraCalendarIds || [])])];
+            const calendarIds = await this._resolveCalendarIds();
+            if (calendarIds.length === 0) {
+                return { error: 'No calendar configured for this tenant' };
+            }
 
             logger.info('Fetching calendar events (Timezone Corrected)', {
                 startDate,
@@ -207,7 +234,7 @@ class CalendarManager {
             logger.info('Creating calendar event', { title, date, time });
 
             const response = await this.calendar.events.insert({
-                calendarId: config.google.calendarId,
+                calendarId: await this._resolveCalendarId(),
                 requestBody: event
             });
 
@@ -273,7 +300,7 @@ class CalendarManager {
 
         try {
             await this.calendar.events.delete({
-                calendarId: config.google.calendarId,
+                calendarId: await this._resolveCalendarId(),
                 eventId
             });
 

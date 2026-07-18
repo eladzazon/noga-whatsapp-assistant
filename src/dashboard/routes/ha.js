@@ -78,7 +78,8 @@ export default function createHaRoutes(deps) {
     // Proxy: Get entities from Home Assistant
     router.get('/api/ha/entities', requireAuth, asyncHandler(async (req, res) => {
         const { homeAssistantManager } = await skillsIndexPromise;
-        const result = await homeAssistantManager.getEntities();
+        const ha = await homeAssistantManager.getCurrent();
+        const result = await ha.getEntities();
         res.json(result);
     }));
 

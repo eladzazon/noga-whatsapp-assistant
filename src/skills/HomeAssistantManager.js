@@ -1,14 +1,24 @@
 import axios from 'axios';
 import config from '../utils/config.js';
 import logger from '../utils/logger.js';
+import db from '../database/DatabaseManager.js';
+import tenantContext from '../utils/tenantContext.js';
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 
 // Cache TTL: 30 seconds
 const ENTITY_CACHE_TTL_MS = 30_000;
 
+/**
+ * One tenant's Home Assistant connection (MCP client + legacy axios fallback). Block 4 Phase 2:
+ * previously a single process-wide singleton built from config.homeAssistant.*; now instantiated
+ * per-tenant by HomeAssistantRegistry below, built from either config.homeAssistant.* (the
+ * default tenant) or profiles.ha_url/ha_token (an approved tenant).
+ */
 class HomeAssistantManager {
-    constructor() {
+    constructor(haUrl, haToken) {
+        this.haUrl = haUrl;
+        this.haToken = haToken;
         this.client = null; // Axios client (for fallback/finding entities)
         this.mcpClient = null; // New MCP client
         this.baseUrl = null;
@@ -21,7 +31,7 @@ class HomeAssistantManager {
      * Initialize Home Assistant client
      */
     async init() {
-        const { url, token } = config.homeAssistant;
+        const { haUrl: url, haToken: token } = this;
 
         if (!url || !token) {
             logger.warn('Home Assistant not configured');
@@ -42,7 +52,7 @@ class HomeAssistantManager {
 
         // Initialize MCP Client
         try {
-            logger.info('Initializing Home Assistant MCP client...');
+            logger.info('Initializing Home Assistant MCP client...', { baseUrl: this.baseUrl });
 
             const transport = new StreamableHTTPClientTransport(new URL(`${this.baseUrl}/api/mcp`), {
                 requestInit: {
@@ -64,9 +74,9 @@ class HomeAssistantManager {
             });
 
             await this.mcpClient.connect(transport);
-            logger.info('Home Assistant MCP client connected successfully');
+            logger.info('Home Assistant MCP client connected successfully', { baseUrl: this.baseUrl });
         } catch (err) {
-            logger.error('Failed to connect to Home Assistant MCP server', { error: err.message });
+            logger.error('Failed to connect to Home Assistant MCP server', { baseUrl: this.baseUrl, error: err.message });
             this.mcpClient = null;
         }
 
@@ -245,5 +255,47 @@ class HomeAssistantManager {
     }
 }
 
-export default new HomeAssistantManager();
+/**
+ * Lazily creates and caches one HomeAssistantManager per tenant. The default tenant
+ * (config.tenantId) uses config.homeAssistant.url/token exactly as before; any other
+ * (approved) tenant uses its own profiles.ha_url/ha_token.
+ *
+ * Known Phase 2 limitation: Gemini's MCP tool declarations are still built once, globally, from
+ * whichever tenant's HA connects first (see skills/index.js) — this registry makes each tool
+ * CALL execute against the correct tenant's HA instance, but doesn't give each tenant its own
+ * tailored tool list. A tenant whose HA exposes meaningfully different entities/domains than the
+ * reference tenant may hit gaps. Properly solving that is closer to Block 5 (per-tenant
+ * orchestrator) scope.
+ */
+class HomeAssistantRegistry {
+    constructor() {
+        this._instances = new Map(); // tenantId -> HomeAssistantManager
+    }
+
+    async _resolveCredentials(tenantId) {
+        if (tenantId === config.tenantId) {
+            return { haUrl: config.homeAssistant.url, haToken: config.homeAssistant.token };
+        }
+        const profile = await db.getProfileByTenantId(tenantId);
+        return { haUrl: profile?.ha_url || null, haToken: profile?.ha_token || null };
+    }
+
+    async getForTenant(tenantId) {
+        if (this._instances.has(tenantId)) {
+            return this._instances.get(tenantId);
+        }
+        const { haUrl, haToken } = await this._resolveCredentials(tenantId);
+        const manager = new HomeAssistantManager(haUrl, haToken);
+        await manager.init();
+        this._instances.set(tenantId, manager);
+        return manager;
+    }
+
+    /** Resolve the HA connection for whichever tenant is bound to the current async context. */
+    async getCurrent() {
+        return this.getForTenant(tenantContext.getTenantId());
+    }
+}
+
+export default new HomeAssistantRegistry();
 export { HomeAssistantManager };
