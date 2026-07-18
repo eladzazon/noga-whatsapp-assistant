@@ -339,9 +339,12 @@ class WhatsAppManager {
                 });
             }
 
-            // Check whitelist using the exact same logic as before
-            if (!this._isAllowed(senderId, groupId)) {
-                logger.debug('Message ignored - not in whitelist', { senderId, groupId });
+            // Resolve tenant access — replaces the old sync whitelist-only check. Groups now
+            // resolve via profiles.group_jid (Block 4 Phase 2); an unrecognized group gets
+            // registered as pending and stays silent rather than being processed.
+            const { allowed, tenantId } = await this._resolveTenant(senderId, groupId);
+            if (!allowed) {
+                logger.debug('Message ignored - not allowed or pending tenant approval', { senderId, groupId });
                 return;
             }
 
@@ -353,6 +356,7 @@ class WhatsAppManager {
                 chat: jid,
                 isGroup,
                 groupId,
+                tenantId,
                 type: type === 'audioMessage' ? 'ptt' : type === 'conversation' || type === 'extendedTextMessage' ? 'chat' : type,
                 body: body,
                 timestamp: msg.messageTimestamp,
@@ -397,21 +401,68 @@ class WhatsAppManager {
     }
 
     /**
-     * Check if sender is allowed
+     * Resolve whether a message is allowed through, and which tenant it belongs to.
+     * Direct messages keep the original phone-whitelist behavior, scoped to the single default
+     * tenant (Block 4's admin-approval flow is specifically about groups, per the steps doc).
+     * Group messages resolve via profiles.group_jid; an unrecognized group gets registered as a
+     * pending tenant and stays silent — no reply, so a group full of strangers adding the bot
+     * doesn't get an automated response confirming it's alive.
      */
-    _isAllowed(senderId, groupId) {
-        // Check group whitelist
+    async _resolveTenant(senderId, groupId) {
+        if (!groupId) {
+            if (config.whatsapp.whitelist.length > 0 && config.whatsapp.whitelist.includes(senderId)) {
+                return { allowed: true, tenantId: config.tenantId };
+            }
+            return { allowed: false, tenantId: null };
+        }
+
+        const profile = await db.getProfileByGroupJid(groupId);
+        if (profile) {
+            return profile.enabled
+                ? { allowed: true, tenantId: profile.tenant_id }
+                : { allowed: false, tenantId: null }; // already pending — stay silent, don't re-notify
+        }
+
+        // Legacy fallback: config.whatsapp.groupId set but reconciliation hasn't caught up yet
+        // (e.g. changed via the dashboard without a restart). Recognize it directly rather than
+        // registering a duplicate pending profile for a group we already know about.
         if (config.whatsapp.groupId && groupId === config.whatsapp.groupId) {
-            return true;
+            return { allowed: true, tenantId: config.tenantId };
         }
 
-        // Check phone number whitelist
-        if (config.whatsapp.whitelist.length > 0) {
-            return config.whatsapp.whitelist.includes(senderId);
-        }
+        // Genuinely unrecognized group — register it as pending and notify the admin
+        await this._registerPendingGroup(groupId);
+        return { allowed: false, tenantId: null };
+    }
 
-        // If no whitelist configured, deny all (security)
-        return false;
+    /**
+     * Register a brand-new WhatsApp group as a pending tenant and notify the admin.
+     */
+    async _registerPendingGroup(groupId) {
+        try {
+            let groupName = groupId;
+            try {
+                const metadata = await this.client.groupMetadata(groupId);
+                if (metadata && metadata.subject) groupName = metadata.subject;
+            } catch (err) {
+                logger.warn('Failed to fetch group metadata for pending registration', { groupId, error: err.message });
+            }
+
+            const tenantId = await db.createPendingProfile(groupId, groupName);
+            logger.info('New WhatsApp group registered as pending tenant', { groupId, groupName, tenantId });
+
+            if (config.whatsapp.adminPhone) {
+                const adminJid = `${config.whatsapp.adminPhone}@s.whatsapp.net`;
+                const msg = `🔔 קבוצת וואטסאפ חדשה ממתינה לאישור: *${groupName}*\nהיכנס לדשבורד כדי לאשר או לדחות.`;
+                try {
+                    await this.sendMessage(adminJid, msg);
+                } catch (err) {
+                    logger.error('Failed to notify admin of pending group', { error: err.message });
+                }
+            }
+        } catch (err) {
+            logger.error('Failed to register pending group', { groupId, error: err.message });
+        }
     }
 
     /**

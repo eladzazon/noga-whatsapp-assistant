@@ -35,9 +35,10 @@ class MessageRouter {
      * with tenantContext.getTenantId() instead of taking it as a parameter.
      */
     async routeMessage(message) {
-        // Phase 1 of Block 4: always the single default tenant. Phase 2 resolves this from
-        // message.groupId via profiles.group_jid (multi-tenant group routing + admin approval).
-        const tenantId = config.tenantId;
+        // Resolved by WhatsAppManager._resolveTenant() via profiles.group_jid (Block 4 Phase 2).
+        // Falls back to the single default tenant for messages that predate this field (there
+        // shouldn't be any in practice, since WhatsAppManager always sets it before this is called).
+        const tenantId = message.tenantId || config.tenantId;
         return tenantContext.run(tenantId, () => this._routeMessage(message));
     }
 

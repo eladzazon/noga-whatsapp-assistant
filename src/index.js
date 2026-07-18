@@ -50,6 +50,10 @@ async function main() {
         logger.info('Applying DB setting overrides...');
         await applyDbOverrides(db);
 
+        // One-time self-healing fix (Block 4 Phase 2): backfill profiles.group_jid if a
+        // dashboard-set WHATSAPP_GROUP_ID override never made it into the profiles table.
+        await db.reconcileDefaultTenantGroupJid(config.tenantId, config.whatsapp.groupId);
+
         // Initialize skills (Google APIs, Home Assistant)
         logger.info('Initializing skills...');
         await initializeSkills();
