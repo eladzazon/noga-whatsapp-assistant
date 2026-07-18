@@ -105,6 +105,11 @@ export default function createSettingsRoutes(deps) {
         if (settings.WEBHOOK_SECRET) {
             config.dashboard.webhookSecret = settings.WEBHOOK_SECRET;
         }
+        if (settings.BEHAVIOR_ENGINE) {
+            // Config reflects the new value immediately; the registered tool set/prompt only
+            // fully switches on next restart (functionDeclarations are built once at startup).
+            config.behaviorEngine = settings.BEHAVIOR_ENGINE === 'markdown' ? 'markdown' : 'legacy';
+        }
         if (settings.LOG_LEVEL) {
             config.logging.level = settings.LOG_LEVEL;
         }

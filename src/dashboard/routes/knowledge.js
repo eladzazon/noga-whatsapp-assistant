@@ -1,17 +1,7 @@
 import { Router } from 'express';
-import fs from 'fs';
-import path from 'path';
 import { asyncHandler } from '../middleware/error.js';
-
-// Helper to check file/dir existence asynchronously
-async function exists(filePath) {
-    try {
-        await fs.promises.access(filePath);
-        return true;
-    } catch {
-        return false;
-    }
-}
+import config from '../../utils/config.js';
+import memoryManager from '../../skills/MemoryManager.js';
 
 export default function createKnowledgeRoutes(deps) {
     const router = Router();
@@ -21,20 +11,8 @@ export default function createKnowledgeRoutes(deps) {
 
     // Get all knowledge files
     router.get('/api/knowledge', requireAuth, asyncHandler(async (req, res) => {
-        const knowledgeDir = path.resolve(process.cwd(), 'data', 'knowledge');
-        if (!(await exists(knowledgeDir))) {
-            return res.json({ files: [] });
-        }
-        
-        const files = await fs.promises.readdir(knowledgeDir);
-        const mdFiles = files.filter(f => f.endsWith('.md'));
-        const filesData = await Promise.all(
-            mdFiles.map(async f => {
-                const content = await fs.promises.readFile(path.join(knowledgeDir, f), 'utf-8');
-                return { name: f, content };
-            })
-        );
-        res.json({ files: filesData });
+        const files = await memoryManager.getKnowledgeFiles(config.tenantId);
+        res.json({ files });
     }));
 
     // Save knowledge file
@@ -44,19 +22,14 @@ export default function createKnowledgeRoutes(deps) {
         if (!content && content !== '') {
             return res.status(400).json({ error: 'Content is required' });
         }
-        
-        const knowledgeDir = path.resolve(process.cwd(), 'data', 'knowledge');
-        if (!(await exists(knowledgeDir))) {
-            await fs.promises.mkdir(knowledgeDir, { recursive: true });
-        }
-        
-        await fs.promises.writeFile(path.join(knowledgeDir, filename), content, 'utf-8');
-        
+
+        await memoryManager.writeKnowledgeFile(config.tenantId, filename, content);
+
         // Re-initialize Gemini model
         if (server.geminiManager) {
             await server.geminiManager.reinit();
         }
-        
+
         logger.info('Knowledge file updated via dashboard', { filename });
         res.json({ success: true });
     }));
@@ -64,16 +37,13 @@ export default function createKnowledgeRoutes(deps) {
     // Delete knowledge file
     router.delete('/api/knowledge/:filename', requireAuth, asyncHandler(async (req, res) => {
         const { filename } = req.params;
-        const filePath = path.resolve(process.cwd(), 'data', 'knowledge', filename);
-        if (await exists(filePath)) {
-            await fs.promises.unlink(filePath);
-        }
-        
+        await memoryManager.deleteKnowledgeFile(config.tenantId, filename);
+
         // Re-initialize Gemini model
         if (server.geminiManager) {
             await server.geminiManager.reinit();
         }
-        
+
         logger.info('Knowledge file deleted via dashboard', { filename });
         res.json({ success: true });
     }));
@@ -82,20 +52,8 @@ export default function createKnowledgeRoutes(deps) {
 
     // Get all skill files
     router.get('/api/skills', requireAuth, asyncHandler(async (req, res) => {
-        const skillsDir = path.resolve(process.cwd(), 'data', 'skills');
-        if (!(await exists(skillsDir))) {
-            return res.json({ files: [] });
-        }
-        
-        const files = await fs.promises.readdir(skillsDir);
-        const mdFiles = files.filter(f => f.endsWith('.md'));
-        const filesData = await Promise.all(
-            mdFiles.map(async f => {
-                const content = await fs.promises.readFile(path.join(skillsDir, f), 'utf-8');
-                return { name: f, content };
-            })
-        );
-        res.json({ files: filesData });
+        const files = await memoryManager.getSkillFiles(config.tenantId);
+        res.json({ files });
     }));
 
     // Save skill file
@@ -105,19 +63,14 @@ export default function createKnowledgeRoutes(deps) {
         if (!content && content !== '') {
             return res.status(400).json({ error: 'Content is required' });
         }
-        
-        const skillsDir = path.resolve(process.cwd(), 'data', 'skills');
-        if (!(await exists(skillsDir))) {
-            await fs.promises.mkdir(skillsDir, { recursive: true });
-        }
-        
-        await fs.promises.writeFile(path.join(skillsDir, filename), content, 'utf-8');
-        
+
+        await memoryManager.createSkill(config.tenantId, filename, content);
+
         // Re-initialize Gemini model
         if (server.geminiManager) {
             await server.geminiManager.reinit();
         }
-        
+
         logger.info('Skill file updated via dashboard', { filename });
         res.json({ success: true });
     }));
@@ -125,16 +78,13 @@ export default function createKnowledgeRoutes(deps) {
     // Delete skill file
     router.delete('/api/skills/:filename', requireAuth, asyncHandler(async (req, res) => {
         const { filename } = req.params;
-        const filePath = path.resolve(process.cwd(), 'data', 'skills', filename);
-        if (await exists(filePath)) {
-            await fs.promises.unlink(filePath);
-        }
-        
+        await memoryManager.deleteSkill(config.tenantId, filename);
+
         // Re-initialize Gemini model
         if (server.geminiManager) {
             await server.geminiManager.reinit();
         }
-        
+
         logger.info('Skill file deleted via dashboard', { filename });
         res.json({ success: true });
     }));

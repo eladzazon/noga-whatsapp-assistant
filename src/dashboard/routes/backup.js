@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { asyncHandler } from '../middleware/error.js';
 import config from '../../utils/config.js';
+import memoryManager from '../../skills/MemoryManager.js';
 
 // Helper to check file/dir existence asynchronously
 async function exists(filePath) {
@@ -29,30 +30,21 @@ export default function createBackupRoutes(deps) {
             throw err;
         }
 
-        const knowledgeDir = path.resolve(process.cwd(), 'data', 'knowledge');
-        const skillsDir = path.resolve(process.cwd(), 'data', 'skills');
-
         // Restore MD files
         if (knowledge) {
-            if (!(await exists(knowledgeDir))) {
-                await fs.promises.mkdir(knowledgeDir, { recursive: true });
-            }
             await Promise.all(
                 Object.entries(knowledge).map(async ([file, content]) => {
                     if (file.endsWith('.md')) {
-                        await fs.promises.writeFile(path.join(knowledgeDir, file), content, 'utf8');
+                        await memoryManager.writeKnowledgeFile(config.tenantId, file, content);
                     }
                 })
             );
         }
         if (skills) {
-            if (!(await exists(skillsDir))) {
-                await fs.promises.mkdir(skillsDir, { recursive: true });
-            }
             await Promise.all(
                 Object.entries(skills).map(async ([file, content]) => {
                     if (file.endsWith('.md')) {
-                        await fs.promises.writeFile(path.join(skillsDir, file), content, 'utf8');
+                        await memoryManager.createSkill(config.tenantId, file, content);
                     }
                 })
             );
@@ -159,8 +151,6 @@ export default function createBackupRoutes(deps) {
             await fs.promises.mkdir(backupsDir, { recursive: true });
         }
 
-        const knowledgeDir = path.resolve(process.cwd(), 'data', 'knowledge');
-        const skillsDir = path.resolve(process.cwd(), 'data', 'skills');
         const backup = {
             version: 2,
             generated_at: new Date().toISOString(),
@@ -168,25 +158,11 @@ export default function createBackupRoutes(deps) {
             ha_mappings: [], scheduled_prompts: [], reminders: [], settings: {}
         };
 
-        if (await exists(knowledgeDir)) {
-            const files = await fs.promises.readdir(knowledgeDir);
-            const mdFiles = files.filter(f => f.endsWith('.md'));
-            await Promise.all(
-                mdFiles.map(async f => {
-                    backup.knowledge[f] = await fs.promises.readFile(path.join(knowledgeDir, f), 'utf8');
-                })
-            );
-        }
-        if (await exists(skillsDir)) {
-            const files = await fs.promises.readdir(skillsDir);
-            const mdFiles = files.filter(f => f.endsWith('.md'));
-            await Promise.all(
-                mdFiles.map(async f => {
-                    backup.skills[f] = await fs.promises.readFile(path.join(skillsDir, f), 'utf8');
-                })
-            );
-        }
-        
+        const knowledgeFiles = await memoryManager.getKnowledgeFiles(config.tenantId);
+        for (const f of knowledgeFiles) backup.knowledge[f.name] = f.content;
+        const skillFiles = await memoryManager.getSkillFiles(config.tenantId);
+        for (const f of skillFiles) backup.skills[f.name] = f.content;
+
         if (db) {
             const tenantId = config.tenantId;
             backup.keywords = (await db.getKeywords(tenantId)).map(k => ({ keyword: k.keyword, response: k.response, type: k.type, enabled: k.enabled }));

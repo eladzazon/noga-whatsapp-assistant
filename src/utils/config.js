@@ -25,6 +25,11 @@ const config = {
     // Block 4 replaces this with a per-request tenant resolved from profiles.
     tenantId: process.env.DEFAULT_TENANT_ID || 'family_core',
 
+    // Block 3: 'legacy' = today's hardcoded skills/prompt (default, unchanged behavior).
+    // 'markdown' = tenant-scoped identity.md + generic tool primitives. Canary-test against a
+    // disposable WhatsApp group before flipping this for the real family/core tenant.
+    behaviorEngine: process.env.BEHAVIOR_ENGINE === 'markdown' ? 'markdown' : 'legacy',
+
     // Dashboard
     dashboard: {
         port: parseInt(process.env.DASHBOARD_PORT, 10) || 3000,
@@ -174,6 +179,7 @@ export async function applyDbOverrides(db) {
 
         if (appliedCount > 0) {
             // Re-apply to config object
+            config.behaviorEngine = process.env.BEHAVIOR_ENGINE === 'markdown' ? 'markdown' : 'legacy';
             config.dashboard.port = parseInt(process.env.DASHBOARD_PORT, 10) || 3000;
             config.dashboard.user = process.env.DASHBOARD_USER || 'admin';
             config.dashboard.password = process.env.DASHBOARD_PASSWORD || 'changeme';

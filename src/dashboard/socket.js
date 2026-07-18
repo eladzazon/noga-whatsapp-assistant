@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import config from '../utils/config.js';
 
 export default function setupSocketIO(io, deps) {
     const { logger, server, subscribeToLogs, getRecentLogs } = deps;
@@ -74,9 +75,9 @@ export default function setupSocketIO(io, deps) {
         }, 300));
     };
 
-    const knowledgeDir = path.resolve(process.cwd(), 'data', 'knowledge');
-    const skillsDir = path.resolve(process.cwd(), 'data', 'skills');
-    
+    const knowledgeDir = path.resolve(process.cwd(), 'data', 'knowledge', config.tenantId);
+    const skillsDir = path.resolve(process.cwd(), 'data', 'skills', config.tenantId);
+
     watchDir(knowledgeDir, 'knowledge');
     watchDir(skillsDir, 'skills');
 }
