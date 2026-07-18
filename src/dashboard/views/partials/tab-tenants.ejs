@@ -1,0 +1,62 @@
+<div class="tab-pane" id="tab-tenants">
+    <section class="panel">
+        <h2>👥 קבוצות ודיירים (Tenants)</h2>
+        <p class="panel-hint">קבוצות וואטסאפ חדשות שנוגה נוספה אליהן ממתינות כאן לאישור. עד לאישור, נוגה
+            שותקת לחלוטין בקבוצה.</p>
+
+        <!-- Approval Form (shown when approving/editing a specific tenant) -->
+        <div id="tenant-approve-form" class="keyword-form" style="display: none;">
+            <input type="hidden" id="tenant-approve-id" value="">
+            <div class="form-row">
+                <div class="form-group form-group-grow">
+                    <label for="tenant-display-name">שם תצוגה</label>
+                    <input type="text" id="tenant-display-name" class="form-input" dir="rtl">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group form-group-grow">
+                    <label for="tenant-ha-url">Home Assistant URL</label>
+                    <input type="text" id="tenant-ha-url" class="form-input" placeholder="http://homeassistant.local:8123" dir="ltr">
+                </div>
+                <div class="form-group form-group-grow">
+                    <label for="tenant-ha-token">Home Assistant Token</label>
+                    <input type="password" id="tenant-ha-token" class="form-input" dir="ltr" placeholder="השאר ריק כדי לא לשנות">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group form-group-grow">
+                    <label for="tenant-calendar-id">Google Calendar ID</label>
+                    <input type="text" id="tenant-calendar-id" class="form-input" dir="ltr"
+                        placeholder="xxxx@group.calendar.google.com">
+                </div>
+            </div>
+            <p class="panel-hint">היומן משתמש בחשבון השירות (service account) המשותף המוגדר עבור נוגה — יש
+                לשתף את היומן הספציפי של המשפחה עם כתובת המייל של חשבון השירות.</p>
+            <div class="form-actions">
+                <button id="tenant-approve-save" class="btn btn-primary btn-small">אשר ושמור</button>
+                <button id="tenant-approve-cancel" class="btn btn-secondary btn-small">ביטול</button>
+            </div>
+        </div>
+
+        <div class="data-table-container">
+            <table class="data-table" id="tenants-table">
+                <thead>
+                    <tr>
+                        <th>שם</th>
+                        <th>קבוצת וואטסאפ</th>
+                        <th>סטטוס</th>
+                        <th>HA</th>
+                        <th>יומן</th>
+                        <th>נוצר</th>
+                        <th>פעולות</th>
+                    </tr>
+                </thead>
+                <tbody id="tenants-tbody">
+                    <tr class="empty-row">
+                        <td colspan="7">...טוען</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>

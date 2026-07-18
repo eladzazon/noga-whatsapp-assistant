@@ -24,6 +24,7 @@ import createRemindersRoutes from './routes/reminders.js';
 import createSettingsRoutes from './routes/settings.js';
 import createBackupRoutes from './routes/backup.js';
 import createHaRoutes from './routes/ha.js';
+import createTenantsRoutes from './routes/tenants.js';
 import setupSocketIO from './socket.js';
 import { errorHandler } from './middleware/error.js';
 
@@ -159,6 +160,7 @@ class DashboardServer {
         this.app.use(createSettingsRoutes(deps));
         this.app.use(createBackupRoutes(deps));
         this.app.use(createHaRoutes(deps));
+        this.app.use(createTenantsRoutes(deps));
 
         // Centralized error handling middleware
         this.app.use(errorHandler);

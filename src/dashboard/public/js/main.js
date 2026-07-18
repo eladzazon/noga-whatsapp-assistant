@@ -10,6 +10,7 @@ import { loadHaMappings, setupHa } from './tabs/ha.js';
 import { loadSettings, setupSettings } from './tabs/settings.js';
 import { loadBackups, loadBackupSettings, setupBackup } from './tabs/backup.js';
 import { init as setupLogs } from './tabs/logs.js';
+import { loadTenants, setupTenants, initTenantSelector } from './tabs/tenants.js';
 
 (async function () {
     // 1. Initialize Socket.IO
@@ -97,6 +98,7 @@ import { init as setupLogs } from './tabs/logs.js';
     tabLoaders['tab-settings'] = () => loadSettings();
     tabLoaders['tab-homeassistant'] = () => loadHaMappings();
     tabLoaders['tab-backup'] = () => { loadBackups(); loadBackupSettings(); };
+    tabLoaders['tab-tenants'] = () => loadTenants();
 
     // Reload hooks for specific tabs when clicked again
     document.querySelector('[data-tab="tab-reminders"]')?.addEventListener('click', () => {
@@ -118,6 +120,8 @@ import { init as setupLogs } from './tabs/logs.js';
     setupSettings();
     setupBackup();
     setupLogs();
+    setupTenants();
+    initTenantSelector();
 
     // 5. Initial fetches
     await fetchExchangeRate();
