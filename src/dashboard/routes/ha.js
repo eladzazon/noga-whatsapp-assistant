@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { asyncHandler } from '../middleware/error.js';
 import config from '../../utils/config.js';
+import tenantContext from '../../utils/tenantContext.js';
 
 export default function createHaRoutes(deps) {
     const router = Router();
@@ -13,7 +14,7 @@ export default function createHaRoutes(deps) {
             err.statusCode = 500;
             throw err;
         }
-        const mappings = await db.getHaMappings(config.tenantId);
+        const mappings = await db.getHaMappings(tenantContext.getTenantId());
         res.json({ mappings });
     }));
 
@@ -31,7 +32,7 @@ export default function createHaRoutes(deps) {
             throw err;
         }
         try {
-            const id = await db.addHaMapping(config.tenantId, entityId, nickname, location, type);
+            const id = await db.addHaMapping(tenantContext.getTenantId(), entityId, nickname, location, type);
             logger.info('HA mapping added via dashboard', { entityId, nickname });
             res.json({ success: true, id });
         } catch (err) {
@@ -56,7 +57,7 @@ export default function createHaRoutes(deps) {
             err.statusCode = 500;
             throw err;
         }
-        await db.updateHaMapping(config.tenantId, parseInt(id), entityId, nickname, location, type);
+        await db.updateHaMapping(tenantContext.getTenantId(), parseInt(id), entityId, nickname, location, type);
         logger.info('HA mapping updated via dashboard', { id, entityId });
         res.json({ success: true });
     }));
@@ -69,7 +70,7 @@ export default function createHaRoutes(deps) {
             err.statusCode = 500;
             throw err;
         }
-        await db.deleteHaMapping(config.tenantId, parseInt(id));
+        await db.deleteHaMapping(tenantContext.getTenantId(), parseInt(id));
         logger.info('HA mapping deleted via dashboard', { id });
         res.json({ success: true });
     }));

@@ -1,5 +1,6 @@
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/generative-ai';
 import config from '../utils/config.js';
+import tenantContext from '../utils/tenantContext.js';
 import logger from '../utils/logger.js';
 import db from '../database/DatabaseManager.js';
 import promptBuilder from './PromptBuilder.js';
@@ -114,7 +115,7 @@ class GeminiManager {
         // Inject pending reminders so the AI knows what the user might be referring to
         let pendingRemindersInfo = '';
         if (db) {
-            const reminders = await db.getPendingReminders(config.tenantId);
+            const reminders = await db.getPendingReminders(tenantContext.getTenantId());
             if (reminders && reminders.length > 0) {
                 // Sort by last_nudged descending so the most recently nudged is first
                 const sorted = [...reminders].sort((a, b) => {
@@ -203,7 +204,7 @@ class GeminiManager {
         }
 
         // Store user message once
-        await db.addChatMessage(config.tenantId, userId, 'user', text);
+        await db.addChatMessage(tenantContext.getTenantId(), userId, 'user', text);
 
         const maxAttempts = 2;
         let lastError = null;
@@ -319,7 +320,7 @@ class GeminiManager {
                 responseText = responseText.replace(/\s*\[Internal Context:[^\]]*\]/gi, '').trim();
 
                 // Store assistant response
-                await db.addChatMessage(config.tenantId, userId, 'model', responseText);
+                await db.addChatMessage(tenantContext.getTenantId(), userId, 'model', responseText);
 
                 // Log usage and cost
                 if (response.usageMetadata) {
@@ -335,7 +336,7 @@ class GeminiManager {
                     const totalCost = inputCost + outputCost;
 
                     try {
-                        await db.logUsage(config.tenantId, config.gemini.model, inputTokens, outputTokens, totalTokens, totalCost);
+                        await db.logUsage(tenantContext.getTenantId(), config.gemini.model, inputTokens, outputTokens, totalTokens, totalCost);
                         logger.info('Usage logged', { inputTokens, outputTokens, totalCost: totalCost.toFixed(6) });
                     } catch (err) {
                         logger.error('Failed to log usage', { error: err.message });
@@ -402,7 +403,7 @@ class GeminiManager {
 
         // Store reference to voice message once
         const logMsg = senderId ? `[Voice Message from Sender: ${senderId}]` : '[Voice Message]';
-        await db.addChatMessage(config.tenantId, userId, 'user', logMsg);
+        await db.addChatMessage(tenantContext.getTenantId(), userId, 'user', logMsg);
 
         const maxAttempts = 2;
         let lastError = null;
@@ -484,7 +485,7 @@ class GeminiManager {
                 }
 
                 // Store assistant response
-                await db.addChatMessage(config.tenantId, userId, 'model', responseText);
+                await db.addChatMessage(tenantContext.getTenantId(), userId, 'model', responseText);
 
                 logger.info('Voice message processed', { userId, responseLength: responseText.length, attempt });
 
@@ -553,7 +554,7 @@ class GeminiManager {
      * Build conversation history from database
      */
     async _buildHistory(userId) {
-        const messages = await db.getChatHistory(config.tenantId, userId, config.gemini.contextWindowMessages);
+        const messages = await db.getChatHistory(tenantContext.getTenantId(), userId, config.gemini.contextWindowMessages);
 
         // Convert to Gemini format
         let history = messages.map(msg => ({
@@ -587,7 +588,7 @@ class GeminiManager {
      */
     async clearHistory(userId) {
         logger.info('Clearing chat history', { userId });
-        const deleted = await db.clearChatHistory(config.tenantId, userId);
+        const deleted = await db.clearChatHistory(tenantContext.getTenantId(), userId);
         logger.info('Chat history cleared', { userId, deleted });
     }
 

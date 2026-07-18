@@ -1,6 +1,7 @@
 import logger from '../utils/logger.js';
 import db from '../database/DatabaseManager.js';
 import config from '../utils/config.js';
+import tenantContext from '../utils/tenantContext.js';
 
 class ToolCallHandler {
     /**
@@ -45,7 +46,7 @@ class ToolCallHandler {
                 const { name, args } = functionCall;
 
                 // Log the function call
-                await db.logAction(config.tenantId, userId, 'function_call', { name, args });
+                await db.logAction(tenantContext.getTenantId(), userId, 'function_call', { name, args });
 
                 let result;
                 try {

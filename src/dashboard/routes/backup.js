@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { asyncHandler } from '../middleware/error.js';
 import config from '../../utils/config.js';
+import tenantContext from '../../utils/tenantContext.js';
 import memoryManager from '../../skills/MemoryManager.js';
 
 // Helper to check file/dir existence asynchronously
@@ -35,7 +36,7 @@ export default function createBackupRoutes(deps) {
             await Promise.all(
                 Object.entries(knowledge).map(async ([file, content]) => {
                     if (file.endsWith('.md')) {
-                        await memoryManager.writeKnowledgeFile(config.tenantId, file, content);
+                        await memoryManager.writeKnowledgeFile(tenantContext.getTenantId(), file, content);
                     }
                 })
             );
@@ -44,7 +45,7 @@ export default function createBackupRoutes(deps) {
             await Promise.all(
                 Object.entries(skills).map(async ([file, content]) => {
                     if (file.endsWith('.md')) {
-                        await memoryManager.createSkill(config.tenantId, file, content);
+                        await memoryManager.createSkill(tenantContext.getTenantId(), file, content);
                     }
                 })
             );
@@ -52,7 +53,7 @@ export default function createBackupRoutes(deps) {
 
         // Restore DB-backed data
         if (db) {
-            const tenantId = config.tenantId;
+            const tenantId = tenantContext.getTenantId();
 
             if (keywords && Array.isArray(keywords)) {
                 // Clear existing keywords and re-insert
@@ -158,13 +159,13 @@ export default function createBackupRoutes(deps) {
             ha_mappings: [], scheduled_prompts: [], reminders: [], settings: {}
         };
 
-        const knowledgeFiles = await memoryManager.getKnowledgeFiles(config.tenantId);
+        const knowledgeFiles = await memoryManager.getKnowledgeFiles(tenantContext.getTenantId());
         for (const f of knowledgeFiles) backup.knowledge[f.name] = f.content;
-        const skillFiles = await memoryManager.getSkillFiles(config.tenantId);
+        const skillFiles = await memoryManager.getSkillFiles(tenantContext.getTenantId());
         for (const f of skillFiles) backup.skills[f.name] = f.content;
 
         if (db) {
-            const tenantId = config.tenantId;
+            const tenantId = tenantContext.getTenantId();
             backup.keywords = (await db.getKeywords(tenantId)).map(k => ({ keyword: k.keyword, response: k.response, type: k.type, enabled: k.enabled }));
             backup.ha_mappings = (await db.getHaMappings(tenantId)).map(m => ({ entity_id: m.entity_id, nickname: m.nickname, location: m.location, type: m.type }));
             backup.scheduled_prompts = (await db.getScheduledPrompts(tenantId)).map(p => ({ name: p.name, prompt: p.prompt, cron_expression: p.cron_expression, enabled: p.enabled }));
@@ -185,7 +186,7 @@ export default function createBackupRoutes(deps) {
         }
         
         if (db) {
-            const dbOverrides2 = await db.getAllConfig(config.tenantId);
+            const dbOverrides2 = await db.getAllConfig(tenantContext.getTenantId());
             for (const [key, value] of Object.entries(dbOverrides2)) {
                 if (key.startsWith('env_')) backup.settings[key.substring(4)] = value;
             }
@@ -199,7 +200,7 @@ export default function createBackupRoutes(deps) {
 
         // Enforce retention limit (0 means disabled)
         if (db) {
-            const retentionVal = await db.getConfig(config.tenantId, 'backup_retention', 7);
+            const retentionVal = await db.getConfig(tenantContext.getTenantId(), 'backup_retention', 7);
             const retention = retentionVal !== null && retentionVal !== undefined ? parseInt(retentionVal) : 7;
             if (retention > 0) {
                 const allFiles = await fs.promises.readdir(backupsDir);
@@ -258,7 +259,7 @@ export default function createBackupRoutes(deps) {
 
     // GET /api/backup-settings — get retention setting
     router.get('/api/backup-settings', requireAuth, asyncHandler(async (req, res) => {
-        const retentionVal = db ? await db.getConfig(config.tenantId, 'backup_retention', 7) : 7;
+        const retentionVal = db ? await db.getConfig(tenantContext.getTenantId(), 'backup_retention', 7) : 7;
         const retention = retentionVal !== null && retentionVal !== undefined ? parseInt(retentionVal) : 7;
         res.json({ retention });
     }));
@@ -272,7 +273,7 @@ export default function createBackupRoutes(deps) {
             throw err;
         }
         if (db) {
-            await db.setConfig(config.tenantId, 'backup_retention', retention);
+            await db.setConfig(tenantContext.getTenantId(), 'backup_retention', retention);
         }
         logger.info('Backup retention updated', { retention });
         res.json({ success: true, retention });

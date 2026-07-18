@@ -4,6 +4,7 @@ import memoryManager from './MemoryManager.js';
 import db from '../database/DatabaseManager.js';
 import logger from '../utils/logger.js';
 import config from '../utils/config.js';
+import tenantContext from '../utils/tenantContext.js';
 import whatsappManager from '../bot/WhatsAppManager.js';
 import { fetchUrl, fetchRss, searchWeb } from '../utils/WebFetcher.js';
 
@@ -95,7 +96,7 @@ const COMMON_HANDLERS = {
             await whatsappManager.sendMessage(target.jid, args.message);
 
             // Log outbound message to chat history so Noga remembers what she sent
-            await db.addChatMessage(config.tenantId, target.jid, 'model', args.message);
+            await db.addChatMessage(tenantContext.getTenantId(), target.jid, 'model', args.message);
 
             return { success: true, status: `Message sent successfully to ${args.recipient}` };
         } catch (err) {
@@ -113,7 +114,7 @@ const COMMON_HANDLERS = {
         logger.info('Executing: find_device', args);
 
         // 1. Check custom mappings
-        const mappings = await db.findHaMappingsByName(config.tenantId, args.name, args.device_type);
+        const mappings = await db.findHaMappingsByName(tenantContext.getTenantId(), args.name, args.device_type);
 
         // 2. Check native HA entities
         const nativeResult = await homeAssistantManager.findEntityByName(args.name, args.device_type);
@@ -297,25 +298,25 @@ const LEGACY_HANDLERS = {
 
     add_reminder: async (args) => {
         logger.info('Executing: add_reminder', args);
-        const id = await db.addReminder(config.tenantId, args.title, args.due_date_iso, args.nudge_interval_minutes || 60);
+        const id = await db.addReminder(tenantContext.getTenantId(), args.title, args.due_date_iso, args.nudge_interval_minutes || 60);
         return { success: true, reminder_id: id, message: `Reminder added successfully.` };
     },
 
     get_pending_reminders: async () => {
         logger.info('Executing: get_pending_reminders');
-        const reminders = await db.getPendingReminders(config.tenantId);
+        const reminders = await db.getPendingReminders(tenantContext.getTenantId());
         return { success: true, count: reminders.length, reminders };
     },
 
     update_reminder_status: async (args) => {
         logger.info('Executing: update_reminder_status', args);
-        const success = await db.updateReminderStatus(config.tenantId, args.id, args.status);
+        const success = await db.updateReminderStatus(tenantContext.getTenantId(), args.id, args.status);
         return { success, message: success ? `Reminder marked as ${args.status}` : 'Reminder not found' };
     },
 
     snooze_reminder: async (args) => {
         logger.info('Executing: snooze_reminder', args);
-        const success = await db.updateReminderDueDate(config.tenantId, args.id, args.new_due_date_iso);
+        const success = await db.updateReminderDueDate(tenantContext.getTenantId(), args.id, args.new_due_date_iso);
         if (success) {
             return { success: true, message: `Reminder ${args.id} successfully rescheduled to ${args.new_due_date_iso}. Nudge timer has been reset.` };
         }
@@ -324,12 +325,12 @@ const LEGACY_HANDLERS = {
 
     read_knowledge_file: async (args) => {
         logger.info('Executing: read_knowledge_file', args);
-        return await memoryManager.readKnowledgeFile(config.tenantId, args.filename);
+        return await memoryManager.readKnowledgeFile(tenantContext.getTenantId(), args.filename);
     },
 
     update_memory: async (args) => {
         logger.info('Executing: update_memory', args);
-        const result = await memoryManager.writeKnowledgeFile(config.tenantId, args.filename, args.content);
+        const result = await memoryManager.writeKnowledgeFile(tenantContext.getTenantId(), args.filename, args.content);
         if (result.success && globalGeminiManager) {
             await globalGeminiManager.reinit();
         }
@@ -338,7 +339,7 @@ const LEGACY_HANDLERS = {
 
     create_skill: async (args) => {
         logger.info('Executing: create_skill', args);
-        const result = await memoryManager.createSkill(config.tenantId, args.skill_name, args.instructions);
+        const result = await memoryManager.createSkill(tenantContext.getTenantId(), args.skill_name, args.instructions);
         if (result.success && globalGeminiManager) {
             await globalGeminiManager.reinit();
         }
@@ -347,13 +348,13 @@ const LEGACY_HANDLERS = {
 
     list_memory: async () => {
         logger.info('Executing: list_memory');
-        const files = await memoryManager.getKnowledgeFiles(config.tenantId);
+        const files = await memoryManager.getKnowledgeFiles(tenantContext.getTenantId());
         return { success: true, files: files.map(f => f.name) };
     },
 
     delete_memory: async (args) => {
         logger.info('Executing: delete_memory', args);
-        const result = await memoryManager.deleteKnowledgeFile(config.tenantId, args.filename);
+        const result = await memoryManager.deleteKnowledgeFile(tenantContext.getTenantId(), args.filename);
         if (result.success && globalGeminiManager) {
             await globalGeminiManager.reinit();
         }
@@ -582,25 +583,25 @@ const MARKDOWN_HANDLERS = {
 
     add_reminder: async (args) => {
         logger.info('Executing: add_reminder', args);
-        const id = await db.addReminder(config.tenantId, args.title, args.due_date_iso, args.nudge_interval_minutes || 60);
+        const id = await db.addReminder(tenantContext.getTenantId(), args.title, args.due_date_iso, args.nudge_interval_minutes || 60);
         return { success: true, reminder_id: id, message: `Reminder added successfully.` };
     },
 
     get_pending_reminders: async () => {
         logger.info('Executing: get_pending_reminders');
-        const reminders = await db.getPendingReminders(config.tenantId);
+        const reminders = await db.getPendingReminders(tenantContext.getTenantId());
         return { success: true, count: reminders.length, reminders };
     },
 
     update_reminder_status: async (args) => {
         logger.info('Executing: update_reminder_status', args);
-        const success = await db.updateReminderStatus(config.tenantId, args.id, args.status);
+        const success = await db.updateReminderStatus(tenantContext.getTenantId(), args.id, args.status);
         return { success, message: success ? `Reminder marked as ${args.status}` : 'Reminder not found' };
     },
 
     snooze_reminder: async (args) => {
         logger.info('Executing: snooze_reminder', args);
-        const success = await db.updateReminderDueDate(config.tenantId, args.id, args.new_due_date_iso);
+        const success = await db.updateReminderDueDate(tenantContext.getTenantId(), args.id, args.new_due_date_iso);
         if (success) {
             return { success: true, message: `Reminder ${args.id} successfully rescheduled to ${args.new_due_date_iso}. Nudge timer has been reset.` };
         }
@@ -609,42 +610,42 @@ const MARKDOWN_HANDLERS = {
 
     get_reminder_by_msg_id: async (args) => {
         logger.info('Executing: get_reminder_by_msg_id', args);
-        const reminder = await db.getReminderByNudgeMessageId(config.tenantId, args.message_id);
+        const reminder = await db.getReminderByNudgeMessageId(tenantContext.getTenantId(), args.message_id);
         return reminder ? { success: true, reminder } : { success: false, message: 'No pending reminder found for that message ID.' };
     },
 
     log_reminder: async (args) => {
         logger.info('Executing: log_reminder', args);
-        await db.logAction(config.tenantId, null, 'reminder_note', { reminderId: args.id, note: args.note });
+        await db.logAction(tenantContext.getTenantId(), null, 'reminder_note', { reminderId: args.id, note: args.note });
         return { success: true, message: 'Note recorded.' };
     },
 
     create_job: async (args) => {
         logger.info('Executing: create_job', args);
-        const id = await db.addScheduledPrompt(config.tenantId, args.name, args.prompt, args.cron_expression, args.enabled !== false);
+        const id = await db.addScheduledPrompt(tenantContext.getTenantId(), args.name, args.prompt, args.cron_expression, args.enabled !== false);
         return { success: true, job_id: id, message: 'Job created successfully.' };
     },
 
     list_jobs: async () => {
         logger.info('Executing: list_jobs');
-        const jobs = await db.getScheduledPrompts(config.tenantId);
+        const jobs = await db.getScheduledPrompts(tenantContext.getTenantId());
         return { success: true, count: jobs.length, jobs };
     },
 
     cancel_job: async (args) => {
         logger.info('Executing: cancel_job', args);
-        await db.deleteScheduledPrompt(config.tenantId, args.id);
+        await db.deleteScheduledPrompt(tenantContext.getTenantId(), args.id);
         return { success: true, message: `Job ${args.id} cancelled.` };
     },
 
     read_file: async (args) => {
         logger.info('Executing: read_file', args);
-        return await memoryManager.readFile(config.tenantId, args.kind, args.filename);
+        return await memoryManager.readFile(tenantContext.getTenantId(), args.kind, args.filename);
     },
 
     write_file: async (args) => {
         logger.info('Executing: write_file', args);
-        const result = await memoryManager.writeFile(config.tenantId, args.kind, args.filename, args.content);
+        const result = await memoryManager.writeFile(tenantContext.getTenantId(), args.kind, args.filename, args.content);
         if (result.success && globalGeminiManager) {
             await globalGeminiManager.reinit();
         }
@@ -653,7 +654,7 @@ const MARKDOWN_HANDLERS = {
 
     search_files: async (args) => {
         logger.info('Executing: search_files', args);
-        return await memoryManager.searchFiles(config.tenantId, args.query);
+        return await memoryManager.searchFiles(tenantContext.getTenantId(), args.query);
     },
 
     http_get_json: async (args) => {
@@ -693,7 +694,7 @@ export async function initializeSkills() {
 
     await calendarManager.init();
     await homeAssistantManager.init();
-    await memoryManager.init(config.tenantId);
+    await memoryManager.init(tenantContext.getTenantId());
 
     const modeDeclarations = config.behaviorEngine === 'markdown' ? MARKDOWN_DECLARATIONS : LEGACY_DECLARATIONS;
     const modeHandlers = config.behaviorEngine === 'markdown' ? MARKDOWN_HANDLERS : LEGACY_HANDLERS;
@@ -763,7 +764,7 @@ export async function getSkillsStatus() {
     return {
         calendar: calendarManager.getStatus(),
         homeAssistant: homeAssistantManager.getStatus(),
-        memory: await memoryManager.getStatus(config.tenantId)
+        memory: await memoryManager.getStatus(tenantContext.getTenantId())
     };
 }
 

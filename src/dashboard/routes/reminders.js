@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { asyncHandler } from '../middleware/error.js';
 import config from '../../utils/config.js';
+import tenantContext from '../../utils/tenantContext.js';
 
 export default function createRemindersRoutes(deps) {
     const router = Router();
@@ -13,7 +14,7 @@ export default function createRemindersRoutes(deps) {
             err.statusCode = 500;
             throw err;
         }
-        const reminders = await db.getAllReminders(config.tenantId);
+        const reminders = await db.getAllReminders(tenantContext.getTenantId());
         res.json({ success: true, reminders });
     }));
 
@@ -30,7 +31,7 @@ export default function createRemindersRoutes(deps) {
             err.statusCode = 500;
             throw err;
         }
-        const id = await db.addReminder(config.tenantId, title, dueDate, nudgeIntervalMinutes || 60);
+        const id = await db.addReminder(tenantContext.getTenantId(), title, dueDate, nudgeIntervalMinutes || 60);
         res.json({ success: true, id });
     }));
 
@@ -48,7 +49,7 @@ export default function createRemindersRoutes(deps) {
             err.statusCode = 500;
             throw err;
         }
-        await db.updateReminder(config.tenantId, parseInt(id), title, dueDate, nudgeIntervalMinutes || 60);
+        await db.updateReminder(tenantContext.getTenantId(), parseInt(id), title, dueDate, nudgeIntervalMinutes || 60);
         res.json({ success: true });
     }));
 
@@ -66,7 +67,7 @@ export default function createRemindersRoutes(deps) {
             err.statusCode = 500;
             throw err;
         }
-        await db.updateReminderStatus(config.tenantId, parseInt(id), status);
+        await db.updateReminderStatus(tenantContext.getTenantId(), parseInt(id), status);
         res.json({ success: true });
     }));
 
@@ -78,7 +79,7 @@ export default function createRemindersRoutes(deps) {
             err.statusCode = 500;
             throw err;
         }
-        await db.deleteReminder(config.tenantId, parseInt(id));
+        await db.deleteReminder(tenantContext.getTenantId(), parseInt(id));
         res.json({ success: true });
     }));
 

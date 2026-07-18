@@ -2,6 +2,7 @@ import { Router } from 'express';
 import fs from 'fs';
 import path from 'path';
 import { asyncHandler } from '../middleware/error.js';
+import tenantContext from '../../utils/tenantContext.js';
 
 export default function createWhatsappRoutes(deps) {
     const router = Router();
@@ -37,7 +38,7 @@ export default function createWhatsappRoutes(deps) {
             whatsapp: server.getWhatsAppStatus ? server.getWhatsAppStatus() : { isReady: false },
             gemini: server.getGeminiStatus ? server.getGeminiStatus() : { isInitialized: false },
             skills: server.getSkillsStatus ? await server.getSkillsStatus() : {},
-            usage: db ? await db.getUsageStats(config.tenantId) : { today: {}, month: {} }
+            usage: db ? await db.getUsageStats(tenantContext.getTenantId()) : { today: {}, month: {} }
         });
     }));
 
@@ -116,7 +117,7 @@ export default function createWhatsappRoutes(deps) {
                             
                             // Log to history
                             if (db) {
-                                await db.addChatMessage(config.tenantId, config.whatsapp.groupId, 'model', `[Image Notification] ${message}`);
+                                await db.addChatMessage(tenantContext.getTenantId(), config.whatsapp.groupId, 'model', `[Image Notification] ${message}`);
                             }
 
                             // Clean up
@@ -133,7 +134,7 @@ export default function createWhatsappRoutes(deps) {
                         await whatsappManager.sendMessage(config.whatsapp.groupId, message);
                         // Log to history
                         if (db) {
-                            await db.addChatMessage(config.tenantId, config.whatsapp.groupId, 'model', message);
+                            await db.addChatMessage(tenantContext.getTenantId(), config.whatsapp.groupId, 'model', message);
                         }
                     }
                     
@@ -199,7 +200,7 @@ export default function createWhatsappRoutes(deps) {
 
         // 4. Create reminder
         const interval = parseInt(nudge_interval_minutes) || 60;
-        const id = await db.addReminder(config.tenantId, title, resolvedDueDate, interval);
+        const id = await db.addReminder(tenantContext.getTenantId(), title, resolvedDueDate, interval);
 
         logger.info('Webhook reminder created', { id, title, due_date: resolvedDueDate, interval });
 

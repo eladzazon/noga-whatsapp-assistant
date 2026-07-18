@@ -1,4 +1,5 @@
 import config from '../utils/config.js';
+import tenantContext from '../utils/tenantContext.js';
 import logger from '../utils/logger.js';
 import memoryManager from '../skills/MemoryManager.js';
 
@@ -14,7 +15,7 @@ class PromptBuilder {
      * @returns {Promise<string>} The assembled system prompt
      */
     async build() {
-        const tenantId = config.tenantId;
+        const tenantId = tenantContext.getTenantId();
 
         let knowledgeFiles = [];
         let skillFiles = [];

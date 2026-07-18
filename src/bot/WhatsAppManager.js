@@ -5,6 +5,7 @@ import pino from 'pino';
 import fs from 'fs';
 import path from 'path';
 import config from '../utils/config.js';
+import tenantContext from '../utils/tenantContext.js';
 import logger from '../utils/logger.js';
 import db from '../database/DatabaseManager.js';
 
@@ -142,7 +143,7 @@ class WhatsAppManager {
                     this.sendMessage(adminJid, bootMsg);
                     // Log boot notification to chat history
                     if (db) {
-                        db.addChatMessage(config.tenantId, adminJid, 'model', bootMsg).catch(err => {
+                        db.addChatMessage(tenantContext.getTenantId(), adminJid, 'model', bootMsg).catch(err => {
                             logger.error('Failed to log boot notification', { error: err.message });
                         });
                     }

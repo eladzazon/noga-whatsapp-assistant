@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { asyncHandler } from '../middleware/error.js';
 import config from '../../utils/config.js';
+import tenantContext from '../../utils/tenantContext.js';
 
 export default function createKeywordsRoutes(deps) {
     const router = Router();
@@ -15,7 +16,7 @@ export default function createKeywordsRoutes(deps) {
             err.statusCode = 500;
             throw err;
         }
-        const keywords = await db.getKeywords(config.tenantId);
+        const keywords = await db.getKeywords(tenantContext.getTenantId());
         res.json({ keywords });
     }));
 
@@ -33,7 +34,7 @@ export default function createKeywordsRoutes(deps) {
             throw err;
         }
         try {
-            const id = await db.addKeyword(config.tenantId, keyword, response, type || 'static');
+            const id = await db.addKeyword(tenantContext.getTenantId(), keyword, response, type || 'static');
             logger.info('Keyword added via dashboard', { keyword, type: type || 'static' });
             res.json({ success: true, id });
         } catch (err) {
@@ -59,7 +60,7 @@ export default function createKeywordsRoutes(deps) {
             throw err;
         }
         try {
-            await db.updateKeyword(config.tenantId, parseInt(id), keyword, response, enabled !== false, type || 'static');
+            await db.updateKeyword(tenantContext.getTenantId(), parseInt(id), keyword, response, enabled !== false, type || 'static');
             logger.info('Keyword updated via dashboard', { id, keyword, type: type || 'static' });
             res.json({ success: true });
         } catch (err) {
@@ -78,7 +79,7 @@ export default function createKeywordsRoutes(deps) {
             err.statusCode = 500;
             throw err;
         }
-        await db.deleteKeyword(config.tenantId, parseInt(id));
+        await db.deleteKeyword(tenantContext.getTenantId(), parseInt(id));
         logger.info('Keyword deleted via dashboard', { id });
         res.json({ success: true });
     }));
@@ -92,7 +93,7 @@ export default function createKeywordsRoutes(deps) {
             err.statusCode = 500;
             throw err;
         }
-        const prompts = await db.getScheduledPrompts(config.tenantId);
+        const prompts = await db.getScheduledPrompts(tenantContext.getTenantId());
         res.json({ prompts });
     }));
 
@@ -110,7 +111,7 @@ export default function createKeywordsRoutes(deps) {
             throw err;
         }
 
-        const id = await db.addScheduledPrompt(config.tenantId, name, prompt, cronExpression, enabled);
+        const id = await db.addScheduledPrompt(tenantContext.getTenantId(), name, prompt, cronExpression, enabled);
         logger.info('Scheduled prompt added via dashboard', { name });
 
         // Reload scheduling engine
@@ -135,7 +136,7 @@ export default function createKeywordsRoutes(deps) {
             throw err;
         }
 
-        await db.updateScheduledPrompt(config.tenantId, parseInt(id), name, prompt, cronExpression, enabled);
+        await db.updateScheduledPrompt(tenantContext.getTenantId(), parseInt(id), name, prompt, cronExpression, enabled);
         logger.info('Scheduled prompt updated via dashboard', { id, name });
 
         // Reload scheduling engine
@@ -154,7 +155,7 @@ export default function createKeywordsRoutes(deps) {
             throw err;
         }
 
-        await db.deleteScheduledPrompt(config.tenantId, parseInt(id));
+        await db.deleteScheduledPrompt(tenantContext.getTenantId(), parseInt(id));
         logger.info('Scheduled prompt deleted via dashboard', { id });
 
         // Reload scheduling engine

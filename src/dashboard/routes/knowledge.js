@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { asyncHandler } from '../middleware/error.js';
 import config from '../../utils/config.js';
+import tenantContext from '../../utils/tenantContext.js';
 import memoryManager from '../../skills/MemoryManager.js';
 
 export default function createKnowledgeRoutes(deps) {
@@ -11,7 +12,7 @@ export default function createKnowledgeRoutes(deps) {
 
     // Get all knowledge files
     router.get('/api/knowledge', requireAuth, asyncHandler(async (req, res) => {
-        const files = await memoryManager.getKnowledgeFiles(config.tenantId);
+        const files = await memoryManager.getKnowledgeFiles(tenantContext.getTenantId());
         res.json({ files });
     }));
 
@@ -23,7 +24,7 @@ export default function createKnowledgeRoutes(deps) {
             return res.status(400).json({ error: 'Content is required' });
         }
 
-        await memoryManager.writeKnowledgeFile(config.tenantId, filename, content);
+        await memoryManager.writeKnowledgeFile(tenantContext.getTenantId(), filename, content);
 
         // Re-initialize Gemini model
         if (server.geminiManager) {
@@ -37,7 +38,7 @@ export default function createKnowledgeRoutes(deps) {
     // Delete knowledge file
     router.delete('/api/knowledge/:filename', requireAuth, asyncHandler(async (req, res) => {
         const { filename } = req.params;
-        await memoryManager.deleteKnowledgeFile(config.tenantId, filename);
+        await memoryManager.deleteKnowledgeFile(tenantContext.getTenantId(), filename);
 
         // Re-initialize Gemini model
         if (server.geminiManager) {
@@ -52,7 +53,7 @@ export default function createKnowledgeRoutes(deps) {
 
     // Get all skill files
     router.get('/api/skills', requireAuth, asyncHandler(async (req, res) => {
-        const files = await memoryManager.getSkillFiles(config.tenantId);
+        const files = await memoryManager.getSkillFiles(tenantContext.getTenantId());
         res.json({ files });
     }));
 
@@ -64,7 +65,7 @@ export default function createKnowledgeRoutes(deps) {
             return res.status(400).json({ error: 'Content is required' });
         }
 
-        await memoryManager.createSkill(config.tenantId, filename, content);
+        await memoryManager.createSkill(tenantContext.getTenantId(), filename, content);
 
         // Re-initialize Gemini model
         if (server.geminiManager) {
@@ -78,7 +79,7 @@ export default function createKnowledgeRoutes(deps) {
     // Delete skill file
     router.delete('/api/skills/:filename', requireAuth, asyncHandler(async (req, res) => {
         const { filename } = req.params;
-        await memoryManager.deleteSkill(config.tenantId, filename);
+        await memoryManager.deleteSkill(tenantContext.getTenantId(), filename);
 
         // Re-initialize Gemini model
         if (server.geminiManager) {

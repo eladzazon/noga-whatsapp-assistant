@@ -2,6 +2,7 @@ import { Router } from 'express';
 import fs from 'fs';
 import path from 'path';
 import { asyncHandler } from '../middleware/error.js';
+import tenantContext from '../../utils/tenantContext.js';
 
 // Helper to check file/dir existence asynchronously
 async function exists(filePath) {
@@ -40,7 +41,7 @@ export default function createSettingsRoutes(deps) {
 
         // 2. Override with DB-stored settings (these take priority)
         if (db) {
-            const dbOverrides = await db.getAllConfig(config.tenantId);
+            const dbOverrides = await db.getAllConfig(tenantContext.getTenantId());
             const ENV_PREFIX = 'env_';
             for (const [key, value] of Object.entries(dbOverrides)) {
                 if (key.startsWith(ENV_PREFIX)) {
@@ -67,7 +68,7 @@ export default function createSettingsRoutes(deps) {
         const ENV_PREFIX = 'env_';
         for (const [key, value] of Object.entries(settings)) {
             // Save to DB with env_ prefix to distinguish from other config
-            await db.setConfig(config.tenantId, `${ENV_PREFIX}${key}`, value);
+            await db.setConfig(tenantContext.getTenantId(), `${ENV_PREFIX}${key}`, value);
 
             // Apply to process.env immediately
             process.env[key] = value;

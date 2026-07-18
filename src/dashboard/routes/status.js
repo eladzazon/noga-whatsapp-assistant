@@ -5,6 +5,7 @@ import { asyncHandler } from '../middleware/error.js';
 import { readLastLines } from '../../utils/logger.js';
 import { getVersionInfo } from '../../utils/version.js';
 import config from '../../utils/config.js';
+import tenantContext from '../../utils/tenantContext.js';
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -44,11 +45,11 @@ export default function createStatusRoutes(deps) {
             whatsapp: server.getWhatsAppStatus ? server.getWhatsAppStatus() : { isReady: false },
             gemini: server.getGeminiStatus ? server.getGeminiStatus() : { isInitialized: false },
             skills: server.getSkillsStatus ? await server.getSkillsStatus() : {},
-            usage: db ? await db.getUsageStats(config.tenantId) : { today: {}, month: {} },
+            usage: db ? await db.getUsageStats(tenantContext.getTenantId()) : { today: {}, month: {} },
             version: getVersionInfo(),
             schemaVersion: instance ? instance.schema_version : null,
-            latestVersion: db ? await db.getConfig(config.tenantId, 'last_known_latest_version', null) : null,
-            lastUpdateCheck: db ? await db.getConfig(config.tenantId, 'last_update_check', null) : null,
+            latestVersion: db ? await db.getConfig(tenantContext.getTenantId(), 'last_known_latest_version', null) : null,
+            lastUpdateCheck: db ? await db.getConfig(tenantContext.getTenantId(), 'last_update_check', null) : null,
             recentErrorCount: countRecentErrors(deps.getRecentLogs(200))
         });
     }));
