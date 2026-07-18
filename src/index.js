@@ -4,6 +4,7 @@ dotenv.config();
 import config, { validateConfig, applyDbOverrides } from './utils/config.js';
 import logger from './utils/logger.js';
 import db from './database/DatabaseManager.js';
+import tenantContext from './utils/tenantContext.js';
 import { getVersionInfo } from './utils/version.js';
 import whatsappManager from './bot/WhatsAppManager.js';
 import geminiManager from './bot/GeminiManager.js';
@@ -108,13 +109,19 @@ async function main() {
 
 
 
-        // Set up database cleanup cron (runs daily at 3 AM)
+        // Set up database cleanup cron (runs daily at 3 AM), once per enabled tenant
         cron.schedule('0 3 * * *', async () => {
-            logger.info('Running database cleanup...');
-            const prunedMessages = await db.pruneOldMessages(config.tenantId, 100);
-            const cleanedCache = await db.cleanOldCache(config.tenantId, 7);
-            const prunedReminders = await db.pruneExpiredReminders(config.tenantId, 1);
-            logger.info('Database cleanup complete', { prunedMessages, cleanedCache, prunedReminders });
+            const profiles = await db.getEnabledProfiles();
+            for (const profile of profiles) {
+                await tenantContext.run(profile.tenant_id, async () => {
+                    const tenantId = tenantContext.getTenantId();
+                    logger.info('Running database cleanup...', { tenantId });
+                    const prunedMessages = await db.pruneOldMessages(tenantId, 100);
+                    const cleanedCache = await db.cleanOldCache(tenantId, 7);
+                    const prunedReminders = await db.pruneExpiredReminders(tenantId, 1);
+                    logger.info('Database cleanup complete', { tenantId, prunedMessages, cleanedCache, prunedReminders });
+                });
+            }
         }, {
             timezone: 'Asia/Jerusalem'
         });
