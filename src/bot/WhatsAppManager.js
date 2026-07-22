@@ -14,6 +14,7 @@ class WhatsAppManager {
         this.client = null;
         this.isReady = false;
         this.qrCode = null;
+        this.qrDataUrl = null;
         this.onQrCodeCallback = null;
         this.onMessageCallback = null;
         this.onReadyCallback = null;
@@ -86,9 +87,12 @@ class WhatsAppManager {
                 // Display in terminal
                 qrcodeTerminal.generate(qr, { small: true });
 
-                // Generate base64 for dashboard
+                // Generate base64 for the dashboard. Stored on the instance (not just pushed via
+                // callback) so the Block 5 internal API can report it to admin-portal by polling
+                // getStatus() instead of needing a live in-process push.
                 try {
                     const qrDataUrl = await qrcode.toDataURL(qr);
+                    this.qrDataUrl = qrDataUrl;
                     if (this.onQrCodeCallback) {
                         this.onQrCodeCallback(qrDataUrl);
                     }
@@ -129,6 +133,7 @@ class WhatsAppManager {
                 logger.info('WhatsApp client is ready!');
                 this.isReady = true;
                 this.qrCode = null;
+                this.qrDataUrl = null;
 
                 if (this.onReadyCallback) {
                     this.onReadyCallback();
@@ -564,7 +569,8 @@ class WhatsAppManager {
     getStatus() {
         return {
             isReady: this.isReady,
-            hasQrCode: !!this.qrCode
+            hasQrCode: !!this.qrCode,
+            qrDataUrl: this.qrDataUrl
         };
     }
 

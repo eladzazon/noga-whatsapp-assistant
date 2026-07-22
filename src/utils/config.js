@@ -39,6 +39,17 @@ const config = {
         webhookSecret: process.env.WEBHOOK_SECRET
     },
 
+    // Block 5 Phase 1: internal API the admin-portal process calls on the orchestrator process
+    // for the handful of things that depend on live in-memory state (WhatsApp/Gemini status, the
+    // dashboard chat feature, reinit-on-file-edit). Not exposed publicly — same Docker network
+    // only, plus the shared secret below.
+    internal: {
+        port: parseInt(process.env.INTERNAL_API_PORT, 10) || 3100,
+        // Same-process fallback for local/dev runs that haven't split into two containers yet.
+        orchestratorUrl: process.env.ORCHESTRATOR_INTERNAL_URL || `http://localhost:${parseInt(process.env.INTERNAL_API_PORT, 10) || 3100}`,
+        secret: process.env.INTERNAL_API_SECRET || 'default-internal-secret-change-me'
+    },
+
     // WhatsApp
     whatsapp: {
         whitelist: parseList(process.env.WHATSAPP_WHITELIST),
@@ -153,6 +164,9 @@ export function validateConfig() {
     }
     if (config.dashboard.sessionSecret === 'default-secret-change-me') {
         logger.warn('[Config] Using default session secret. Set SESSION_SECRET in production.');
+    }
+    if (config.internal.secret === 'default-internal-secret-change-me') {
+        logger.warn('[Config] Using default internal API secret. Set INTERNAL_API_SECRET in production.');
     }
     if (isNaN(config.dashboard.port) || config.dashboard.port < 1 || config.dashboard.port > 65535) {
         throw new Error(`Invalid DASHBOARD_PORT: ${process.env.DASHBOARD_PORT}. Must be 1-65535.`);
