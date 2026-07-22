@@ -3,22 +3,21 @@ import fs from 'fs';
 import path from 'path';
 import { asyncHandler } from '../middleware/error.js';
 import tenantContext from '../../utils/tenantContext.js';
+import internalApi from '../internalApiClient.js';
 
 export default function createWhatsappRoutes(deps) {
     const router = Router();
-    const { requireAuth, config, logger, whatsappManagerPromise, upload, server, db } = deps;
+    const { requireAuth, config, logger, upload, db } = deps;
 
     // WhatsApp Disconnect
     router.post('/api/whatsapp/disconnect', requireAuth, asyncHandler(async (req, res) => {
-        const whatsappManager = await whatsappManagerPromise;
-        await whatsappManager.logout();
+        await internalApi.whatsappDisconnect();
         res.json({ success: true, message: 'WhatsApp disconnected successfully. Scan new QR code.' });
     }));
 
     // WhatsApp Reconnect (manual - used after 405 errors)
     router.post('/api/whatsapp/reconnect', requireAuth, asyncHandler(async (req, res) => {
-        const whatsappManager = await whatsappManagerPromise;
-        await whatsappManager.reconnect();
+        await internalApi.whatsappReconnect();
         res.json({ success: true, message: 'Reconnecting WhatsApp. Please wait for QR code...' });
     }));
 
@@ -34,10 +33,14 @@ export default function createWhatsappRoutes(deps) {
             return res.status(401).json({ error: 'Unauthorized' });
         }
 
+        const orchestratorStatus = await internalApi.getStatus().catch(err => {
+            logger.warn('Failed to reach orchestrator for status', { error: err.message });
+            return { whatsapp: { isReady: false }, gemini: { isInitialized: false }, skills: {} };
+        });
         res.json({
-            whatsapp: server.getWhatsAppStatus ? server.getWhatsAppStatus() : { isReady: false },
-            gemini: server.getGeminiStatus ? server.getGeminiStatus() : { isInitialized: false },
-            skills: server.getSkillsStatus ? await server.getSkillsStatus() : {},
+            whatsapp: orchestratorStatus.whatsapp,
+            gemini: orchestratorStatus.gemini,
+            skills: orchestratorStatus.skills,
             usage: db ? await db.getUsageStats(tenantContext.getTenantId()) : { today: {}, month: {} }
         });
     }));
@@ -92,19 +95,21 @@ export default function createWhatsappRoutes(deps) {
             } else if (isRaw) {
                 message = rawMessage || event;
             } else {
-                message = await server.geminiManager.generateBroadcastMessage({ event, ...data });
+                message = await internalApi.broadcast({ event, ...data });
             }
 
             // Send to WhatsApp Group
             if (config.whatsapp.groupId) {
-                const whatsappStatus = server.getWhatsAppStatus ? server.getWhatsAppStatus() : { isReady: false };
+                const orchestratorStatus = await internalApi.getStatus().catch(() => ({ whatsapp: { isReady: false } }));
+                const whatsappStatus = orchestratorStatus.whatsapp;
 
                 if (whatsappStatus.isReady) {
-                    const whatsappManager = await whatsappManagerPromise;
-                    
                     let messageSent = false;
-                    
-                    // If an image was uploaded, send it as media
+
+                    // If an image was uploaded, send it as media. mediaPath must be readable by
+                    // the orchestrator process too — both containers mount the same noga-data
+                    // volume at the same path (Block 5 Phase 1's shared temp-file approach for
+                    // media crossing the admin-portal/orchestrator boundary).
                     if (req.file) {
                         try {
                             // Provide a default extension if missing so WhatsApp knows it's an image
@@ -112,9 +117,9 @@ export default function createWhatsappRoutes(deps) {
                             const tempPath = req.file.path;
                             const mediaPath = tempPath + fileExt;
                             await fs.promises.rename(tempPath, mediaPath);
-                            
-                            await whatsappManager.sendMediaMessage(config.whatsapp.groupId, mediaPath, message);
-                            
+
+                            await internalApi.whatsappSendMedia(config.whatsapp.groupId, mediaPath, message);
+
                             // Log to history
                             if (db) {
                                 await db.addChatMessage(tenantContext.getTenantId(), config.whatsapp.groupId, 'model', `[Image Notification] ${message}`);
@@ -128,16 +133,16 @@ export default function createWhatsappRoutes(deps) {
                             // Fallback to text
                         }
                     }
-                    
+
                     // Send as text if no image or image failed
                     if (!messageSent) {
-                        await whatsappManager.sendMessage(config.whatsapp.groupId, message);
+                        await internalApi.whatsappSendMessage(config.whatsapp.groupId, message);
                         // Log to history
                         if (db) {
                             await db.addChatMessage(tenantContext.getTenantId(), config.whatsapp.groupId, 'model', message);
                         }
                     }
-                    
+
                     return res.json({ success: true, message, hasImage: !!req.file });
                 } else {
                     // Clean up file if WA not ready

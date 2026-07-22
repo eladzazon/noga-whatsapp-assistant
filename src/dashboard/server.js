@@ -28,11 +28,6 @@ import createTenantsRoutes from './routes/tenants.js';
 import setupSocketIO from './socket.js';
 import { errorHandler } from './middleware/error.js';
 
-// Pre-load singletons once at module level to avoid dynamic import overhead
-const whatsappManagerPromise = import('../bot/WhatsAppManager.js').then(m => m.default);
-const schedulerManagerPromise = import('../bot/SchedulerManager.js').then(m => m.default);
-const skillsIndexPromise = import('../skills/index.js');
-
 const FileStore = sessionFileStore(session);
 
 const uploadDir = path.resolve(process.cwd(), 'data', 'temp');
@@ -49,9 +44,6 @@ class DashboardServer {
         this.app = express();
         this.server = null;
         this.io = null;
-        this.qrCode = null;
-        this.geminiManager = null;
-        this.messageRouter = null;
     }
 
     /**
@@ -147,7 +139,6 @@ class DashboardServer {
     _setupRoutes() {
         const deps = {
             requireAuth, db, config, logger,
-            whatsappManagerPromise, schedulerManagerPromise, skillsIndexPromise,
             upload, server: this, getRecentLogs
         };
         
@@ -167,58 +158,10 @@ class DashboardServer {
     }
 
     /**
-     * Update QR code and broadcast to clients
-     */
-    updateQrCode(qrDataUrl) {
-        this.qrCode = qrDataUrl;
-        if (this.io) {
-            this.io.emit('qr', qrDataUrl);
-        }
-    }
-
-    /**
-     * Clear QR code (when connected)
-     */
-    clearQrCode() {
-        this.qrCode = null;
-        if (this.io) {
-            this.io.emit('qr', null);
-            this.io.emit('connected');
-        }
-    }
-
-    /**
-     * Broadcast WhatsApp disconnection
-     */
-    notifyDisconnected(reason) {
-        if (this.io) {
-            this.io.emit('disconnected', reason);
-        }
-    }
-
-    /**
-     * Set status getters
-     */
-    setStatusGetters(whatsapp, gemini, skills) {
-        this.getWhatsAppStatus = whatsapp;
-        this.getGeminiStatus = gemini;
-        this.getSkillsStatus = skills;
-    }
-
-    /**
      * Set config update handler
      */
     setConfigUpdateHandler(handler) {
         this.onConfigUpdate = handler;
-    }
-
-    /**
-     * Set manager references for API routes
-     */
-    setManagers(geminiManager, dbInstance, messageRouter) {
-        this.geminiManager = geminiManager;
-        this.db = dbInstance;
-        this.messageRouter = messageRouter;
     }
 
     /**

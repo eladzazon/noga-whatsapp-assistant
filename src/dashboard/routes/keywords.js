@@ -2,10 +2,11 @@ import { Router } from 'express';
 import { asyncHandler } from '../middleware/error.js';
 import config from '../../utils/config.js';
 import tenantContext from '../../utils/tenantContext.js';
+import internalApi from '../internalApiClient.js';
 
 export default function createKeywordsRoutes(deps) {
     const router = Router();
-    const { requireAuth, db, logger, schedulerManagerPromise } = deps;
+    const { requireAuth, db, logger } = deps;
 
     // ==================== Keywords API ====================
 
@@ -114,9 +115,8 @@ export default function createKeywordsRoutes(deps) {
         const id = await db.addScheduledPrompt(tenantContext.getTenantId(), name, prompt, cronExpression, enabled);
         logger.info('Scheduled prompt added via dashboard', { name });
 
-        // Reload scheduling engine
-        const schedulerManager = await schedulerManagerPromise;
-        await schedulerManager.reload();
+        // Reload scheduling engine (lives on the orchestrator)
+        await internalApi.reloadSchedules();
 
         res.json({ success: true, id });
     }));
@@ -139,9 +139,8 @@ export default function createKeywordsRoutes(deps) {
         await db.updateScheduledPrompt(tenantContext.getTenantId(), parseInt(id), name, prompt, cronExpression, enabled);
         logger.info('Scheduled prompt updated via dashboard', { id, name });
 
-        // Reload scheduling engine
-        const schedulerManager = await schedulerManagerPromise;
-        await schedulerManager.reload();
+        // Reload scheduling engine (lives on the orchestrator)
+        await internalApi.reloadSchedules();
 
         res.json({ success: true });
     }));
@@ -158,9 +157,8 @@ export default function createKeywordsRoutes(deps) {
         await db.deleteScheduledPrompt(tenantContext.getTenantId(), parseInt(id));
         logger.info('Scheduled prompt deleted via dashboard', { id });
 
-        // Reload scheduling engine
-        const schedulerManager = await schedulerManagerPromise;
-        await schedulerManager.reload();
+        // Reload scheduling engine (lives on the orchestrator)
+        await internalApi.reloadSchedules();
 
         res.json({ success: true });
     }));

@@ -6,6 +6,7 @@ import { readLastLines } from '../../utils/logger.js';
 import { getVersionInfo } from '../../utils/version.js';
 import config from '../../utils/config.js';
 import tenantContext from '../../utils/tenantContext.js';
+import internalApi from '../internalApiClient.js';
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -41,10 +42,14 @@ export default function createStatusRoutes(deps) {
     // API: Get status
     router.get('/api/status', requireAuth, asyncHandler(async (req, res) => {
         const instance = db ? await db.getInstanceInfo() : null;
+        const orchestratorStatus = await internalApi.getStatus().catch(err => {
+            logger.warn('Failed to reach orchestrator for status', { error: err.message });
+            return { whatsapp: { isReady: false }, gemini: { isInitialized: false }, skills: {} };
+        });
         res.json({
-            whatsapp: server.getWhatsAppStatus ? server.getWhatsAppStatus() : { isReady: false },
-            gemini: server.getGeminiStatus ? server.getGeminiStatus() : { isInitialized: false },
-            skills: server.getSkillsStatus ? await server.getSkillsStatus() : {},
+            whatsapp: orchestratorStatus.whatsapp,
+            gemini: orchestratorStatus.gemini,
+            skills: orchestratorStatus.skills,
             usage: db ? await db.getUsageStats(tenantContext.getTenantId()) : { today: {}, month: {} },
             version: getVersionInfo(),
             schemaVersion: instance ? instance.schema_version : null,

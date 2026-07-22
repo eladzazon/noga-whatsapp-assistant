@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import internalApi from '../internalApiClient.js';
 
 export function requireAuth(req, res, next) {
     if (req.session && req.session.authenticated) {
@@ -9,7 +10,7 @@ export function requireAuth(req, res, next) {
 
 export default function createAuthRoutes(deps) {
     const router = Router();
-    const { config, logger, server } = deps;
+    const { config, logger } = deps;
 
     // Login page
     router.get('/', (req, res) => {
@@ -41,9 +42,10 @@ export default function createAuthRoutes(deps) {
     });
 
     // Dashboard page
-    router.get('/dashboard', requireAuth, (req, res) => {
+    router.get('/dashboard', requireAuth, async (req, res) => {
+        const { whatsapp } = await internalApi.getStatus().catch(() => ({ whatsapp: {} }));
         res.render('dashboard', {
-            qrCode: server.qrCode,
+            qrCode: whatsapp.qrDataUrl || null,
             recentLogs: deps.getRecentLogs(50)
         });
     });

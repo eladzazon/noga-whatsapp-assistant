@@ -1,10 +1,15 @@
 import fs from 'fs';
 import path from 'path';
 import config from '../utils/config.js';
-import tenantContext from '../utils/tenantContext.js';
+import internalApi from './internalApiClient.js';
+
+// How often to poll the orchestrator for WhatsApp connection/QR state and re-emit to connected
+// browsers (Block 5 Phase 1 — no push channel exists between the two processes yet; Phase 2's
+// Redis wa:status/wa:qr channels replace this polling loop with real-time push).
+const WHATSAPP_STATUS_POLL_MS = 3000;
 
 export default function setupSocketIO(io, deps) {
-    const { logger, server, subscribeToLogs, getRecentLogs } = deps;
+    const { logger, subscribeToLogs, getRecentLogs } = deps;
 
     // Authentication middleware for Socket.IO
     io.use((socket, next) => {
@@ -12,12 +17,15 @@ export default function setupSocketIO(io, deps) {
         next();
     });
 
-    io.on('connection', (socket) => {
+    io.on('connection', async (socket) => {
         logger.debug('Dashboard client connected', { id: socket.id });
 
         // Send current QR code if available
-        if (server.qrCode) {
-            socket.emit('qr', server.qrCode);
+        try {
+            const { whatsapp } = await internalApi.getStatus();
+            if (whatsapp.qrDataUrl) socket.emit('qr', whatsapp.qrDataUrl);
+        } catch (err) {
+            logger.debug('Orchestrator unreachable for initial QR check', { error: err.message });
         }
 
         // Send recent logs
@@ -25,19 +33,8 @@ export default function setupSocketIO(io, deps) {
 
         // Dashboard Chat: Receive message from dashboard
         socket.on('dashboard_message', async (text) => {
-            if (!server.messageRouter) {
-                return socket.emit('dashboard_response', {
-                    error: 'Message Router not initialized'
-                });
-            }
-
-            // Socket.IO events aren't covered by the Express tenantContext middleware — bind it
-            // here too. No session-sharing with Socket.IO exists yet (see the placeholder auth
-            // middleware above), so this is always config.tenantId today, same as before.
             try {
-                const response = await tenantContext.run(config.tenantId, () =>
-                    server.messageRouter.processText('dashboard_admin', text)
-                );
+                const response = await internalApi.chat(text);
                 socket.emit('dashboard_response', { text: response });
             } catch (err) {
                 socket.emit('dashboard_response', { error: err.message });
@@ -45,10 +42,12 @@ export default function setupSocketIO(io, deps) {
         });
 
         // Dashboard Chat: Clear history
-        socket.on('clear_chat', () => {
-            if (server.geminiManager) {
-                tenantContext.run(config.tenantId, () => server.geminiManager.clearHistory('dashboard_admin'));
+        socket.on('clear_chat', async () => {
+            try {
+                await internalApi.clearChat();
                 socket.emit('chat_cleared');
+            } catch (err) {
+                logger.warn('Failed to clear chat via orchestrator', { error: err.message });
             }
         });
 
@@ -56,6 +55,27 @@ export default function setupSocketIO(io, deps) {
             logger.debug('Dashboard client disconnected', { id: socket.id });
         });
     });
+
+    // Poll the orchestrator for WhatsApp state and re-broadcast to every connected browser
+    // whenever it changes — see WHATSAPP_STATUS_POLL_MS comment above.
+    let lastQrDataUrl = null;
+    let lastIsReady = null;
+    setInterval(async () => {
+        try {
+            const { whatsapp } = await internalApi.getStatus();
+            if (whatsapp.qrDataUrl && whatsapp.qrDataUrl !== lastQrDataUrl) {
+                io.emit('qr', whatsapp.qrDataUrl);
+            }
+            if (whatsapp.isReady && !lastIsReady) {
+                io.emit('qr', null);
+                io.emit('connected');
+            }
+            lastQrDataUrl = whatsapp.qrDataUrl;
+            lastIsReady = whatsapp.isReady;
+        } catch (err) {
+            // Orchestrator unreachable this tick — skip silently, retry next interval.
+        }
+    }, WHATSAPP_STATUS_POLL_MS);
 
     // Subscribe to log events and broadcast
     subscribeToLogs((logEntry) => {

@@ -6,6 +6,7 @@ import { asyncHandler } from '../middleware/error.js';
 import config from '../../utils/config.js';
 import tenantContext from '../../utils/tenantContext.js';
 import memoryManager from '../../skills/MemoryManager.js';
+import internalApi from '../internalApiClient.js';
 
 // Helper to check file/dir existence asynchronously
 async function exists(filePath) {
@@ -112,10 +113,10 @@ export default function createBackupRoutes(deps) {
             server.io.emit('file_changed', { type: 'skills' });
         }
 
-        // Re-initialize Gemini with updated files
-        if (server.geminiManager) {
-            await server.geminiManager.reinit();
-        }
+        // Re-initialize Gemini with updated files (lives on the orchestrator)
+        await internalApi.reinit().catch(err => {
+            logger.warn('Failed to reinit orchestrator after restore', { error: err.message });
+        });
 
         res.json({ success: true, message: 'Full system backup restored successfully' });
     }));

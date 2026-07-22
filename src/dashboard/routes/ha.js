@@ -2,10 +2,11 @@ import { Router } from 'express';
 import { asyncHandler } from '../middleware/error.js';
 import config from '../../utils/config.js';
 import tenantContext from '../../utils/tenantContext.js';
+import internalApi from '../internalApiClient.js';
 
 export default function createHaRoutes(deps) {
     const router = Router();
-    const { requireAuth, db, logger, skillsIndexPromise } = deps;
+    const { requireAuth, db, logger } = deps;
 
     // Get all Home Assistant mappings
     router.get('/api/ha/mappings', requireAuth, asyncHandler(async (req, res) => {
@@ -75,11 +76,9 @@ export default function createHaRoutes(deps) {
         res.json({ success: true });
     }));
 
-    // Proxy: Get entities from Home Assistant
+    // Proxy: Get entities from Home Assistant (lives on the orchestrator)
     router.get('/api/ha/entities', requireAuth, asyncHandler(async (req, res) => {
-        const { homeAssistantManager } = await skillsIndexPromise;
-        const ha = await homeAssistantManager.getCurrent();
-        const result = await ha.getEntities();
+        const result = await internalApi.getHaEntities(tenantContext.getTenantId());
         res.json(result);
     }));
 

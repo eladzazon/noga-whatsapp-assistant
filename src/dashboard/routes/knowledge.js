@@ -3,10 +3,17 @@ import { asyncHandler } from '../middleware/error.js';
 import config from '../../utils/config.js';
 import tenantContext from '../../utils/tenantContext.js';
 import memoryManager from '../../skills/MemoryManager.js';
+import internalApi from '../internalApiClient.js';
 
 export default function createKnowledgeRoutes(deps) {
     const router = Router();
-    const { requireAuth, logger, server } = deps;
+    const { requireAuth, logger } = deps;
+
+    // Re-initializing Gemini's system prompt lives on the orchestrator (it holds the live
+    // model instance) — best-effort here, a failed reinit doesn't roll back the file write.
+    const reinitGemini = () => internalApi.reinit().catch(err => {
+        logger.warn('Failed to reinit orchestrator after file change', { error: err.message });
+    });
 
     // ==================== Knowledge Base API ====================
 
@@ -27,9 +34,7 @@ export default function createKnowledgeRoutes(deps) {
         await memoryManager.writeKnowledgeFile(tenantContext.getTenantId(), filename, content);
 
         // Re-initialize Gemini model
-        if (server.geminiManager) {
-            await server.geminiManager.reinit();
-        }
+        await reinitGemini();
 
         logger.info('Knowledge file updated via dashboard', { filename });
         res.json({ success: true });
@@ -41,9 +46,7 @@ export default function createKnowledgeRoutes(deps) {
         await memoryManager.deleteKnowledgeFile(tenantContext.getTenantId(), filename);
 
         // Re-initialize Gemini model
-        if (server.geminiManager) {
-            await server.geminiManager.reinit();
-        }
+        await reinitGemini();
 
         logger.info('Knowledge file deleted via dashboard', { filename });
         res.json({ success: true });
@@ -68,9 +71,7 @@ export default function createKnowledgeRoutes(deps) {
         await memoryManager.createSkill(tenantContext.getTenantId(), filename, content);
 
         // Re-initialize Gemini model
-        if (server.geminiManager) {
-            await server.geminiManager.reinit();
-        }
+        await reinitGemini();
 
         logger.info('Skill file updated via dashboard', { filename });
         res.json({ success: true });
@@ -82,9 +83,7 @@ export default function createKnowledgeRoutes(deps) {
         await memoryManager.deleteSkill(tenantContext.getTenantId(), filename);
 
         // Re-initialize Gemini model
-        if (server.geminiManager) {
-            await server.geminiManager.reinit();
-        }
+        await reinitGemini();
 
         logger.info('Skill file deleted via dashboard', { filename });
         res.json({ success: true });
