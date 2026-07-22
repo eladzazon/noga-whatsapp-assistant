@@ -10,14 +10,15 @@ import whatsappManager from './bot/WhatsAppManager.js';
 import geminiManager from './bot/GeminiManager.js';
 import messageRouter from './bot/MessageRouter.js';
 import schedulerManager from './bot/SchedulerManager.js';
-import dashboardServer from './dashboard/server.js';
+import internalApiServer from './internal/server.js';
 import {
     initializeSkills,
     getSkillsStatus,
     functionDeclarations,
     functionHandlers,
     calendarManager,
-    setGeminiManager
+    setGeminiManager,
+    homeAssistantManager
 } from './skills/index.js';
 import cron from 'node-cron';
 
@@ -69,40 +70,25 @@ async function main() {
         logger.info('Initializing Scheduler...');
         await schedulerManager.init(geminiManager);
 
-        // Initialize dashboard server
-        logger.info('Initializing dashboard...');
-        dashboardServer.init();
-
-        // Set status getters for dashboard API
-        dashboardServer.setStatusGetters(
-            () => whatsappManager.getStatus(),
-            () => geminiManager.getStatus(),
-            () => getSkillsStatus()
-        );
-
-        // Set manager references for dashboard API routes
-        dashboardServer.setManagers(geminiManager, db, messageRouter);
-
-        // Start dashboard server
-        dashboardServer.start();
+        // Block 5 Phase 1: the dashboard now runs as its own admin-portal process
+        // (src/admin-portal-index.js) and reaches this process only via the internal API below —
+        // no more direct in-process wiring (setManagers/setStatusGetters/updateQrCode/etc).
+        logger.info('Initializing internal API...');
+        internalApiServer.init({ whatsappManager, geminiManager, messageRouter, getSkillsStatus, schedulerManager, homeAssistantManager });
+        internalApiServer.start();
 
         // Initialize WhatsApp client
         logger.info('Initializing WhatsApp...');
 
-        // Set up QR code streaming to dashboard
-        whatsappManager.onQrCode((qrDataUrl) => {
-            dashboardServer.updateQrCode(qrDataUrl);
-        });
-
-        // Set up ready handler
+        // Ready/disconnected are logged here; admin-portal polls GET /internal/status for
+        // connection state and QR code instead of receiving a push (Phase 2's Redis wa:status/
+        // wa:qr channels will restore real-time push once WhatsApp is its own container).
         whatsappManager.onReady(() => {
-            dashboardServer.clearQrCode();
             logger.info('WhatsApp ready - Noga is listening!');
         });
 
-        // Set up disconnected handler
         whatsappManager.onDisconnected((reason) => {
-            dashboardServer.notifyDisconnected(reason);
+            logger.warn('WhatsApp disconnected', { reason });
         });
 
         // Initialize WhatsApp (this will show QR code if needed)
@@ -131,7 +117,7 @@ async function main() {
         });
 
         logger.info('✨ Noga is ready and listening!');
-        logger.info(`Dashboard available at http://localhost:${config.dashboard.port}`);
+        logger.info(`Internal API available at http://localhost:${config.internal.port}`);
 
     } catch (err) {
         logger.error('Fatal error during startup', { error: err.message, stack: err.stack });
@@ -150,8 +136,8 @@ async function shutdown(signal) {
         // Close database
         await db.close();
 
-        // Stop dashboard server
-        dashboardServer.stop();
+        // Stop internal API server
+        internalApiServer.stop();
 
         logger.info('Shutdown complete');
         process.exit(0);
