@@ -31,8 +31,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    ports:
-      - "${DASHBOARD_PORT:-3000}:3000"
+    # Block 5 Phase 1: no longer publishes a dashboard port — admin-portal does that. The
+    # internal API (INTERNAL_API_PORT) stays reachable only over proxy-network, by design.
     volumes:
       # Persistent data (legacy SQLite file + WhatsApp session — the SQLite file is kept
       # read-only after the Block 2 migration as a rollback fallback, not written to anymore)
@@ -55,6 +55,36 @@ services:
       resources:
         limits:
           memory: 1G
+
+  admin-portal:
+    build:
+      context: .
+      dockerfile: Dockerfile.admin-portal
+    image: eladzazon/noga-admin-portal:latest
+    container_name: noga-admin-portal
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${DASHBOARD_PORT:-3000}:3000"
+    volumes:
+      # Same noga-data volume as the orchestrator: knowledge/skills files, session store, and
+      # the shared data/temp path used to hand media across the process boundary (Block 5
+      # Phase 1's chosen approach over base64-over-HTTP).
+      - noga-data:/app/data
+      - noga-logs:/app/data/logs
+      - ./.env:/app/.env:ro
+    environment:
+      - NODE_ENV=production
+      - TZ=America/New_York
+      - DB_URL=postgresql://${POSTGRES_USER:-noga}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-noga}
+    networks:
+      - proxy-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
 
 volumes:
   noga-data:

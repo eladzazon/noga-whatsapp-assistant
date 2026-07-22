@@ -10,6 +10,8 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
+    "start:admin-portal": "node src/admin-portal-index.js",
+    "dev:admin-portal": "node --watch src/admin-portal-index.js",
     "migrate": "node scripts/run_migrations.js",
     "migrate:data": "node scripts/migrate_sqlite_to_postgres.js"
   },

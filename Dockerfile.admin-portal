@@ -42,13 +42,14 @@ RUN mkdir -p /app/data && chown -R noga:noga /app/data
 # Switch to non-root user
 USER noga
 
-# Expose internal API port (Block 5 Phase 1: this container no longer serves the dashboard —
-# admin-portal does, from its own image/Dockerfile.admin-portal)
-EXPOSE 3100
+# Expose dashboard port
+EXPOSE 3000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:3100/health || exit 1
+    CMD wget --no-verbose --tries=1 --spider http://localhost:3000/ || exit 1
 
-# Start the application
-CMD ["node", "src/index.js"]
+# Start the admin-portal process (Block 5 Phase 1 — extracted from the monolith; shares this
+# same image/package.json since it depends on the same node_modules, but runs a different
+# entry point and only needs the dashboard port published)
+CMD ["node", "src/admin-portal-index.js"]
