@@ -2,7 +2,7 @@ import { escapeHtml, escapeAttr, showConfirmModal } from '../core/utils.js';
 
 function setupFileEditor(type) {
     const fileList = document.getElementById(`${type}-file-list`);
-    const editor = document.getElementById(type === 'knowledge' ? 'knowledge-editor' : 'skill-editor');
+    const editor = document.getElementById(`${type}-editor`);
     const filenameSpan = document.getElementById(`current-${type}-filename`);
     const addBtn = document.getElementById(`add-${type}-file`);
     const saveBtn = document.getElementById(`save-${type}`);
@@ -12,6 +12,11 @@ function setupFileEditor(type) {
 
     let currentFile = null;
     let filesData = [];
+    let isDirty = false;
+
+    if (editor) {
+        editor.addEventListener('input', () => { isDirty = true; });
+    }
 
     async function loadFiles() {
         try {
@@ -20,8 +25,10 @@ function setupFileEditor(type) {
             filesData = data.files || [];
             renderFileList();
 
-            // Update the open editor if the file content changed remotely
-            if (currentFile) {
+            // Update the open editor if the file changed remotely — but never while the user
+            // has unsaved edits in progress, or a live reload (e.g. our own save round-tripping
+            // through the file watcher) silently wipes out what they just typed.
+            if (currentFile && !isDirty) {
                 const fileObj = filesData.find(f => f.name === currentFile);
                 if (fileObj && editor.value !== fileObj.content) {
                     editor.value = fileObj.content;
@@ -50,6 +57,7 @@ function setupFileEditor(type) {
 
     function selectFile(filename) {
         currentFile = filename;
+        isDirty = false;
         const fileObj = filesData.find(f => f.name === filename);
         if (fileObj) {
             editor.value = fileObj.content;
@@ -82,6 +90,7 @@ function setupFileEditor(type) {
                 // Update local data
                 const fileObj = filesData.find(f => f.name === currentFile);
                 if (fileObj) fileObj.content = content;
+                isDirty = false;
             } else {
                 showStatus(data.error || 'שגיאה בשמירה', 'error');
             }
@@ -107,6 +116,7 @@ function setupFileEditor(type) {
 
             if (data.success) {
                 currentFile = null;
+                isDirty = false;
                 editor.value = '';
                 editor.disabled = true;
                 if (filenameSpan) filenameSpan.textContent = 'בחר קובץ';
