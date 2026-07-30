@@ -1,14 +1,15 @@
 import { escapeHtml, escapeAttr, showConfirmModal } from '../core/utils.js';
 
 function setupFileEditor(type) {
-    const fileList = document.getElementById(`${type}-file-list`);
-    const editor = document.getElementById(type === 'knowledge' ? 'knowledge-editor' : 'skill-editor');
-    const filenameSpan = document.getElementById(`current-${type}-filename`);
-    const addBtn = document.getElementById(`add-${type}-file`);
-    const saveBtn = document.getElementById(`save-${type}`);
-    const deleteBtn = document.getElementById(`delete-${type}-file`);
-    const statusEl = document.getElementById(`${type}-status`);
-    const apiPath = type === 'knowledge' ? '/api/knowledge' : '/api/skills';
+    const isKnowledge = type === 'knowledge';
+    const fileList = document.getElementById(isKnowledge ? 'knowledge-file-list' : 'skills-file-list');
+    const editor = document.getElementById(isKnowledge ? 'knowledge-editor' : 'skill-editor');
+    const filenameSpan = document.getElementById(isKnowledge ? 'current-knowledge-filename' : 'current-skill-filename');
+    const addBtn = document.getElementById(isKnowledge ? 'add-knowledge-file' : 'add-skill-file');
+    const saveBtn = document.getElementById(isKnowledge ? 'save-knowledge' : 'save-skill');
+    const deleteBtn = document.getElementById(isKnowledge ? 'delete-knowledge-file' : 'delete-skill-file');
+    const statusEl = document.getElementById(isKnowledge ? 'knowledge-status' : 'skill-status');
+    const apiPath = isKnowledge ? '/api/knowledge' : '/api/skills';
 
     let currentFile = null;
     let filesData = [];
