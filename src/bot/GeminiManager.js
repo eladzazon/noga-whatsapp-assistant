@@ -111,6 +111,10 @@ class GeminiManager {
         const currentTime = now.toLocaleTimeString('he-IL', options);
         const dayOfWeek = now.toLocaleDateString('he-IL', { ...options, weekday: 'long' });
         const utcISO = now.toISOString();
+        // en-CA formats as YYYY-MM-DD — handed to the model verbatim so it doesn't have to
+        // convert currentDate/utcISO into the ISO date list_calendar_events expects itself
+        // (that conversion is where it previously computed the wrong day).
+        const todayISO = now.toLocaleDateString('en-CA', options);
 
         // Inject pending reminders so the AI knows what the user might be referring to
         let pendingRemindersInfo = '';
@@ -140,7 +144,7 @@ class GeminiManager {
             }
         }
 
-        const dynamicPrompt = `${this.systemPrompt}\n\n[SYSTEM INFO: Today is ${dayOfWeek}, ${currentDate}, Current local time is ${currentTime}, Current UTC ISO is ${utcISO}${pendingRemindersInfo}]`;
+        const dynamicPrompt = `${this.systemPrompt}\n\n[SYSTEM INFO: Today is ${dayOfWeek}, ${currentDate} (ISO: ${todayISO}), Current local time is ${currentTime}, Current UTC ISO is ${utcISO}${pendingRemindersInfo}]`;
 
         return this.genAI.getGenerativeModel({
             model: config.gemini.model,
@@ -298,7 +302,7 @@ class GeminiManager {
                         if (functionCallResult.hasErrors) {
                             followUpPrompt = 'הפעולה הסתיימה עם שגיאות ולא החזרת טקסט. אנא הודע למשתמש שהייתה שגיאה בביצוע הבקשה.';
                         } else if (functionCallResult.totalFunctionsCalled > 0) {
-                            followUpPrompt = 'הפעולה בוצעה אך לא החזרת טקסט. אנא כתוב הודעה קצרה וידידותית בעברית למשתמש המאשרת שהבקשה שלו טופלה.';
+                            followUpPrompt = 'ביצעת את הפעולות הנדרשות (קריאה לפונקציות) אך לא כתבת תשובה למשתמש. אנא כתוב כעת תשובה מלאה בעברית הכוללת את כל המידע שאספת בפועל מהפונקציות שקראת (למשל: מצב מכשירים, אירועי יומן, תוצאות חיפוש) - אל תסתפק באישור כללי שה"פעולה בוצעה", כתוב את התוכן עצמו.';
                         } else {
                             followUpPrompt = 'קיבלת הודעה אך החזרת טקסט ריק בלי לבצע אף פעולה ובלי לקרוא לאף פונקציה. אנא התנצל בפני המשתמש והסבר שלא הצלחת להשלים את הבקשה. אל תגיד שהבקשה טופלה בהצלחה.';
                         }
