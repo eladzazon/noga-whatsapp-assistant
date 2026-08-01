@@ -5,7 +5,7 @@ import db from '../database/DatabaseManager.js';
 import logger from '../utils/logger.js';
 import config from '../utils/config.js';
 import tenantContext from '../utils/tenantContext.js';
-import whatsappManager from '../bot/WhatsAppManager.js';
+import { publish, CHANNELS } from '../utils/redisClient.js';
 import { fetchUrl, fetchRss, searchWeb } from '../utils/WebFetcher.js';
 
 let globalGeminiManager = null;
@@ -93,7 +93,7 @@ const COMMON_HANDLERS = {
             const target = resolveWhatsappTarget(args.recipient);
             if (target.error) return { error: target.error };
 
-            await whatsappManager.sendMessage(target.jid, args.message);
+            await publish(CHANNELS.OUTGOING, { tenantId: tenantContext.getTenantId(), chatId: target.jid, type: 'send', text: args.message });
 
             // Log outbound message to chat history so Noga remembers what she sent
             await db.addChatMessage(tenantContext.getTenantId(), target.jid, 'model', args.message);

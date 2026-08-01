@@ -1,10 +1,11 @@
-import whatsappManager from './WhatsAppManager.js';
 import geminiManager from './GeminiManager.js';
+import waStatusCache from './waStatusCache.js';
 import logger from '../utils/logger.js';
 import db from '../database/DatabaseManager.js';
 import config from '../utils/config.js';
 import tenantContext from '../utils/tenantContext.js';
 import { getRecentLogs, readServerLogs } from '../utils/logger.js';
+import { publish, CHANNELS, createSubscriber } from '../utils/redisClient.js';
 
 
 class MessageRouter {
@@ -14,19 +15,41 @@ class MessageRouter {
         this.lastMessageTime = new Map();
         this.MAX_QUEUE_SIZE = 3;
         this.PROCESSING_TIMEOUT_MS = 120000; // 2 minutes
+        this.incomingSubscriber = null;
     }
 
     /**
-     * Initialize the message router
+     * Initialize the message router. Block 5 Phase 2: WhatsApp lives in its own process now, so
+     * incoming messages arrive over Redis instead of a direct in-process callback.
      */
     init() {
-        // Set up message handler
-        whatsappManager.onMessage(async (message) => {
-            await this.routeMessage(message);
+        this.incomingSubscriber = createSubscriber([CHANNELS.INCOMING], async (channel, payload) => {
+            await this.routeMessage(payload.messageData);
         });
 
         logger.info('Message router initialized');
         return this;
+    }
+
+    /**
+     * Publish an outbound text send — fire-and-forget, matching wa:outgoing's pub/sub semantics
+     * (if whatsapp-connector is down, the message is dropped, not queued; every call site here
+     * already tolerates that the same way it tolerated a synchronous send failing before).
+     */
+    async _sendText(chatId, text) {
+        await publish(CHANNELS.OUTGOING, { tenantId: tenantContext.getTenantId(), chatId, type: 'send', text });
+    }
+
+    /**
+     * Publish an outbound emoji reaction (🤖/⚡/🎧 acknowledgments) — best-effort, errors ignored
+     * by every caller here same as before the process split.
+     */
+    async _react(key, emoji) {
+        try {
+            await publish(CHANNELS.OUTGOING, { tenantId: tenantContext.getTenantId(), type: 'react', key, emoji });
+        } catch (e) {
+            // Ignore — matches pre-split behavior where reaction failures were swallowed
+        }
     }
 
     /**
@@ -57,7 +80,7 @@ class MessageRouter {
                 if (reminder) {
                     await db.updateReminderStatus(tenantContext.getTenantId(), reminder.id, 'done');
                     const confirmMsg = `✅ המשימה "${reminder.title}" סומנה כבוצעה! 🎉`;
-                    await whatsappManager.sendMessage(chat, confirmMsg);
+                    await this._sendText(chat, confirmMsg);
                     await db.addChatMessage(tenantContext.getTenantId(), contextId, 'model', confirmMsg);
                     logger.info(`Reminder ${reminder.id} marked as done via 👍 reaction`, { reactedMsgId, title: reminder.title });
                     return;
@@ -79,7 +102,7 @@ class MessageRouter {
             if (queue.length >= this.MAX_QUEUE_SIZE) {
                 logger.warn('Message queue full, dropping message', { contextId, queueSize: queue.length });
                 try {
-                    await whatsappManager.sendMessage(chat, 'יש לי כבר כמה הודעות בתור, אחזור אליך בקרוב 😅');
+                    await this._sendText(chat, 'יש לי כבר כמה הודעות בתור, אחזור אליך בקרוב 😅');
                 } catch (e) {
                     logger.error('Failed to send queue-full notification', { error: e.message });
                 }
@@ -125,11 +148,11 @@ class MessageRouter {
 
             // Send response
             if (response && response.trim().length > 0) {
-                await whatsappManager.sendMessage(chat, response);
+                await this._sendText(chat, response);
             } else {
                 logger.warn('Empty response generated', { from });
                 const fallbackMsg = 'סליחה, המערכת סיימה לעבד את הבקשה אבל לא ייצרה שום טקסט כתשובה. ייתכן שיש תקלה פנימית או שהפעולה בוצעה בשקט. 😅';
-                await whatsappManager.sendMessage(chat, fallbackMsg);
+                await this._sendText(chat, fallbackMsg);
                 // Log fallback message to chat history
                 await db.addChatMessage(tenantContext.getTenantId(), contextId, 'model', fallbackMsg);
             }
@@ -145,7 +168,7 @@ class MessageRouter {
                     ? 'המכסה היומית של הבינה המלאכותית נגמרה 😅 אשתף פעולה שוב בקרוב!'
                     : `סליחה, נתקלתי בתקלה ולכן לא יכולתי לענות לבקשתך 😅`;
 
-                await whatsappManager.sendMessage(chat, errorMessage);
+                await this._sendText(chat, errorMessage);
                 // Log error message to chat history
                 await db.addChatMessage(tenantContext.getTenantId(), contextId, 'model', errorMessage);
             } catch (sendErr) {
@@ -194,7 +217,7 @@ class MessageRouter {
 
             if (keywordMatch.type === 'ai') {
                 if (message) {
-                    try { await whatsappManager.reactToMessage(message.key, '🤖'); } catch (e) {}
+                    await this._react(message.key, '🤖');
                 }
                 const augmentedMessage = `[Custom Instructions: ${keywordMatch.response}]\n\nUser message: ${text}`;
                 return await geminiManager.processMessage(userId, augmentedMessage, { keepHistory: true });
@@ -202,14 +225,14 @@ class MessageRouter {
 
             // Static keyword: return the response directly
             if (message) {
-                try { await whatsappManager.reactToMessage(message.key, '⚡'); } catch (e) {}
+                await this._react(message.key, '⚡');
             }
             return keywordMatch.response;
         }
 
         // React to show we received the message (WhatsApp only)
         if (message) {
-            try { await whatsappManager.reactToMessage(message.key, '🤖'); } catch (e) {}
+            await this._react(message.key, '🤖');
         }
 
         // Process with Gemini, passing message context
@@ -225,11 +248,7 @@ class MessageRouter {
         logger.info('Processing voice message', { from });
 
         // React to show we're processing
-        try {
-            await whatsappManager.reactToMessage(message.key, '🎧');
-        } catch {
-            // Ignore reaction errors
-        }
+        await this._react(message.key, '🎧');
 
         const contextId = isGroup ? chat : from;
 
@@ -300,7 +319,7 @@ class MessageRouter {
 
                 // from is a bare phone number — reconstruct full JID for Baileys
                 const adminJid = from.includes('@') ? from : `${from}@s.whatsapp.net`;
-                await whatsappManager.sendMessage(adminJid, liveMsg);
+                await this._sendText(adminJid, liveMsg);
                 return serverMsg;
             }
 
@@ -351,7 +370,7 @@ class MessageRouter {
      * Get system status
      */
     async getStatusText() {
-        const waStatus = whatsappManager.getStatus();
+        const waStatus = waStatusCache.getStatus();
         const geminiStatus = geminiManager.getStatus();
         const usage = await db.getUsageStats(tenantContext.getTenantId());
 

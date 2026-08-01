@@ -2,14 +2,18 @@ import express from 'express';
 import config from '../utils/config.js';
 import logger from '../utils/logger.js';
 import tenantContext from '../utils/tenantContext.js';
+import waStatusCache from '../bot/waStatusCache.js';
 
 /**
- * Block 5 Phase 1: the internal API the admin-portal process calls for everything that depends
- * on the orchestrator's live in-memory state — WhatsApp/Gemini status, the dashboard chat
- * feature, reinit-on-file-edit, and WhatsApp send/disconnect/reconnect (still needed here since
- * WhatsApp itself doesn't move out until Phase 2). Not exposed publicly: same Docker network
+ * Block 5: the internal API the admin-portal process calls for everything that depends on the
+ * orchestrator's live in-memory state — Gemini status, the dashboard chat feature,
+ * reinit-on-file-edit, schedule reload, HA entities. Not exposed publicly: same Docker network
  * only, plus the shared-secret check below (same pattern as the existing HA webhook secret,
  * deliberately a separate secret so the two auth surfaces don't get conflated).
+ *
+ * As of Phase 2, WhatsApp-control actions (disconnect/reconnect/send-message/send-media) live on
+ * whatsapp-connector's own internal API instead (src/internal/whatsappConnectorServer.js) —
+ * admin-portal calls that directly now that WhatsApp is a separate process from this one.
  *
  * Deliberately not proxying pure-DB operations here (keywords, reminders, knowledge files,
  * tenant approval, etc.) — admin-portal keeps its own DatabaseManager connection to the same
@@ -19,7 +23,6 @@ class InternalApiServer {
     constructor() {
         this.app = null;
         this.server = null;
-        this.whatsappManager = null;
         this.geminiManager = null;
         this.messageRouter = null;
         this.getSkillsStatus = null;
@@ -29,7 +32,6 @@ class InternalApiServer {
 
     /**
      * @param {Object} deps
-     * @param {Object} deps.whatsappManager
      * @param {Object} deps.geminiManager
      * @param {Object} deps.messageRouter
      * @param {Function} deps.getSkillsStatus
@@ -37,7 +39,6 @@ class InternalApiServer {
      * @param {Object} deps.homeAssistantManager
      */
     init(deps) {
-        this.whatsappManager = deps.whatsappManager;
         this.geminiManager = deps.geminiManager;
         this.messageRouter = deps.messageRouter;
         this.getSkillsStatus = deps.getSkillsStatus;
@@ -69,7 +70,7 @@ class InternalApiServer {
         app.get('/internal/status', async (req, res, next) => {
             try {
                 res.json({
-                    whatsapp: this.whatsappManager.getStatus(),
+                    whatsapp: waStatusCache.getStatus(),
                     gemini: this.geminiManager.getStatus(),
                     skills: await this.getSkillsStatus()
                 });
@@ -130,38 +131,6 @@ class InternalApiServer {
                     return ha.getEntities();
                 });
                 res.json(result);
-            } catch (err) { next(err); }
-        });
-
-        app.post('/internal/whatsapp/disconnect', async (req, res, next) => {
-            try {
-                await this.whatsappManager.logout();
-                res.json({ success: true });
-            } catch (err) { next(err); }
-        });
-
-        app.post('/internal/whatsapp/reconnect', async (req, res, next) => {
-            try {
-                await this.whatsappManager.reconnect();
-                res.json({ success: true });
-            } catch (err) { next(err); }
-        });
-
-        app.post('/internal/whatsapp/send-message', async (req, res, next) => {
-            try {
-                const { chatId, text } = req.body;
-                const messageId = await this.whatsappManager.sendMessage(chatId, text);
-                res.json({ success: true, messageId });
-            } catch (err) { next(err); }
-        });
-
-        // mediaPath must point at a location on the volume shared between admin-portal and
-        // this process (both mount data/temp) — see docker-compose.yml.
-        app.post('/internal/whatsapp/send-media', async (req, res, next) => {
-            try {
-                const { chatId, mediaPath, caption } = req.body;
-                await this.whatsappManager.sendMediaMessage(chatId, mediaPath, caption);
-                res.json({ success: true });
             } catch (err) { next(err); }
         });
 

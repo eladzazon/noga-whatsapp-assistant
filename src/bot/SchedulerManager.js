@@ -8,6 +8,9 @@ import { getVersionInfo } from '../utils/version.js';
 import memoryManager from '../skills/MemoryManager.js';
 import fs from 'fs';
 import path from 'path';
+import waStatusCache from './waStatusCache.js';
+import whatsappConnectorClient from './whatsappConnectorClient.js';
+import { publish, CHANNELS } from '../utils/redisClient.js';
 
 const UPDATE_FEED_URL = 'https://api.github.com/repos/eladzazon/noga-whatsapp-assistant/releases/latest';
 
@@ -96,8 +99,7 @@ class SchedulerManager {
                     }
 
                     // Make sure WhatsApp is connected
-                    const { default: whatsappManager } = await import('./WhatsAppManager.js');
-                    const status = whatsappManager.getStatus();
+                    const status = waStatusCache.getStatus();
 
                     if (!status.isReady) {
                         logger.warn(`WhatsApp not ready, skipping scheduled prompt: ${promptData.name}`);
@@ -113,7 +115,7 @@ class SchedulerManager {
 
                     // 2. Send the response to the WhatsApp group
                     if (response && response.trim()) {
-                        await whatsappManager.sendMessage(config.whatsapp.groupId, response);
+                        await publish(CHANNELS.OUTGOING, { tenantId, chatId: config.whatsapp.groupId, type: 'send', text: response });
                         logger.info(`Scheduled prompt sent successfully: ${promptData.name}`);
                     } else {
                         logger.warn(`Scheduled prompt generated empty response: ${promptData.name}`);
@@ -254,8 +256,7 @@ class SchedulerManager {
         try {
             if (!config.whatsapp.groupId) return;
 
-            const { default: whatsappManager } = await import('./WhatsAppManager.js');
-            if (!whatsappManager.isReady) return;
+            if (!waStatusCache.getStatus().isReady) return;
 
             const reminders = await db.getPendingReminders(tenantId);
             const now = new Date();
@@ -269,7 +270,7 @@ class SchedulerManager {
                     await db.updateReminderStatus(tenantId, reminder.id, 'cancelled');
                     logger.info(`Reminder ${reminder.id} cancelled due to reaching nudge limit (10)`);
                     const msg = `אני מפסיקה לנדנד על המשימה "${reminder.title}". סימנתי אותה כמבוטלת.`;
-                    await whatsappManager.sendMessage(config.whatsapp.groupId, msg);
+                    await publish(CHANNELS.OUTGOING, { tenantId, chatId: config.whatsapp.groupId, type: 'send', text: msg });
                     continue;
                 }
 
@@ -316,7 +317,11 @@ class SchedulerManager {
                         const response = await this.geminiManager.generateBroadcastMessage(eventData);
 
                         if (response && response.trim()) {
-                            const sentMessageId = await whatsappManager.sendMessage(config.whatsapp.groupId, response);
+                            // Needs the sent message's ID synchronously to register it for the
+                            // 👍-reaction completion flow — calls whatsapp-connector's internal
+                            // API directly instead of the fire-and-forget wa:outgoing publish
+                            // every other send in this file uses (see whatsappConnectorClient.js).
+                            const sentMessageId = await whatsappConnectorClient.sendMessage(config.whatsapp.groupId, response);
 
                         // Log to history with the internal ID appended so Noga remembers exactly which reminder this was
                         await db.addChatMessage(tenantId, config.whatsapp.groupId, 'model', `${response} [Internal Context: Reminder ID ${reminder.id}]`);
@@ -415,8 +420,7 @@ class SchedulerManager {
 
             if (newLines.length === 0) return;
 
-            const { default: whatsappManager } = await import('./WhatsAppManager.js');
-            if (!whatsappManager.isReady) return;
+            if (!waStatusCache.getStatus().isReady) return;
 
             let instruction = 'Summarize and de-duplicate these system error log lines into a short, clear Hebrew message for the admin. Group similar/repeated errors together instead of listing each one.';
             if (config.behaviorEngine === 'markdown') {
@@ -439,7 +443,7 @@ class SchedulerManager {
 
             const digest = await this.geminiManager.generateBroadcastMessage(eventData);
             if (digest && digest.trim()) {
-                await whatsappManager.sendMessage(config.whatsapp.groupId, digest);
+                await publish(CHANNELS.OUTGOING, { tenantId, chatId: config.whatsapp.groupId, type: 'send', text: digest });
                 logger.info('Self-diagnostics digest sent', { tenantId, newErrorCount: newLines.length });
             }
         } catch (err) {
