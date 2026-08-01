@@ -8,6 +8,7 @@ import config from '../utils/config.js';
 import tenantContext from '../utils/tenantContext.js';
 import logger from '../utils/logger.js';
 import db from '../database/DatabaseManager.js';
+import { publish, CHANNELS } from '../utils/redisClient.js';
 
 class WhatsAppManager {
     constructor() {
@@ -15,11 +16,16 @@ class WhatsAppManager {
         this.isReady = false;
         this.qrCode = null;
         this.qrDataUrl = null;
-        this.onQrCodeCallback = null;
-        this.onMessageCallback = null;
-        this.onReadyCallback = null;
-        this.onDisconnectedCallback = null;
         this.hasBooted = false;
+    }
+
+    /**
+     * Publish the current connection state to wa:status — this is how the orchestrator (a
+     * separate process/container as of Block 5 Phase 2) learns about connection changes, replacing
+     * the in-process onReady/onDisconnected callbacks WhatsAppManager used to expose.
+     */
+    async _publishStatus() {
+        await publish(CHANNELS.STATUS, this.getStatus());
     }
 
     /**
@@ -93,9 +99,8 @@ class WhatsAppManager {
                 try {
                     const qrDataUrl = await qrcode.toDataURL(qr);
                     this.qrDataUrl = qrDataUrl;
-                    if (this.onQrCodeCallback) {
-                        this.onQrCodeCallback(qrDataUrl);
-                    }
+                    await publish(CHANNELS.QR, { qrDataUrl });
+                    await this._publishStatus();
                 } catch (err) {
                     logger.error('Failed to generate QR code image', { error: err.message });
                 }
@@ -103,15 +108,12 @@ class WhatsAppManager {
 
             if (connection === 'close') {
                 this.isReady = false;
+                await this._publishStatus();
                 const statusCode = (lastDisconnect?.error)?.output?.statusCode;
                 const isLoggedOut = statusCode === DisconnectReason.loggedOut;
                 const is405 = statusCode === 405;
 
                 logger.warn('WhatsApp disconnected', { reason: lastDisconnect?.error, statusCode, isLoggedOut, is405 });
-
-                if (this.onDisconnectedCallback) {
-                    this.onDisconnectedCallback(lastDisconnect?.error);
-                }
 
                 if (isLoggedOut) {
                     // Logged out from phone - purge session and restart to get new QR
@@ -134,10 +136,7 @@ class WhatsAppManager {
                 this.isReady = true;
                 this.qrCode = null;
                 this.qrDataUrl = null;
-
-                if (this.onReadyCallback) {
-                    this.onReadyCallback();
-                }
+                await this._publishStatus();
 
                 // Send boot notification to admin if configured - only on full start
                 if (!this.hasBooted && config.whatsapp.adminPhone) {
@@ -396,10 +395,10 @@ class WhatsAppManager {
                 }
             }
 
-            // Call message handler
-            if (this.onMessageCallback) {
-                await this.onMessageCallback(messageData);
-            }
+            // Publish for the orchestrator's wa:incoming subscriber (Block 5 Phase 2) — tenantId
+            // is pulled out to the top level for routing convenience, matching what
+            // MessageRouter._routeMessage() expects; messageData keeps its own copy too.
+            await publish(CHANNELS.INCOMING, { tenantId, messageData });
         } catch (err) {
             logger.error('Error handling message', { error: err.message });
         }
@@ -544,24 +543,6 @@ class WhatsAppManager {
         } catch (err) {
             logger.debug('Failed to react to message', { error: err.message });
         }
-    }
-
-    // ==================== Event Handlers ====================
-
-    onQrCode(callback) {
-        this.onQrCodeCallback = callback;
-    }
-
-    onMessage(callback) {
-        this.onMessageCallback = callback;
-    }
-
-    onReady(callback) {
-        this.onReadyCallback = callback;
-    }
-
-    onDisconnected(callback) {
-        this.onDisconnectedCallback = callback;
     }
 
     // ==================== Status ====================
