@@ -23,6 +23,25 @@ services:
         limits:
           memory: 256M
 
+  redis:
+    image: redis:7-alpine
+    container_name: noga-redis
+    restart: unless-stopped
+    networks:
+      - proxy-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    # Pub/sub transport only (wa:incoming/wa:outgoing/wa:qr/wa:status) — no persistence needed,
+    # messages are inherently ephemeral: if redis restarts, in-flight messages are lost same as
+    # the connection dropping would lose them anyway.
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
   noga:
     build: .
     image: eladzazon/noga-whatsapp-assistant:latest
@@ -31,8 +50,11 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    # Block 5 Phase 1: no longer publishes a dashboard port — admin-portal does that. The
-    # internal API (INTERNAL_API_PORT) stays reachable only over proxy-network, by design.
+      redis:
+        condition: service_healthy
+    # Block 5: no longer publishes a dashboard port (admin-portal does that) or handles WhatsApp
+    # directly (whatsapp-connector does, Phase 2) — the internal API (INTERNAL_API_PORT) stays
+    # reachable only over proxy-network, by design.
     volumes:
       # Persistent data (legacy SQLite file + WhatsApp session — the SQLite file is kept
       # read-only after the Block 2 migration as a rollback fallback, not written to anymore)
@@ -72,6 +94,41 @@ services:
       # Same noga-data volume as the orchestrator: knowledge/skills files, session store, and
       # the shared data/temp path used to hand media across the process boundary (Block 5
       # Phase 1's chosen approach over base64-over-HTTP).
+      - noga-data:/app/data
+      - noga-logs:/app/data/logs
+      - ./.env:/app/.env:ro
+    environment:
+      - NODE_ENV=production
+      - TZ=America/New_York
+      - DB_URL=postgresql://${POSTGRES_USER:-noga}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-noga}
+    networks:
+      - proxy-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  whatsapp-connector:
+    build:
+      context: .
+      dockerfile: Dockerfile.whatsapp-connector
+    image: eladzazon/noga-whatsapp-connector:latest
+    container_name: noga-whatsapp-connector
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    # No published port — the internal API (WHATSAPP_CONNECTOR_INTERNAL_PORT) stays reachable
+    # only over proxy-network, same philosophy as noga's.
+    volumes:
+      # Shares the same noga-data volume as noga/admin-portal (session persistence under
+      # data/.baileys_auth, and the shared data/temp path admin-portal writes outbound media
+      # uploads to before this container reads and sends them) — the design doc's original
+      # "mount only .baileys_auth" framing would need a volume-subpath mount, which isn't
+      # reliably supported across older Docker Compose versions; reusing the same full-volume
+      # pattern noga/admin-portal already use is simpler and lower-risk for a first cut.
       - noga-data:/app/data
       - noga-logs:/app/data/logs
       - ./.env:/app/.env:ro
