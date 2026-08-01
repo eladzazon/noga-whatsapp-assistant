@@ -12,6 +12,8 @@
     "dev": "node --watch src/index.js",
     "start:admin-portal": "node src/admin-portal-index.js",
     "dev:admin-portal": "node --watch src/admin-portal-index.js",
+    "start:whatsapp-connector": "node src/whatsapp-connector-index.js",
+    "dev:whatsapp-connector": "node --watch src/whatsapp-connector-index.js",
     "migrate": "node scripts/run_migrations.js",
     "migrate:data": "node scripts/migrate_sqlite_to_postgres.js"
   },
@@ -27,6 +29,7 @@
     "express": "^5.2.1",
     "express-session": "^1.19.0",
     "googleapis": "^171.4.0",
+    "ioredis": "^5.4.1",
     "multer": "^2.1.1",
     "node-cron": "^4.2.1",
     "node-ical": "^0.26.1",

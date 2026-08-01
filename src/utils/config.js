@@ -50,6 +50,21 @@ const config = {
         secret: process.env.INTERNAL_API_SECRET || 'default-internal-secret-change-me'
     },
 
+    // Block 5 Phase 2: pub/sub transport between whatsapp-connector and the orchestrator
+    // (wa:incoming/wa:outgoing/wa:qr/wa:status).
+    redis: {
+        url: process.env.REDIS_URL || 'redis://localhost:6379'
+    },
+
+    // Block 5 Phase 2: whatsapp-connector's own internal API — mirrors `internal` above, but for
+    // the 4 WhatsApp-control actions (disconnect/reconnect/send-message/send-media) that need a
+    // synchronous request/response, which pub/sub doesn't fit.
+    whatsappConnector: {
+        port: parseInt(process.env.WHATSAPP_CONNECTOR_INTERNAL_PORT, 10) || 3200,
+        internalUrl: process.env.WHATSAPP_CONNECTOR_INTERNAL_URL || `http://localhost:${parseInt(process.env.WHATSAPP_CONNECTOR_INTERNAL_PORT, 10) || 3200}`,
+        secret: process.env.WHATSAPP_CONNECTOR_INTERNAL_SECRET || 'default-internal-secret-change-me'
+    },
+
     // WhatsApp
     whatsapp: {
         whitelist: parseList(process.env.WHATSAPP_WHITELIST),
@@ -176,6 +191,9 @@ export function validateConfig() {
     }
     if (config.internal.secret === 'default-internal-secret-change-me') {
         logger.warn('[Config] Using default internal API secret. Set INTERNAL_API_SECRET in production.');
+    }
+    if (config.whatsappConnector.secret === 'default-internal-secret-change-me') {
+        logger.warn('[Config] Using default whatsapp-connector internal secret. Set WHATSAPP_CONNECTOR_INTERNAL_SECRET in production.');
     }
     if (isNaN(config.dashboard.port) || config.dashboard.port < 1 || config.dashboard.port > 65535) {
         throw new Error(`Invalid DASHBOARD_PORT: ${process.env.DASHBOARD_PORT}. Must be 1-65535.`);
