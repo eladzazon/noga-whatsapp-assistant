@@ -46,9 +46,9 @@ USER noga
 # admin-portal does, from its own image/Dockerfile.admin-portal)
 EXPOSE 3100
 
-# Health check
+# Health check — node:24-slim has neither wget nor curl, so probe with Node's own http client
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:3100/health || exit 1
+    CMD node -e "require('http').get('http://localhost:3100/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"
 
 # Start the application
 CMD ["node", "src/index.js"]
