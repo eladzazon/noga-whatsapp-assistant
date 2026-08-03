@@ -184,9 +184,6 @@ class GeminiManager {
     async processMessage(userId, text, options = {}) {
         logger.info('Processing message with Gemini', { userId, textLength: text.length });
 
-        // Check if this is a volatile request (devices, calendar, etc)
-        const isVolatileRequest = this._isVolatileRequestMessage(text);
-
         // Always use history to maintain context, even for volatile requests.
         let history = [];
         if (options.keepHistory === false) {
@@ -194,6 +191,16 @@ class GeminiManager {
         } else {
             history = await this._buildHistory(userId);
         }
+
+        // Check if this is a volatile request (devices, calendar, etc). A bare follow-up
+        // (e.g. just a room/device name) inherits volatility from the immediately preceding
+        // bot turn too — otherwise a short reply to a device disambiguation list gets tagged
+        // non-volatile and the context hint below re-anchors it to that list alone, burying
+        // the earlier turn-off/turn-on request the user is actually continuing.
+        const lastTurn = history.length > 0 ? history[history.length - 1] : null;
+        const lastTurnWasVolatile = !!lastTurn && lastTurn.role === 'model' &&
+            this._isVolatileRequestMessage(lastTurn.parts[0].text);
+        const isVolatileRequest = this._isVolatileRequestMessage(text) || lastTurnWasVolatile;
 
         // ── Context Awareness: inject a hint for short follow-up messages ──
         let textToSend = text;
